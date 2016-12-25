@@ -1,0 +1,16 @@
+# -*- coding:utf-8-unix; mode:toml; -*-
+[ignore]
+.*/node_modules/.*
+.*/lib/.*
+.*/dist/.*
+.*/examples/.*
+.*/webpack.config.js
+
+[include]
+
+[libs]
+decls/
+
+[options]
+all=true
+unsafe.enable_getters_and_setters=true

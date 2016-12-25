@@ -1,0 +1,40 @@
+{
+  "name": "storage-element",
+  "version": "0.0.1",
+  "description": "custom elements to access local/sessionStorage or chrome.storage easily",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "babel src -d lib",
+    "lint": "eslint .",
+    "fix": "eslint . --fix",
+    "flow": "flow check src",
+    "check": "npm run flow && npm run lint",
+    "debug-dist": "webpack && cp -v dist/storage-elements-debug.js examples",
+    "prod-dist": "NODE_ENV=production webpack && cp -v dist/storage-elements.js examples",
+    "dist": "npm run debug-dist && npm run prod-dist",
+    "serve": "python -m SimpleHTTPServer 8888",
+    "clean": "rm -fr lib dist"
+  },
+  "keywords": [
+    "custom-element"
+  ],
+  "author": "Keiichiro Ui",
+  "license": "MIT",
+  "devDependencies": {
+    "babel-cli": "^6.18.0",
+    "babel-eslint": "^6.1.2",
+    "babel-loader": "^6.2.10",
+    "babel-plugin-transform-flow-strip-types": "^6.18.0",
+    "babel-preset-babili": "0.0.9",
+    "babel-preset-env": "^1.1.1",
+    "babili-webpack-plugin": "0.0.7",
+    "eslint": "^3.12.2",
+    "eslint-config-babel": "^1.0.2",
+    "eslint-plugin-babel": "^4.0.0",
+    "eslint-plugin-flowtype": "^2.29.1",
+    "flow-bin": "^0.37.0",
+    "flow-typed": "^2.0.0",
+    "webpack": "^1.14.0"
+  }
+}

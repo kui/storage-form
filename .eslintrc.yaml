@@ -1,0 +1,21 @@
+root: true
+
+parser: 'babel-eslint'
+
+plugins:
+  - flowtype
+
+extends:
+  - eslint:recommended
+  - babel
+  - plugin:flowtype/recommended
+
+env:
+  browser: true
+  es6: true
+
+parserOptions:
+  ecmaVersion: 7
+
+# List of available rules - ESLint http://eslint.org/docs/rules/
+# rules:

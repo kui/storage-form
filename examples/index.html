@@ -1,0 +1,46 @@
+<!doctype html>
+<meta charset="utf-8">
+
+<title>Examples</title>
+
+<h1>Examples</h1>
+
+<h2>Manually save example</h2>
+
+<form is="storage-form"
+      id="example1"
+      area="local-storage">
+  <label>foo: <input is="storage-input" name="foo"></label><br>
+  <label>checkbox-sample: <input is="storage-input" name="checkbox-sample" type="checkbox"
+                                 value="this-is-on-value!">
+  </label><br>
+  radio-sample:
+  <label><input is="storage-input" type="radio" name="radio-sample" value="value-1">value-1</label>,
+  <label><input is="storage-input" type="radio" name="radio-sample" value="value-2">value-2</label>,
+  <label><input is="storage-input" type="radio" name="radio-sample" value="value-3">value-3</label>
+  <br>
+  <textarea is="storage-textarea" name="sometextarea"></textarea><br>
+  <input type="submit" value="Save">
+</form>
+
+
+<h2>Auto save/load example</h2>
+
+<form is="storage-form"
+      id="example2"
+      area="session-storage"
+      sync
+      sync-delay="500">
+  <label>bar: <input is="storage-input" name="bar"></label><br>
+  <label>select-sample:
+    <select is="storage-select" name="select-sample">
+      <option value="value-1">value-1</option>
+      <option value="value-2">value-2</option>
+      <option value="value-3">value-3</option>
+    </select>
+  </label><br>
+</form>
+
+<p>Auto saving/loading with 500ms delay</p>
+
+<script src="storage-elements-debug.js"></script>
