@@ -10,14 +10,15 @@
     "fix": "eslint . --fix",
     "flow": "flow check src",
     "check": "npm run flow && npm run lint",
-    "debug-dist": "webpack && cp -v dist/storage-elements-debug.js examples",
-    "prod-dist": "NODE_ENV=production webpack && cp -v dist/storage-elements.js examples",
+    "debug-dist": "webpack",
+    "prod-dist": "NODE_ENV=production webpack",
     "dist": "npm run debug-dist && npm run prod-dist",
+    "docs": "npm run check && npm run dist && mkdir -vp docs && cp -v examples/* dist/* docs",
     "serve": "python -m SimpleHTTPServer 8888",
     "clean": "rm -fr lib dist"
   },
   "keywords": [
-    "custom-element"
+    "custom elements", "web stroage", "chrome storage"
   ],
   "author": "Keiichiro Ui",
   "license": "MIT",

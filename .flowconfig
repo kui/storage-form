@@ -4,6 +4,7 @@
 .*/lib/.*
 .*/dist/.*
 .*/examples/.*
+.*/docs/.*
 .*/webpack.config.js
 
 [include]
