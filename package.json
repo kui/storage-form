@@ -37,5 +37,6 @@
     "flow-bin": "^0.37.0",
     "flow-typed": "^2.0.0",
     "webpack": "^1.14.0"
-  }
+  },
+  "repository": "https://github.com/kui/storage-elements.git"
 }
