@@ -16,7 +16,7 @@ declare interface StorageItemElement extends ItemElement {
   getForm(): HTMLStorageFormElement;
 }
 
-export function mixinStorageElement(c: Class<ItemElement>): Class<StorageItemElement> {
+export function mixinStorageItem(c: Class<ItemElement>): Class<StorageItemElement> {
   return class extends c {
     constructor() {
       super();
@@ -51,9 +51,6 @@ export function mixinStorageElement(c: Class<ItemElement>): Class<StorageItemEle
     }
 
     getArea(): ?ah.Area {
-      const a = this.getAttribute("area");
-      if (a) return a;
-
       const fa = this.getForm().getAttribute("area");
       if (fa) return fa;
       return null;
@@ -76,51 +73,52 @@ export function mixinStorageElement(c: Class<ItemElement>): Class<StorageItemEle
   };
 }
 
-export const StorageTextAreaElement = mixinStorageElement(HTMLTextAreaElement);
-export const StorageSelectElement = mixinStorageElement(HTMLSelectElement);
+export function mixinStorageInput(c: Class<HTMLInputElement>) {
+  return class extends mixinStorageItem(c) {
+    // DONOT use "async" keyword.
+    // Because "async" function transpiler does not support "super".
+    load(): Promise<void> {
+      if (!this.name) throw Error("\"name\" attribute are required");
 
-const MixinedInputElement = mixinStorageElement(HTMLInputElement);
-export class StorageInputElement extends MixinedInputElement {
+      if (this.type === "checkbox") {
+        return this.getAreaHandler().read(this.name).then((v) => {
+          this.checked = v != null;
+          // Update stored value to current checkbox value
+          this.store();
+        });
+      }
 
-  // DONOT use "async" keyword.
-  // Because "async" function transpiler does not support "super".
-  load(): Promise<void> {
-    if (!this.name) throw Error("\"name\" attribute are required");
+      if (this.type === "radio") {
+        return this.getAreaHandler().read(this.name).then((v) => {
+          this.checked = this.value === v;
+        });
+      }
 
-    if (this.type === "checkbox") {
-      return this.getAreaHandler().read(this.name).then((v) => {
-        this.checked = v != null;
-        // Update stored value to current checkbox value
-        this.store();
-      });
+      return super.load();
     }
 
-    if (this.type === "radio") {
-      return this.getAreaHandler().read(this.name).then((v) => {
-        this.checked = this.value === v;
-      });
+    store(): Promise<void> {
+      if (!this.name) throw Error("\"name\" attribute are required");
+
+      if (this.type === "checkbox") {
+        if (this.checked) return super.store();
+        return this.deleteStore();
+      }
+
+      if (this.type === "radio") {
+        if (this.checked) return super.store();
+        return Promise.resolve();
+      }
+
+      return super.store();
     }
 
-    return super.load();
-  }
-
-  store(): Promise<void> {
-    if (!this.name) throw Error("\"name\" attribute are required");
-
-    if (this.type === "checkbox") {
-      if (this.checked) return super.store();
-      return this.deleteStore();
+    deleteStore(): Promise<void> {
+      return this.getAreaHandler().removeItem(this.name);
     }
-
-    if (this.type === "radio") {
-      if (this.checked) return super.store();
-      return Promise.resolve();
-    }
-
-    return super.store();
-  }
-
-  deleteStore(): Promise<void> {
-    return this.getAreaHandler().removeItem(this.name);
-  }
+  };
 }
+
+export const StorageTextAreaElement = mixinStorageItem(HTMLTextAreaElement);
+export const StorageSelectElement = mixinStorageItem(HTMLSelectElement);
+export const StorageInputElement = mixinStorageInput(HTMLInputElement);
