@@ -34,7 +34,11 @@ export function mixinStorageElement(c: Class<ItemElement>): Class<StorageItemEle
       if (!this.name) throw Error("\"name\" attribute are required");
 
       const v = await this.getAreaHandler().read(this.name);
-      this.value = v ? v : "";
+      if (v == null) {
+        this.store();
+      } else {
+        this.value = v;
+      }
     }
 
     getAreaHandler(): ah.AreaHandler {
