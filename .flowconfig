@@ -12,6 +12,10 @@
 [libs]
 decls/
 
+# no require when "flow check" but "flow check-contents" require to write explicitly
+# in flow 0.37.4
+flow-typed/
+
 [options]
 all=true
 unsafe.enable_getters_and_setters=true

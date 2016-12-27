@@ -3,14 +3,6 @@ Storage Elements
 
 Custom elements to manipulate `localStorage`/`sessionStorage`/`chrome.storage.{sync,local}` as `<input>` elements. This make you to build easily configuration pages of your Google Chrome extention or web application.
 
-Defined elements
---------------------
-
-* `<form is="storage-form" ...>`: Parent element belowing elements.
-* `<input is="storage-input" ...>`
-* `<textarea is="storage-textarea" ...>`
-* `<select is="storage-select" ...>`
-
 
 Example1
 -----------------
@@ -21,7 +13,7 @@ Manually saving and store to `localStorage`
 <h1>Manually store</h1>
 
 <form is="storage-form" area="local-storage">
-  <input is="storage-input" name="foo"><br>
+  <input name="foo"><br>
   <input type="submit">
 </form>
 ```
@@ -41,11 +33,8 @@ In your Google Chrome extention option page (require `chrome.storage`):
 ```html
 <h1>Auto save</h1>
 
-<form is="storage-form"
-      area="chrome-local"
-      sync
-      sync-delay="500">
-  <input is="storage-input" type="checkbox" name="foo" value="bar">
+<form is="storage-form" area="chrome-local" autosync>
+  <input type="checkbox" name="foo" value="bar">
 </form>
 ```
 
@@ -63,12 +52,9 @@ storing to `sessionStorage` and using other elements.
 ```html
 <h1>Auto save</h1>
 
-<form is="storage-form"
-      area="session-storage"
-      sync
-      sync-delay="500">
-  <textarea is="storage-textarea" name="ta">ba</textarea><br>
-  <select is="storage-select" name="ss">
+<form is="storage-form" area="session-storage" autosync>
+  <textarea name="ta">ba</textarea><br>
+  <select name="ss">
     <option checked>111</option>
     <option>222</option>
   </select>
