@@ -4,27 +4,42 @@ import * as ah from "./area-handler";
 declare interface FormComponentElement extends HTMLElement {
   name?: string;
   value?: string;
+  type?: string;
   checked?: boolean;
-  selected?: boolean;
+
+  // <select> element
   options?: HTMLOptionsCollection;
+  length?: number;
+
+  // <option> element
+  selected?: boolean;
 }
 
 declare class Object {
   static entries<K, V>(o: { [key: K]: V }): Array<[K, V]>
 }
 
-declare type Values = { [key: string]: Array<string> };
-declare type ValueChanges = { [key: string]: Array<[string, string]> };
+type Name = string
+
+// TODO use Map<string, Array<string>>
+declare type Values = { [key: Name]: Array<string> };
+// TODO use Map<string, Array<?{ newValue: ?string, oldValue: ?string }>>
+declare type ValueChanges = { [key: Name]: Array<?[?string, ?string]> };
+
+declare type FormElements = Map<Name, Array<FormComponentElement>>;
 
 export default class HTMLStorageFormElement extends HTMLFormElement {
   values: Values;
+  storageSyncTask: ?number;
+  formElements: FormElements;
 
   constructor() {
     super();
-    this.values = {};
   }
 
   createdCallback() {
+    this.values = {};
+    this.formElements = new Map();
     this.addEventListener("submit", (event) => {
       event.preventDefault();
       this.store();
@@ -32,42 +47,105 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     // if (this.isAutoSyncEnabled())this.periodicalSync();
   }
 
-  writeFormByName(name: string, values: Array<string>) {
-    if (values.length === 0) return;
+  async attachedCallback() {
+    await this.scanFormComponents();
 
-    const element = this[name];
-    // checkbox
-    if (element.checked !== undefined) {
-      element.checked = true;
-      return;
+    if (this.storageSyncTask == null) {
+      this.storageSyncTask = setInterval(() => {
+        // this.scanFormComponents();
+        // this.load();
+        // this.store();
+      }, 500);
     }
+  }
 
-    // other text forms
-    element.value = values[0];
+  detachedCallback() {
+    if (this.storageSyncTask != null)
+      clearTimeout(this.storageSyncTask);
+  }
+
+  async scanFormComponents() {
+    const currentElements = new Set(this.elements);
+    const added = u.subtractSet(currentElements, this.getFormElementSet());
+    this.formElements = Array.from(currentElements).reduce((map: FormElements, e) => {
+      const name = e.name;
+      if (!name) return map;
+
+      let el = map.get(name);
+      if (!el) {
+        el = [];
+        map.set(name, el);
+      }
+      el.unshift(e);
+      return map;
+    }, new Map());
+
+    added.forEach(this.initComponent, this);
+
+    if (added.size === 0) return;
+
+    const addedNames: Array<string> = Array.from(added)
+    // $FlowFixMe null/undfined check by filter
+          .map(e => e.name)
+          .filter(n => n);
+    await this.load();
+    await this.store(addedNames);
+  }
+
+  getFormElementSet(): Set<FormComponentElement> {
+    return Array.from(this.formElements.values())
+      .reduce((set, elements) => {
+        elements.forEach(set.add, set);
+        return set;
+      }, new Set());
+  }
+
+  initComponent(e: FormComponentElement) {
+    console.debug(e);
+    // set some of event listener
   }
 
   async load() {
-    const storageChanges = this.getStorageChanges();
-
-    const formValues = this.readFormAll();
-
-    for (const [name, values] of Object.entries(storeValues)) {
-      this.writeFormByName(name, values);
-    }
+    console.debug("load");
+    const storageValues = await this.readStorageAll();
+    const storageChanges =  this.diffValues(storageValues, this.values);
+    this.values = storageValues;
+    this.writeForm(storageChanges);
   }
 
-  async getStorageChanges(): Promise<ValueChanges> {
-    const storeValues = await this.readStorageAll();
-    return this.diffValues(storeValues, this.values);
+  async store(names?: Array<string> = []) {
+    console.debug("store: %o", names.length === 0 ? "all" : names);
+    const formValues = this.readFormAll();
+    const formChanges = this.diffValues(formValues, this.values);
+    this.values = formValues;
+
+    // Store all
+    if (names.length === 0) {
+      await this.writeStorage(formChanges);
+      return;
+    }
+
+    // Store values specified with "names"
+    const subChanges = names.reduce((result, name) => {
+      result[name] = formChanges[name];
+      return result;
+    }, {});
+    console.log(subChanges);
+    await this.writeStorage(subChanges);
   }
 
   diffValues(newValues: Values, oldValues: Values): ValueChanges {
     const names: Array<string> = u.dedup(Object.keys(newValues).concat(Object.keys(oldValues)));
     return names.reduce((result: ValueChanges, name: string): ValueChanges => {
-      const newValue = newValues[name][0];
-      const oldValue = oldValues[name][0];
-      if (newValue === oldValue) return result;
-      result[name] = [[newValue, oldValue]];
+      if (newValues[name] == null) newValues[name] = [];
+      if (oldValues[name] == null) oldValues[name] = [];
+      result[name] = [];
+      const len = Math.max(newValues[name].length, oldValues[name].length);
+      for (let i = 0; i < len; i++) {
+        const newValue = newValues[name][i];
+        const oldValue = oldValues[name][i];
+        result[name][i] = newValue === oldValue ? null : [newValue, oldValue];
+      }
       return result;
     }, {});
   }
@@ -93,25 +171,71 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     return v == null ? [] : [v];
   }
 
-  async store() {
-    this.values = this.readFormAll();
-    await Promise.all(
-      Object.entries(this.values)
-        .map(([k, v]) => this.writeStorageByName(k, v))
-    );
+  writeForm(changes: ValueChanges) {
+    for (const [name, changeArray] of Object.entries(changes)) {
+      const change = changeArray[0];
+      const [newValue] = change == null ? [] : change;
+      const elementOrList: null | FormComponentElement | RadioCollection = this[name];
+
+      if (elementOrList == null) continue;
+
+      console.debug("write to form: name=%s, value=%s, element=%o", name, newValue, elementOrList);
+
+      if (elementOrList instanceof RadioCollection) {
+        if (newValue == null) continue;
+        elementOrList.value = newValue;
+        continue;
+      }
+
+      if (elementOrList.type === "checkbox") {
+        elementOrList.checked = newValue != null;
+        continue;
+      }
+
+      if (elementOrList.value != null) {
+        if (newValue == null) continue;
+        elementOrList.value = newValue;
+        continue;
+      }
+
+      console.error("Unsupported element: %o", elementOrList);
+    }
+  }
+
+  async writeStorage(changes: ValueChanges) {
+    const handler = this.getAreaHandler();
+    const promises = Object.entries(changes).map(async ([name, chageArray]) => {
+      console.debug(chageArray);
+      const c = chageArray[0];
+      if (c == null) return;
+      const [newValue] = c;
+
+      console.debug("write to storage: name=%s, value=%s", name, newValue);
+
+      if (newValue == null) {
+        await handler.removeItem(name);
+      } else {
+        await handler.write(name, newValue);
+      }
+    });
+    await Promise.all(promises);
   }
 
   readFormAll(): { [key: string ]: Array<string> } {
-    return Array.from(this.elements)
-      .reduce((items: { [key: string ]: Array<string> }, element: FormComponentElement) => {
+    return Array.from(this.formElements)
+      .reduce((items: Values, element: FormComponentElement) => {
         if (!element.name) return items;
         if (element.value === undefined) return items;
 
         const n = element.name;
         if (items[n] == null) items[n] = [];
 
-        // Do nothing when the element has "checked" or "selected" but it's value is "false"
-        if (element.checked === false || element.selected === false) return items;
+        if (element.type
+            && element.type === "checkbox"
+            && element.type === "radio") {
+          if (element.checked) items[n].unshift(element.value);
+          return items;
+        }
 
         // expand <select> elements to <option> elements.
         if (element.options !== undefined) {
@@ -128,18 +252,12 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   }
 
   getNames(): Array<string> {
-    return Array.from(this.elements)
+    return Array.from(this.formElements)
       .reduce((names, e: FormComponentElement) => {
         if (!e.name) return names;
-        return names.concat(e.name);
+        names.unshift(e.name);
+        return names;
       }, []);
-  }
-
-  async writeStorageByName(name: string, values: Array<string>) {
-    const h = this.getAreaHandler();
-    const p = h.write(name, values.join(","));
-    const ps = values.map((v, i) => h.write(`${name}[${i}]`, v));
-    await Promise.all(ps.concat(p));
   }
 
   getAreaHandler(): ah.AreaHandler {
@@ -147,7 +265,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     if (!a) throw Error("\"area\" attribute is required");
 
     const h = ah.findHandler(a);
-    if (!h) throw Error(`Unsupported area: ${a}`);
+    if (!h) throw Error(`Unsupported area: "${a}"`);
     return h;
   }
 
@@ -188,10 +306,6 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       await this.sync();
     }
   }
-
-  attachedCallback() {}
-
-  detachedCallback() {}
 
   static get observedAttributes() {
     return [

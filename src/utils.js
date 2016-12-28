@@ -10,3 +10,21 @@ export function dedup<T>(array: Array<T>, predicate?: (t: T, o: T) => boolean = 
     return result.concat(element);
   },[]);
 }
+
+export function subtractSet<T>(targetSet: Set<T>, removedSet: Set<T>): Set<T> {
+  return new Set(Array.from(targetSet).filter((e) => !removedSet.has(e)));
+}
+
+export class MMap<K, V> extends Map<K, Array<V>> {
+  add(key: K, value: V): this {
+    let a = this.get(key);
+    if (!a) {
+      a = [];
+      this.set(key, a);
+    }
+    a.unshift(value);
+    return this;
+  }
+
+  
+}

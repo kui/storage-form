@@ -10,10 +10,10 @@ declare interface ItemElement extends HTMLElement {
 }
 
 declare interface StorageItemElement extends ItemElement {
-  load(): Promise<void>;
-  store(): Promise<void>;
-  getAreaHandler(): ah.AreaHandler;
-  getForm(): HTMLStorageFormElement;
+  // load(): Promise<void>;
+  // store(): Promise<void>;
+  // getAreaHandler(): ah.AreaHandler;
+  // getForm(): HTMLStorageFormElement;
 }
 
 export function mixinStorageItem(c: Class<ItemElement>): Class<StorageItemElement> {
@@ -22,100 +22,100 @@ export function mixinStorageItem(c: Class<ItemElement>): Class<StorageItemElemen
       super();
     }
 
-    createdCallback() {
-      if (this.name) this.load();
-    }
+    // createdCallback() {
+    //   if (this.name) this.load();
+    // }
 
-    attachedCallback() {
-      this.load();
-    }
+    // attachedCallback() {
+    //   this.load();
+    // }
 
-    async load(): Promise<void> {
-      if (!this.name) throw Error("\"name\" attribute are required");
+    // async load(): Promise<void> {
+    //   if (!this.name) throw Error("\"name\" attribute are required");
 
-      const v = await this.getAreaHandler().read(this.name);
-      if (v == null) {
-        this.store();
-      } else {
-        this.value = v;
-      }
-    }
+    //   const v = await this.getAreaHandler().read(this.name);
+    //   if (v == null) {
+    //     this.store();
+    //   } else {
+    //     this.value = v;
+    //   }
+    // }
 
-    getAreaHandler(): ah.AreaHandler {
-      const a: ?ah.Area = this.getArea();
-      if (!a) throw Error("\"area\" attribute is required");
+    // getAreaHandler(): ah.AreaHandler {
+    //   const a: ?ah.Area = this.getArea();
+    //   if (!a) throw Error("\"area\" attribute is required");
 
-      const h = ah.findHandler(a);
-      if (!h) throw Error(`Unsupported area: ${a}`);
-      return h;
-    }
+    //   const h = ah.findHandler(a);
+    //   if (!h) throw Error(`Unsupported area: ${a}`);
+    //   return h;
+    // }
 
-    getArea(): ?ah.Area {
-      const fa = this.getForm().getAttribute("area");
-      if (fa) return fa;
-      return null;
-    }
+    // getArea(): ?ah.Area {
+    //   const fa = this.getForm().getAttribute("area");
+    //   if (fa) return fa;
+    //   return null;
+    // }
 
-    getForm(): HTMLStorageFormElement {
-      const f = this.form;
-      if (f instanceof HTMLStorageFormElement) return f;
-      throw Error(`'${String(this.getAttribute("is"))}' requires ` +
-                  "'<form is=\"storage-form\" ...>' as a parent Node");
-    }
+    // getForm(): HTMLStorageFormElement {
+    //   const f = this.form;
+    //   if (f instanceof HTMLStorageFormElement) return f;
+    //   throw Error(`'${String(this.getAttribute("is"))}' requires ` +
+    //               "'<form is=\"storage-form\" ...>' as a parent Node");
+    // }
 
-    async store(): Promise<void> {
-      if (!this.name) throw Error("\"name\" attribute are required");
+    // async store(): Promise<void> {
+    //   if (!this.name) throw Error("\"name\" attribute are required");
 
-      await this.getAreaHandler().write(this.name, this.value);
-    }
+    //   await this.getAreaHandler().write(this.name, this.value);
+    // }
 
-    detachedCallback() {}
+    // detachedCallback() {}
   };
 }
 
 export function mixinStorageInput(c: Class<HTMLInputElement>) {
   return class extends mixinStorageItem(c) {
-    // DONOT use "async" keyword.
-    // Because "async" function transpiler does not support "super".
-    load(): Promise<void> {
-      if (!this.name) throw Error("\"name\" attribute are required");
+    // // DONOT use "async" keyword.
+    // // Because "async" function transpiler does not support "super".
+    // load(): Promise<void> {
+    //   if (!this.name) throw Error("\"name\" attribute are required");
 
-      if (this.type === "checkbox") {
-        return this.getAreaHandler().read(this.name).then((v) => {
-          this.checked = v != null;
-          // Update stored value to current checkbox value
-          this.store();
-        });
-      }
+    //   if (this.type === "checkbox") {
+    //     return this.getAreaHandler().read(this.name).then((v) => {
+    //       this.checked = v != null;
+    //       // Update stored value to current checkbox value
+    //       this.store();
+    //     });
+    //   }
 
-      if (this.type === "radio") {
-        return this.getAreaHandler().read(this.name).then((v) => {
-          this.checked = this.value === v;
-        });
-      }
+    //   if (this.type === "radio") {
+    //     return this.getAreaHandler().read(this.name).then((v) => {
+    //       this.checked = this.value === v;
+    //     });
+    //   }
 
-      return super.load();
-    }
+    //   return super.load();
+    // }
 
-    store(): Promise<void> {
-      if (!this.name) throw Error("\"name\" attribute are required");
+    // store(): Promise<void> {
+    //   if (!this.name) throw Error("\"name\" attribute are required");
 
-      if (this.type === "checkbox") {
-        if (this.checked) return super.store();
-        return this.deleteStore();
-      }
+    //   if (this.type === "checkbox") {
+    //     if (this.checked) return super.store();
+    //     return this.deleteStore();
+    //   }
 
-      if (this.type === "radio") {
-        if (this.checked) return super.store();
-        return Promise.resolve();
-      }
+    //   if (this.type === "radio") {
+    //     if (this.checked) return super.store();
+    //     return Promise.resolve();
+    //   }
 
-      return super.store();
-    }
+    //   return super.store();
+    // }
 
-    deleteStore(): Promise<void> {
-      return this.getAreaHandler().removeItem(this.name);
-    }
+    // deleteStore(): Promise<void> {
+    //   return this.getAreaHandler().removeItem(this.name);
+    // }
   };
 }
 
