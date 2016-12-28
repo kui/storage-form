@@ -19,6 +19,10 @@ declare class Object {
   static entries<K, V>(o: { [key: K]: V }): Array<[K, V]>
 }
 
+// See https://www.w3.org/TR/html5/infrastructure.html#htmloptionscollection
+declare interface HTMLOptionsCollection extends HTMLCollection<HTMLOptionElement> {
+}
+
 type Name = string
 
 // TODO use Map<string, Array<string>>
@@ -26,7 +30,7 @@ declare type Values = { [key: Name]: Array<string> };
 // TODO use Map<string, Array<?{ newValue: ?string, oldValue: ?string }>>
 declare type ValueChanges = { [key: Name]: Array<?[?string, ?string]> };
 
-declare type FormElements = Map<Name, Array<FormComponentElement>>;
+declare type FormElements = u.MMap<Name, FormComponentElement>;
 
 export default class HTMLStorageFormElement extends HTMLFormElement {
   values: Values;
@@ -39,7 +43,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
 
   createdCallback() {
     this.values = {};
-    this.formElements = new Map();
+    this.formElements = new u.MMap();
     this.addEventListener("submit", (event) => {
       event.preventDefault();
       this.store();
@@ -78,7 +82,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       }
       el.unshift(e);
       return map;
-    }, new Map());
+    }, new u.MMap());
 
     added.forEach(this.initComponent, this);
 
@@ -101,7 +105,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   }
 
   initComponent(e: FormComponentElement) {
-    console.debug(e);
+    console.debug("initComponent: %o", e);
     // set some of event listener
   }
 
@@ -116,7 +120,11 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   async store(names?: Array<string> = []) {
     console.debug("store: %o", names.length === 0 ? "all" : names);
     const formValues = this.readFormAll();
+    console.debug("form values: %o", formValues);
+
     const formChanges = this.diffValues(formValues, this.values);
+    console.debug("form changes: %o", formChanges);
+
     this.values = formValues;
 
     // Store all
@@ -130,7 +138,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       result[name] = formChanges[name];
       return result;
     }, {});
-    console.log(subChanges);
+
     await this.writeStorage(subChanges);
   }
 
@@ -175,37 +183,32 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     for (const [name, changeArray] of Object.entries(changes)) {
       const change = changeArray[0];
       const [newValue] = change == null ? [] : change;
-      const elementOrList: null | FormComponentElement | RadioCollection = this[name];
+      const elements = this.formElements.get(name);
 
-      if (elementOrList == null) continue;
+      if (elements == null) continue;
 
-      console.debug("write to form: name=%s, value=%s, element=%o", name, newValue, elementOrList);
+      console.debug("write to form: name=%s, value=%s, elements=%o", name, newValue, elements);
 
-      if (elementOrList instanceof RadioCollection) {
-        if (newValue == null) continue;
-        elementOrList.value = newValue;
-        continue;
-      }
+      elements.forEach((e) => {
+        if (e.type === "checkbox" || e.type === "radio") {
+          e.checked = newValue === e.value;
+          return;
+        }
 
-      if (elementOrList.type === "checkbox") {
-        elementOrList.checked = newValue != null;
-        continue;
-      }
+        if (e.value != null) {
+          if (newValue == null) return;
+          e.value = newValue;
+          return;
+        }
 
-      if (elementOrList.value != null) {
-        if (newValue == null) continue;
-        elementOrList.value = newValue;
-        continue;
-      }
-
-      console.error("Unsupported element: %o", elementOrList);
+        console.error("Unsupported element: %o", e);
+      });
     }
   }
 
   async writeStorage(changes: ValueChanges) {
     const handler = this.getAreaHandler();
     const promises = Object.entries(changes).map(async ([name, chageArray]) => {
-      console.debug(chageArray);
       const c = chageArray[0];
       if (c == null) return;
       const [newValue] = c;
@@ -221,28 +224,27 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     await Promise.all(promises);
   }
 
-  readFormAll(): { [key: string ]: Array<string> } {
-    return Array.from(this.formElements)
+  readFormAll(): Values {
+    return Array.from(this.formElements.flattenValues())
       .reduce((items: Values, element: FormComponentElement) => {
         if (!element.name) return items;
-        if (element.value === undefined) return items;
+        if (element.value == null) return items;
 
         const n = element.name;
         if (items[n] == null) items[n] = [];
 
-        if (element.type
-            && element.type === "checkbox"
-            && element.type === "radio") {
+        if (element.type === "checkbox" || element.type === "radio") {
           if (element.checked) items[n].unshift(element.value);
           return items;
         }
 
         // expand <select> elements to <option> elements.
-        if (element.options !== undefined) {
-          // $FlowFixMe `Array.from` does not accept HTMLOptionsCollection as an argument.
-          const opts: Array<HTMLOptionElement> = Array.from(element.options);
-          const vals = opts.map((e) => e.value);
-          items[n] = items[n].concat(...vals);
+        if (element.options != null) {
+          const vals = items[n];
+          for (const opt of element.options) {
+            if (!opt.selected) continue;
+            vals.unshift(opt.value);
+          }
           return items;
         }
 
@@ -252,7 +254,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   }
 
   getNames(): Array<string> {
-    return Array.from(this.formElements)
+    return Array.from(this.formElements.flattenValues())
       .reduce((names, e: FormComponentElement) => {
         if (!e.name) return names;
         names.unshift(e.name);

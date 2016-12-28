@@ -26,5 +26,11 @@ export class MMap<K, V> extends Map<K, Array<V>> {
     return this;
   }
 
-  
+  * flattenValues(): Iterator<V> {
+    for (const arr of this.values()) {
+      for (const v of arr) {
+        yield v;
+      }
+    }
+  }
 }
