@@ -1,7 +1,31 @@
-export function sleep(msec: number): Promise<void> {
-  return new Promise((resolve) => {
-    setInterval(() => resolve(), msec);
-  });
+export class CancellablePromise<R> extends Promise<R> {
+  cancellFunction: () => void;
+  constructor(
+    callback: (
+      resolve: (result: Promise<R> | R) => void,
+      reject: (error: any) => void
+    ) => mixed,
+    cancell: () => void
+  ) {
+    super(callback);
+    this.cancellFunction = cancell;
+  }
+
+  cancell() {
+    this.cancellFunction();
+  }
+}
+
+export function sleep(msec: number): CancellablePromise<void> {
+  let timeoutId: ?number;
+  return new CancellablePromise(
+    (resolve) => {
+      timeoutId = setTimeout(() => resolve(), msec);
+    },
+    () => {
+      clearTimeout(timeoutId);
+    }
+  );
 }
 
 export function dedup<T>(array: Array<T>, predicate?: (t: T, o: T) => boolean = (t, o) => t === o): Array<T> {
@@ -15,7 +39,7 @@ export function subtractSet<T>(targetSet: Set<T>, removedSet: Set<T>): Set<T> {
   return new Set(Array.from(targetSet).filter((e) => !removedSet.has(e)));
 }
 
-export class MMap<K, V> extends Map<K, Array<V>> {
+export class MultiValueMap<K, V> extends Map<K, Array<V>> {
   add(key: K, value: V): this {
     let a = this.get(key);
     if (!a) {

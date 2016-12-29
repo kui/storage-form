@@ -1,8 +1,12 @@
 import * as u from "./utils";
 import * as ah from "./area-handler";
 
-declare interface FormComponentElement extends HTMLElement {
+declare interface NamableHTMLElement extends HTMLElement {
   name?: string;
+}
+declare interface FormComponentElement extends HTMLElement {
+  name: string;
+
   value?: string;
   type?: string;
   checked?: boolean;
@@ -30,12 +34,14 @@ declare type Values = { [key: Name]: Array<string> };
 // TODO use Map<string, Array<?{ newValue: ?string, oldValue: ?string }>>
 declare type ValueChanges = { [key: Name]: Array<?[?string, ?string]> };
 
-declare type FormElements = u.MMap<Name, FormComponentElement>;
+declare type FormElements = u.MultiValueMap<Name, FormComponentElement>;
 
 export default class HTMLStorageFormElement extends HTMLFormElement {
   values: Values;
   syncTask: ?number;
   formElements: FormElements;
+  scanIntervalMillis: number;
+  scanTask: ?u.CancellablePromise<void>;
 
   constructor() {
     super();
@@ -43,47 +49,57 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
 
   createdCallback() {
     this.values = {};
-    this.formElements = new u.MMap();
+    this.formElements = new u.MultiValueMap();
+    this.scanIntervalMillis = 700;
+
     this.addEventListener("submit", (event) => {
       event.preventDefault();
       this.store();
     });
-    // if (this.isAutoSyncEnabled())this.periodicalSync();
+    this.startPeriodicalScan();
   }
 
   async attachedCallback() {
     await this.scanFormComponents();
+    this.startPeriodicalScan();
   }
 
   detachedCallback() {
     if (this.storageSyncTask != null)
       clearTimeout(this.storageSyncTask);
+    this.stopPeriodicalScan();
+  }
+
+  async startPeriodicalScan() {
+    if (this.scanTask != null) return;
+    while (true) { // this loop will break by stopPeriodicalScan()
+      this.scanTask = u.sleep(this.scanIntervalMillis);
+      await this.scanTask;
+      await this.scanFormComponents();
+    }
+  }
+
+  stopPeriodicalScan() {
+    if (this.scanTask == null) return;
+    this.scanTask.cancell();
+    this.scanTask = null;
   }
 
   async scanFormComponents() {
-    const currentElements = new Set(this.elements);
+    const currentElements: Set<FormComponentElement> =
+          new Set(Array.from(this.elements).filter((e: NamableHTMLElement) => e.name));
     const added = u.subtractSet(currentElements, this.getFormElementSet());
     this.formElements = Array.from(currentElements).reduce((map: FormElements, e) => {
-      const name = e.name;
-      if (!name) return map;
-
-      let el = map.get(name);
-      if (!el) {
-        el = [];
-        map.set(name, el);
-      }
-      el.unshift(e);
+      const name: string = e.name;
+      map.add(name, e);
       return map;
-    }, new u.MMap());
-
-    added.forEach(this.initComponent, this);
+    }, new u.MultiValueMap());
 
     if (added.size === 0) return;
 
-    const addedNames: Array<string> = Array.from(added)
-    // $FlowFixMe null/undfined check by filter
-          .map(e => e.name)
-          .filter(n => n);
+    added.forEach(this.initComponent, this);
+
+    const addedNames: Array<string> = Array.from(added).map(e => e.name);
     await this.load(addedNames);
     await this.store(addedNames);
   }
@@ -102,8 +118,9 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   }
 
   /// partial load if `names` was provided
-  async load(names?: Array<string> = []) {
-    console.debug("load: %o", names.length === 0 ? "all" : names);
+  async load(names?: Array<string>) {
+    console.debug("load: %o", names == null ? "all" : names);
+
     const storageValues = await this.readStorageAll();
     console.debug("read stored values: %o", storageValues);
 
@@ -111,7 +128,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     console.debug("stored value changes: %o", storageChanges);
 
     // Write/Update all
-    if (names.length === 0) {
+    if (names == null) {
       this.values = storageValues;
       this.writeForm(storageChanges);
       return;
@@ -128,8 +145,9 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   }
 
   /// partial store if `names` was provided
-  async store(names?: Array<string> = []) {
-    console.debug("store: %o", names.length === 0 ? "all" : names);
+  async store(names?: Array<string>) {
+    console.debug("store: %o", names == null ? "all" : names);
+
     const formValues = this.readFormAll();
     console.debug("read form values: %o", formValues);
 
@@ -137,7 +155,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     console.debug("form changes: %o", formChanges);
 
     // Store/Update all
-    if (names.length === 0) {
+    if (names == null) {
       this.values = formValues;
       await this.writeStorage(formChanges);
       return;
@@ -237,8 +255,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
 
   readFormAll(): Values {
     return Array.from(this.formElements.flattenValues())
-      .reduce((items: Values, element: FormComponentElement) => {
-        if (!element.name) return items;
+      .reduce((items: Values, element) => {
         if (element.value == null) return items;
 
         const n = element.name;
@@ -249,7 +266,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
           return items;
         }
 
-        // expand <select> elements to <option> elements.
+        // expand a <select> element to <option> elements.
         if (element.options != null) {
           const vals = items[n];
           for (const opt of element.options) {
@@ -266,8 +283,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
 
   getNames(): Array<string> {
     return Array.from(this.formElements.flattenValues())
-      .reduce((names, e: FormComponentElement) => {
-        if (!e.name) return names;
+      .reduce((names, e) => {
         names.unshift(e.name);
         return names;
       }, []);
