@@ -1,4 +1,3 @@
-import * as ah from "./area-handler";
 import HTMLStorageFormElement from "./storage-form";
 
 declare interface ItemElement extends HTMLElement {
@@ -9,116 +8,23 @@ declare interface ItemElement extends HTMLElement {
   checked?: boolean;
 }
 
-declare interface StorageItemElement extends ItemElement {
-  // load(): Promise<void>;
-  // store(): Promise<void>;
-  // getAreaHandler(): ah.AreaHandler;
-  // getForm(): HTMLStorageFormElement;
-}
-
-export function mixinStorageItem(c: Class<ItemElement>): Class<StorageItemElement> {
+export function mixinStorageItem(c: Class<ItemElement>): Class<ItemElement> {
   return class extends c {
     constructor() {
       super();
     }
 
-    // createdCallback() {
-    //   if (this.name) this.load();
-    // }
-
-    // attachedCallback() {
-    //   this.load();
-    // }
-
-    // async load(): Promise<void> {
-    //   if (!this.name) throw Error("\"name\" attribute are required");
-
-    //   const v = await this.getAreaHandler().read(this.name);
-    //   if (v == null) {
-    //     this.store();
-    //   } else {
-    //     this.value = v;
-    //   }
-    // }
-
-    // getAreaHandler(): ah.AreaHandler {
-    //   const a: ?ah.Area = this.getArea();
-    //   if (!a) throw Error("\"area\" attribute is required");
-
-    //   const h = ah.findHandler(a);
-    //   if (!h) throw Error(`Unsupported area: ${a}`);
-    //   return h;
-    // }
-
-    // getArea(): ?ah.Area {
-    //   const fa = this.getForm().getAttribute("area");
-    //   if (fa) return fa;
-    //   return null;
-    // }
-
-    // getForm(): HTMLStorageFormElement {
-    //   const f = this.form;
-    //   if (f instanceof HTMLStorageFormElement) return f;
-    //   throw Error(`'${String(this.getAttribute("is"))}' requires ` +
-    //               "'<form is=\"storage-form\" ...>' as a parent Node");
-    // }
-
-    // async store(): Promise<void> {
-    //   if (!this.name) throw Error("\"name\" attribute are required");
-
-    //   await this.getAreaHandler().write(this.name, this.value);
-    // }
-
-    // detachedCallback() {}
-  };
-}
-
-export function mixinStorageInput(c: Class<HTMLInputElement>) {
-  return class extends mixinStorageItem(c) {
-    // // DONOT use "async" keyword.
-    // // Because "async" function transpiler does not support "super".
-    // load(): Promise<void> {
-    //   if (!this.name) throw Error("\"name\" attribute are required");
-
-    //   if (this.type === "checkbox") {
-    //     return this.getAreaHandler().read(this.name).then((v) => {
-    //       this.checked = v != null;
-    //       // Update stored value to current checkbox value
-    //       this.store();
-    //     });
-    //   }
-
-    //   if (this.type === "radio") {
-    //     return this.getAreaHandler().read(this.name).then((v) => {
-    //       this.checked = this.value === v;
-    //     });
-    //   }
-
-    //   return super.load();
-    // }
-
-    // store(): Promise<void> {
-    //   if (!this.name) throw Error("\"name\" attribute are required");
-
-    //   if (this.type === "checkbox") {
-    //     if (this.checked) return super.store();
-    //     return this.deleteStore();
-    //   }
-
-    //   if (this.type === "radio") {
-    //     if (this.checked) return super.store();
-    //     return Promise.resolve();
-    //   }
-
-    //   return super.store();
-    // }
-
-    // deleteStore(): Promise<void> {
-    //   return this.getAreaHandler().removeItem(this.name);
-    // }
+    attachedCallback() {
+      if (this.form instanceof HTMLStorageFormElement) {
+        this.form.scanFormComponents();
+      } else {
+        console.error("<%s is=%o> must be attached into <form is=\"storage-form\">",
+                      this.tagName.toLowerCase(), this.getAttribute("is"));
+      }
+    }
   };
 }
 
 export const StorageTextAreaElement = mixinStorageItem(HTMLTextAreaElement);
 export const StorageSelectElement = mixinStorageItem(HTMLSelectElement);
-export const StorageInputElement = mixinStorageInput(HTMLInputElement);
+export const StorageInputElement = mixinStorageItem(HTMLInputElement);

@@ -24,8 +24,7 @@ declare class Object {
 }
 
 // See https://www.w3.org/TR/html5/infrastructure.html#htmloptionscollection
-declare class HTMLOptionsCollection extends HTMLCollection<HTMLOptionElement> {
-}
+declare class HTMLOptionsCollection extends HTMLCollection<HTMLOptionElement> {}
 
 type Name = string
 
@@ -43,9 +42,10 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   formElements: FormElements;
 
   syncTask: ?u.CancellablePromise<void>;
-
   scanTask: ?u.CancellablePromise<void>;
   scanIntervalMillis: number;
+
+  itemObserver: MutationObserver;
 
   get autosync(): number {
     const n = parseInt(getAttr(this, "autosync"));
@@ -69,7 +69,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       this.store();
     });
 
-    this.startPeriodicalScan();
+    // this.startPeriodicalScan();
 
     if (this.isAutoSyncEnabled())
       this.startPeriodicalSync();
@@ -78,7 +78,9 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   async attachedCallback() {
     await this.scanFormComponents();
 
-    this.startPeriodicalScan();
+    // this.startPeriodicalScan();
+
+    observeGlobal(this.ownerDocument.body);
 
     if (this.isAutoSyncEnabled())
       this.startPeriodicalSync();
@@ -122,6 +124,9 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     const lastElements = this.getFormElementSet();
     const currentElements = this.getCurrentElements();
 
+    if (isEqualSet(lastElements, currentElements))
+      return;
+
     this.formElements = Array.from(currentElements).reduce((map: FormElements, e) => {
       map.add(e.name, e);
       return map;
@@ -159,7 +164,6 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
 
   initComponent(e: FormComponentElement) {
     console.debug("initComponent: %o", e);
-    // set some of event listener
   }
 
   /// partial load if `names` was provided
@@ -357,6 +361,74 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   }
 }
 
+export class StorageFormObserver {
+  observer: MutationObserver;
+  constructor() {
+    this.observer = new MutationObserver((records) => {
+      for (const r of records) {
+        this.handleRecord(r);
+      }
+    });
+  }
+
+  observe(form: HTMLStorageFormElement) {
+    this.observer.observe(form, { subtree: true });
+  }
+
+  disconnect() {
+    this.observer.disconnect();
+  }
+
+  handleRecord(record: MutationRecord) {
+    if (record.type !== "childList") return;
+    const target = record.target;
+    if (!(target instanceof HTMLStorageFormElement)) return;
+  }
+}
+
+const observedBodies = new Set();
+const bodyObserver = new MutationObserver((records) => {
+  console.log(records);
+  const nodes: Iterator<Node> =
+        concat(...records.map(r => concat(r.addedNodes, r.removedNodes)));
+  const docs = new Set();
+  for (const n: any of nodes) {
+    if (n.value != null) {
+      // scan
+    }
+  }
+});
+
+function observeGlobal(body) {
+  if (observedBodies.has(body)) return;
+  observedBodies.add(body);
+  bodyObserver.observe(body, { childList: true, subtree: true });
+}
+
+function* concat<T>(...iterables: Array<Iterable<T>>): Iterator<T> {
+  for (const i of iterables) {
+    for (const t of i) {
+      yield t;
+    }
+  }
+}
+function some<T>(iter: Iterable<T>, predicate: (t: T) => boolean): boolean {
+  for (const t of iter) {
+    if (predicate(t)) return true;
+  }
+  return false;
+}
+
+function isEqualSet<T>(a: Set<T>, b: Set<T>): boolean {
+  if (a.size !== b.size) return false;
+  for (const t of a) {
+    if (!b.has(t)) return false;
+  }
+  for (const t of b) {
+    if (!a.has(t)) return false;
+  }
+  return true;
+}
 function names(iter: Iterable<FormComponentElement>): Set<string> {
   return new Set(map(iter, (v) => v.name));
 }
