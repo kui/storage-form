@@ -20,7 +20,7 @@ declare class Object {
 }
 
 // See https://www.w3.org/TR/html5/infrastructure.html#htmloptionscollection
-declare interface HTMLOptionsCollection extends HTMLCollection<HTMLOptionElement> {
+declare class HTMLOptionsCollection extends HTMLCollection<HTMLOptionElement> {
 }
 
 type Name = string
@@ -34,7 +34,7 @@ declare type FormElements = u.MMap<Name, FormComponentElement>;
 
 export default class HTMLStorageFormElement extends HTMLFormElement {
   values: Values;
-  storageSyncTask: ?number;
+  syncTask: ?number;
   formElements: FormElements;
 
   constructor() {
@@ -53,14 +53,6 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
 
   async attachedCallback() {
     await this.scanFormComponents();
-
-    if (this.storageSyncTask == null) {
-      this.storageSyncTask = setInterval(() => {
-        // this.scanFormComponents();
-        // this.load();
-        // this.store();
-      }, 500);
-    }
   }
 
   detachedCallback() {
@@ -92,7 +84,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     // $FlowFixMe null/undfined check by filter
           .map(e => e.name)
           .filter(n => n);
-    await this.load();
+    await this.load(addedNames);
     await this.store(addedNames);
   }
 
@@ -109,36 +101,55 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     // set some of event listener
   }
 
-  async load() {
-    console.debug("load");
+  /// partial load if `names` was provided
+  async load(names?: Array<string> = []) {
+    console.debug("load: %o", names.length === 0 ? "all" : names);
     const storageValues = await this.readStorageAll();
+    console.debug("read stored values: %o", storageValues);
+
     const storageChanges =  this.diffValues(storageValues, this.values);
-    this.values = storageValues;
-    this.writeForm(storageChanges);
+    console.debug("stored value changes: %o", storageChanges);
+
+    // Write/Update all
+    if (names.length === 0) {
+      this.values = storageValues;
+      this.writeForm(storageChanges);
+      return;
+    }
+
+    // partial load
+    // Write/Update values specified by "names"
+    const subChanges = {};
+    for (const n of names) {
+      this.values[n] = storageValues[n];
+      subChanges[n] = storageChanges[n];
+    }
+    this.writeForm(subChanges);
   }
 
+  /// partial store if `names` was provided
   async store(names?: Array<string> = []) {
     console.debug("store: %o", names.length === 0 ? "all" : names);
     const formValues = this.readFormAll();
-    console.debug("form values: %o", formValues);
+    console.debug("read form values: %o", formValues);
 
     const formChanges = this.diffValues(formValues, this.values);
     console.debug("form changes: %o", formChanges);
 
-    this.values = formValues;
-
-    // Store all
+    // Store/Update all
     if (names.length === 0) {
+      this.values = formValues;
       await this.writeStorage(formChanges);
       return;
     }
 
-    // Store values specified with "names"
-    const subChanges = names.reduce((result, name) => {
-      result[name] = formChanges[name];
-      return result;
-    }, {});
-
+    // partial store
+    // Store/Update values specified by "names"
+    const subChanges = {};
+    for (const n of names) {
+      this.values[n] = formValues[n];
+      subChanges[n] = formChanges[n];
+    }
     await this.writeStorage(subChanges);
   }
 
@@ -320,7 +331,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   attributeChangedCallback(attrName: string) {
     if (attrName === "sync" ||
         attrName === "sync-delay") {
-      this.periodicalSync();
+      this.startSync();
     }
   }
 }
