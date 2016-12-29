@@ -36,12 +36,24 @@ declare type ValueChanges = { [key: Name]: Array<?[?string, ?string]> };
 
 declare type FormElements = u.MultiValueMap<Name, FormComponentElement>;
 
+const DEFAULT_SYNC_INTERVAL = 500;
+
 export default class HTMLStorageFormElement extends HTMLFormElement {
   values: Values;
-  syncTask: ?number;
   formElements: FormElements;
-  scanIntervalMillis: number;
+
+  syncTask: ?u.CancellablePromise<void>;
+
   scanTask: ?u.CancellablePromise<void>;
+  scanIntervalMillis: number;
+
+  get autosync(): number {
+    const n = parseInt(getAttr(this, "autosync"));
+    return n > 0 ? n : DEFAULT_SYNC_INTERVAL;
+  }
+  set autosync(v: any) { setAttr(this, "autosync", v); }
+  get area(): string { return getAttr(this, "area"); }
+  set area(v: any) { setAttr(this, "area", v); }
 
   constructor() {
     super();
@@ -56,12 +68,20 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       event.preventDefault();
       this.store();
     });
+
     this.startPeriodicalScan();
+
+    if (this.isAutoSyncEnabled())
+      this.startPeriodicalSync();
   }
 
   async attachedCallback() {
     await this.scanFormComponents();
+
     this.startPeriodicalScan();
+
+    if (this.isAutoSyncEnabled())
+      this.startPeriodicalSync();
   }
 
   detachedCallback() {
@@ -78,30 +98,55 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       await this.scanFormComponents();
     }
   }
-
   stopPeriodicalScan() {
     if (this.scanTask == null) return;
     this.scanTask.cancell();
     this.scanTask = null;
   }
 
+  async startPeriodicalSync() {
+    if (this.syncTask != null) return;
+    while (true) { // this loop will break by stopPeriodicalSync()
+      this.syncTask = u.sleep(this.autosync);
+      await this.syncTask;
+      await this.sync();
+    }
+  }
+  stopPeriodicalSync() {
+    if (this.syncTask == null) return;
+    this.syncTask.cancell();
+    this.syncTask = null;
+  }
+
   async scanFormComponents() {
-    const currentElements: Set<FormComponentElement> =
-          new Set(Array.from(this.elements).filter((e: NamableHTMLElement) => e.name));
-    const added = u.subtractSet(currentElements, this.getFormElementSet());
+    const lastElements = this.getFormElementSet();
+    const currentElements = this.getCurrentElements();
+
     this.formElements = Array.from(currentElements).reduce((map: FormElements, e) => {
-      const name: string = e.name;
-      map.add(name, e);
+      map.add(e.name, e);
       return map;
     }, new u.MultiValueMap());
 
-    if (added.size === 0) return;
+    const added = u.subtractSet(currentElements, lastElements);
+    if (added.size > 0) {
+      added.forEach(this.initComponent, this);
+      const addedNames = Array.from(added).map(e => e.name);
+      await this.load(addedNames);
+      await this.store(addedNames);
+    }
 
-    added.forEach(this.initComponent, this);
+    const removedNames = u.subtractSet(names(lastElements),
+                                       names(currentElements));
+    if (removedNames.size > 0) {
+      for (const n of removedNames) {
+        console.debug("Removed name: %o", n);
+        delete this.values[n];
+      }
+    }
+  }
 
-    const addedNames: Array<string> = Array.from(added).map(e => e.name);
-    await this.load(addedNames);
-    await this.store(addedNames);
+  getCurrentElements(): Set<FormComponentElement> {
+    return new Set(Array.from(this.elements).filter((e: NamableHTMLElement) => e.name));
   }
 
   getFormElementSet(): Set<FormComponentElement> {
@@ -119,54 +164,34 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
 
   /// partial load if `names` was provided
   async load(names?: Array<string>) {
-    console.debug("load: %o", names == null ? "all" : names);
-
     const storageValues = await this.readStorageAll();
-    console.debug("read stored values: %o", storageValues);
-
     const storageChanges =  this.diffValues(storageValues, this.values);
-    console.debug("stored value changes: %o", storageChanges);
 
-    // Write/Update all
-    if (names == null) {
-      this.values = storageValues;
-      this.writeForm(storageChanges);
-      return;
-    }
+    if (!names) names = Object.keys(storageChanges);
 
-    // partial load
-    // Write/Update values specified by "names"
+    if (names.length === 0) return;
+
     const subChanges = {};
     for (const n of names) {
       this.values[n] = storageValues[n];
-      subChanges[n] = storageChanges[n];
+      subChanges[n] = storageChanges[n] || [];
     }
     this.writeForm(subChanges);
   }
 
   /// partial store if `names` was provided
   async store(names?: Array<string>) {
-    console.debug("store: %o", names == null ? "all" : names);
-
     const formValues = this.readFormAll();
-    console.debug("read form values: %o", formValues);
-
     const formChanges = this.diffValues(formValues, this.values);
-    console.debug("form changes: %o", formChanges);
 
-    // Store/Update all
-    if (names == null) {
-      this.values = formValues;
-      await this.writeStorage(formChanges);
-      return;
-    }
+    if (!names) names = Object.keys(formChanges);
 
-    // partial store
-    // Store/Update values specified by "names"
+    if (names.length === 0) return;
+
     const subChanges = {};
     for (const n of names) {
       this.values[n] = formValues[n];
-      subChanges[n] = formChanges[n];
+      subChanges[n] = formChanges[n] || [];
     }
     await this.writeStorage(subChanges);
   }
@@ -176,30 +201,33 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     return names.reduce((result: ValueChanges, name: string): ValueChanges => {
       if (newValues[name] == null) newValues[name] = [];
       if (oldValues[name] == null) oldValues[name] = [];
-      result[name] = [];
+      const values = [];
       const len = Math.max(newValues[name].length, oldValues[name].length);
       for (let i = 0; i < len; i++) {
         const newValue = newValues[name][i];
         const oldValue = oldValues[name][i];
-        result[name][i] = newValue === oldValue ? null : [newValue, oldValue];
+        values[i] = newValue === oldValue ? null : [newValue, oldValue];
       }
+      if (values.some((v) => v !== null))
+        result[name] = values;
       return result;
     }, {});
   }
 
   async readStorageAll(): Promise<Values> {
     // start all data fatching at first
-    const ps = this.getNames().reduce((values, name): { [key: string]: Promise<Array<string>> } => {
-      values[name] = this.readStorageByName(name);
-      return values;
-    }, {});
+    const ps = Array.from(this.formElements.flattenValues())
+          .reduce((values, e) => {
+            const n = e.name;
+            values[n] = this.readStorageByName(n);
+            return values;
+          }, {});
 
     // resolve promises
     const result = {};
     for (const [name, promise] of Object.entries(ps)) {
       result[name] = await promise;
     }
-
     return result;
   }
 
@@ -242,11 +270,11 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       if (c == null) return;
       const [newValue] = c;
 
-      console.debug("write to storage: name=%s, value=%s", name, newValue);
-
       if (newValue == null) {
+        console.debug("remove from storage: name=%o", name);
         await handler.removeItem(name);
       } else {
+        console.debug("write to storage: name=%o, value=%o", name, newValue);
         await handler.write(name, newValue);
       }
     });
@@ -281,14 +309,6 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       }, {});
   }
 
-  getNames(): Array<string> {
-    return Array.from(this.formElements.flattenValues())
-      .reduce((names, e) => {
-        names.unshift(e.name);
-        return names;
-      }, []);
-  }
-
   getAreaHandler(): ah.AreaHandler {
     const a: ?ah.Area = this.getArea();
     if (!a) throw Error("\"area\" attribute is required");
@@ -304,50 +324,52 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     return null;
   }
 
-  async sync(): Promise<void> {
-    const d = this.getSyncDelay();
-    if (d == null) return Promise.reject(Error("Require positive integer value 'sync-delay' attribute"));
-    if (d <= 0) return Promise.reject(Error(`Require positive number for "sync-delay": ${d}`));
-
-    await u.sleep(d);
-
-    if (!this.isAutoSyncEnabled()) {
-      return;
-    }
-
-    return this.store();
+  async sync() {
+    await this.load();
+    await this.store();
   }
 
   isAutoSyncEnabled(): boolean {
-    return this.hasAttribute("sync") && this.getSyncDelay() !== null;
-  }
-
-  getSyncDelay() {
-    const a = this.getAttribute("sync-delay");
-    if (!a) return null;
-    const d = parseInt(a);
-    if (d <= 0) return null;
-    return d;
-  }
-
-  async periodicalSync() {
-    while (this.isAutoSyncEnabled()) {
-      await this.sync();
-    }
+    return this.hasAttribute("autosync");
   }
 
   static get observedAttributes() {
     return [
-      "sync",
-      "sync-delay",
-      // "area",
+      "autosync",
+      "area",
     ];
   }
 
   attributeChangedCallback(attrName: string) {
-    if (attrName === "sync" ||
-        attrName === "sync-delay") {
-      this.startSync();
+    switch (attrName) {
+    case "autosync":
+      if (this.isAutoSyncEnabled()) {
+        this.startPeriodicalSync();
+      } else {
+        this.stopPeriodicalSync();
+      }
+      break;
+    case "area":
+      this.values = {};
+      this.formElements = new u.MultiValueMap();
+      break;
     }
   }
+}
+
+function names(iter: Iterable<FormComponentElement>): Set<string> {
+  return new Set(map(iter, (v) => v.name));
+}
+function map<T, U>(iter: Iterable<T>,
+                   callbackfn: (value: T, index: number, array: Array<T>) => U,
+                   thisArg?: any): Array<U> {
+  return Array.from(iter).map(callbackfn, thisArg);
+}
+function getAttr(self: HTMLElement, name: string): string {
+  const v = self.getAttribute(name);
+  return v ? v : "";
+}
+function setAttr(self: HTMLElement, name: string, value: ?string) {
+  if (value == null) return;
+  self.setAttribute(name, value);
 }

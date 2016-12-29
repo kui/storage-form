@@ -23,6 +23,13 @@
   <label><input is="storage-input" type="radio" name="radio-sample" value="value-3">value-3</label>
   <br>
   <textarea is="storage-textarea" name="sometextarea">this is a default textarea value.</textarea><br>
+  <label>select-sample:
+    <select is="storage-select" name="select-sample">
+      <option>value-1
+      <option>value-2
+      <option>value-3
+    </select>
+  </label><br>
   <input type="submit" value="Save">
 </form>
 
@@ -32,18 +39,26 @@
 <form is="storage-form"
       id="example2"
       area="session-storage"
-      sync
-      sync-delay="500">
-  <label>bar: <input is="storage-input" name="bar"></label><br>
-  <label>select-sample:
-    <select is="storage-select" name="select-sample">
-      <option value="value-1">value-1</option>
-      <option value="value-2">value-2</option>
-      <option>value-3</option>
-    </select>
-  </label><br>
+      autosync>
+  <label>bar: <input is="storage-input" name="bar"></label>
 </form>
 
-<p>Auto saving/loading with 500ms delay</p>
+
+<h2>Dynamic building using javascript</h2>
+
+<div id="example3-anchor"></div>
 
 <script src="storage-elements-debug.js"></script>
+<script>
+  // For the third example
+  var base = document.getElementById("example3-anchor");
+  var form = base.appendChild(document.createElement("form", "storage-form"));
+  form.area = "local-storage";
+  var input1 = form.appendChild(document.createElement("input", "storage-input"));
+  input1.name = "ex3-1";
+  var input2 = form.appendChild(document.createElement("input"));
+  input2.type = "checkbox";
+  input2.name = "ex3-2";
+  var submit = form.appendChild(document.createElement("input"));
+  submit.type = "submit";
+</script>
