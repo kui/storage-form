@@ -369,6 +369,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       await this.store(names);
       this.syncPromise = null;
     })();
+    await this.syncPromise;
   }
 
   isAutoSyncEnabled(): boolean {
