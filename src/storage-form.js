@@ -1,9 +1,6 @@
 import * as u from "./utils";
 import * as ah from "./area-handler";
 
-declare interface NamableHTMLElement extends HTMLElement {
-  name?: string;
-}
 declare interface FormComponentElement extends HTMLElement {
   name: string;
 
@@ -33,7 +30,7 @@ declare type Values = { [key: Name]: Array<string> };
 // TODO use Map<Name, Array<?{ newValue: ?string, oldValue: ?string }>>
 declare type ValueChanges = { [key: Name]: Array<?[?string, ?string]> };
 
-declare type FormElements = u.MultiValueMap<Name, FormComponentElement>;
+declare type FormElements = u.ArrayValueMap<Name, FormComponentElement>;
 
 const DEFAULT_SYNC_INTERVAL = 500;
 
@@ -63,7 +60,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
 
   createdCallback() {
     this.values = {};
-    this.formElements = new u.MultiValueMap();
+    this.formElements = new u.ArrayValueMap();
     this.scanIntervalMillis = 700;
     this.componentObservers = new Map();
     this.syncPromise = null;
@@ -145,7 +142,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     this.formElements = Array.from(currentElements).reduce((map: FormElements, e) => {
       map.add(e.name, e);
       return map;
-    }, new u.MultiValueMap());
+    }, new u.ArrayValueMap());
 
     const added = u.subtractSet(currentElements, lastElements);
     if (added.size > 0) {
@@ -175,15 +172,15 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   }
 
   getCurrentElements(): Set<FormComponentElement> {
-    return new Set(Array.from(this.elements).filter((e: NamableHTMLElement) => e.name));
+    const elms = this.elements;
+    return new Set((function* () {
+      for (const e: any of elms)
+        if (e.name) yield e;
+    })());
   }
 
   getFormElementSet(): Set<FormComponentElement> {
-    return Array.from(this.formElements.values())
-      .reduce((set, elements) => {
-        elements.forEach(set.add, set);
-        return set;
-      }, new Set());
+    return new Set(this.formElements.flattenValues());
   }
 
   afterComponentAppend(e: FormComponentElement) {
@@ -394,7 +391,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       break;
     case "area":
       this.values = {};
-      this.formElements = new u.MultiValueMap();
+      this.formElements = new u.ArrayValueMap();
       break;
     }
   }
@@ -411,12 +408,7 @@ function isEqualSet<T>(a: Set<T>, b: Set<T>): boolean {
   return true;
 }
 function names(iter: Iterable<FormComponentElement>): Set<Name> {
-  return new Set(map(iter, (v) => v.name));
-}
-function map<T, U>(iter: Iterable<T>,
-                   callbackfn: (value: T, index: number, array: Array<T>) => U,
-                   thisArg?: any): Array<U> {
-  return Array.from(iter).map(callbackfn, thisArg);
+  return new Set((function* () { for (const e of iter) yield e.name; })());
 }
 function getAttr(self: HTMLElement, name: string): string {
   const v = self.getAttribute(name);

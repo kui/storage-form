@@ -40,7 +40,17 @@ export function subtractSet<T>(targetSet: Set<T>, removedSet: Set<T>): Set<T> {
   return new Set(Array.from(targetSet).filter((e) => !removedSet.has(e)));
 }
 
-export class MultiValueMap<K, V> extends Map<K, Array<V>> {
+class MultiValueMap<K, V, I: Iterable<V>> extends Map<K, I> {
+  * flattenValues(): Iterator<V> {
+    for (const arr of this.values()) {
+      for (const v of arr) {
+        yield v;
+      }
+    }
+  }
+}
+
+export class ArrayValueMap<K, V> extends MultiValueMap<K, V, Array<V>> {
   add(key: K, value: V): this {
     let a = this.get(key);
     if (!a) {
@@ -50,12 +60,16 @@ export class MultiValueMap<K, V> extends Map<K, Array<V>> {
     a.push(value);
     return this;
   }
+}
 
-  * flattenValues(): Iterator<V> {
-    for (const arr of this.values()) {
-      for (const v of arr) {
-        yield v;
-      }
+export class SetValueMap<K, V> extends MultiValueMap<K, V, Set<V>> {
+  add(key: K, value: V): this {
+    let a = this.get(key);
+    if (!a) {
+      a = new Set();
+      this.set(key, a);
     }
+    a.add(value);
+    return this;
   }
 }
