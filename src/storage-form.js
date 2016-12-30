@@ -129,7 +129,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   }
 
   async scanComponents() {
-    if (this.syncPromise) await this.syncPromise;
+    while (this.syncPromise) await this.syncPromise;
 
     const lastElements = this.getFormElementSet();
     const currentElements = this.getCurrentElements();
@@ -363,7 +363,7 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
   }
 
   async sync(names?: ?Array<Name>, opt?: { noLoad: boolean } = { noLoad: false }) {
-    if (this.syncPromise) await this.syncPromise;
+    while (this.syncPromise) await this.syncPromise;
     this.syncPromise = (async () => {
       if (!opt.noLoad) await this.load(names);
       await this.store(names);
