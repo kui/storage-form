@@ -97,6 +97,8 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
     this.stopPeriodicalScan();
   }
 
+  /// Periodical components scan for external components
+  /// such as `<input form="some-form-id" ...>`.
   async startPeriodicalScan() {
     if (this.scanTask != null) return;
     while (true) { // this loop will break by stopPeriodicalScan()
