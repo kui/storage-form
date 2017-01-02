@@ -162,7 +162,7 @@ describe("Binder", () => {
       const binder = new Binder(storageHandler, formHandler);
       await binder.sync([elem1]);
       assert.equal(binder.v.size, 1);
-      await binder.remove(elem1);
+      await binder.remove([elem1]);
       assert.equal(binder.v.size, 0);
     });
   });

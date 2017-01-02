@@ -4,7 +4,7 @@ declare type Name = string;
 declare type Value = string;
 declare type NameValue = { name: Name, value: ?Value };
 declare type Values = Map<Element, NameValue>;
-declare interface Element {
+export interface Element {
   name: Name;
 }
 declare interface StorageHandler {
@@ -16,7 +16,6 @@ declare interface FormHandler {
   write(e: Element, v: ?Value): void;
   read(e: Element): ?Value;
 }
-declare type Targets = Array<Element>;
 
 export default class Binder {
   v: Values;
@@ -31,19 +30,19 @@ export default class Binder {
     this.lock = null;
   }
 
-  async sync(targets: Targets): Promise<void> {
+  async sync(targets: Array<Element>): Promise<void> {
     await syncBlock(this, () => doSync(this, targets));
   }
 
   /// Force write form values to the storage
-  async submit(targets: Targets): Promise<void> {
+  async submit(targets: Array<Element>): Promise<void> {
     await syncBlock(this, () => Promise.all(targets.map(async (e) => {
       await store(this, e);
     })));
   }
 
   /// Sync only new elements
-  async scan(targets: Targets): Promise<void> {
+  async scan(targets: Array<Element>): Promise<void> {
     await syncBlock(this, async () => {
       const newElements = u.subtractSet(new Set(targets), new Set(this.v.keys()));
       await doSync(this, Array.from(newElements));
@@ -51,14 +50,14 @@ export default class Binder {
   }
 
   /// Invork if an element was removed from a form.
-  async remove(elements: Iterable<Element>) {
+  async remove(elements: Array<Element>) {
     await syncBlock(this, async () => {
       for (const e of elements) this.v.delete(e);
     });
   }
 }
 
-async function doSync(self: Binder, targets: Targets) {
+async function doSync(self: Binder, targets: Array<Element>) {
   await Promise.all(targets.map(async (e) => {
     await load(self, e);
     await store(self, e);

@@ -1,13 +1,14 @@
 import * as u from "./utils";
 import * as ah from "./area-handler";
 import Binder from "./binder";
+import type { Element } from "./binder";
 
 declare type Name = string;
 declare type Value = string;
 
 declare interface FormComponentElement extends HTMLElement {
   name: Name;
-  value?: string;
+  value?: Value;
   type?: string;
   checked?: boolean;
 }
@@ -49,16 +50,21 @@ export default class HTMLStorageFormElement extends HTMLFormElement {
       console.debug("scan by form MutationObserver: ", this);
       scan(this);
 
-      const added = flatten(records.map(r => r.addedNodes));
+      const added: Array<HTMLElement> =
+            flatten(records.map(r => (r.addedNodes: Iterable<any>)))
+            .filter((e) => e instanceof HTMLElement);
       if (added.length > 0) {
         for (const e of added) {
           observeComponent(this, e);
         }
       }
 
-      const removed = flatten(records.map((r) => r.removedNodes));
+      const removed: Array<HTMLElement> =
+            flatten(records.map((r) => (r.removedNodes: Iterable<any>)))
+            .filter((e) => e instanceof HTMLElement);
       if (removed.length > 0) {
-        remove(this, removed);
+        // force cast to Array<FormComponentElements>
+        remove(this, (removed.filter((e) => (e: any).name): Array<any>));
         for (const e of removed) {
           disconnectComponent(this, e);
         }
@@ -105,58 +111,50 @@ function isAutoSyncEnabled(self: HTMLStorageFormElement): boolean {
   return self.hasAttribute("autosync");
 }
 
-async function submit(self: HTMLStorageFormElement) {
+async function submit(self: HTMLStorageFormElement): Promise<void> {
   if (self.binder) await self.binder.submit(elements(self));
 }
 
-async function sync(self: HTMLStorageFormElement, targets?: Array<FormComponentElement>) {
-  if (self.binder) {
-    await self.binder.sync(targets ? targets : elements(self));
-  }
+async function sync(self: HTMLStorageFormElement, targets?: Array<Element>): Promise<void> {
+  if (self.binder) await self.binder.sync(targets ? targets : elements(self));
 }
 
-async function scan(self: HTMLStorageFormElement) {
+async function scan(self: HTMLStorageFormElement): Promise<void> {
   if (self.binder) await self.binder.scan(elements(self));
 }
 
-async function remove(self: HTMLStorageFormElement, iter: Iterable<Node>) {
-  if (self.binder) await self.binder.remove(iter);
+async function remove(self: HTMLStorageFormElement, elems: Array<Element>): Promise<void> {
+  if (self.binder) await self.binder.remove(elems);
 }
 
-function observeComponent(self: HTMLStorageFormElement, newElement: any) {
-  const elements = [];
-  if (newElement.hasAttribute("name")) elements.push(newElement);
-  elements.splice(elements.length, 0, ...newElement.querySelectorAll("*"));
+function observeComponent(self: HTMLStorageFormElement, newElement: HTMLElement): void {
+  const elements: Array<FormComponentElement> =
+        // force cast
+        ([newElement, ...Array.from(newElement.querySelectorAll("*"))]
+         .filter((e) => (e: any).value != null && (e: any).name != null): any);
 
   for (const e of elements) {
-    if (e.value == null) continue;
-    const o = new MutationObserver(() => {
-      if (e.name == null) sync(e);
-    });
+    const o = new MutationObserver(() => sync(self, [e]));
     o.observe(e, { attributes: true, atributeFilter: ["name"] });
     self.componentObservers.set(e, o);
   }
-
 }
 
-function disconnectComponent(self: HTMLStorageFormElement, element: any) {
-  const elements = [];
-  elements.push(element);
-  for (const e of element.querySelectorAll("*")) elements.push(e);
+function disconnectComponent(self: HTMLStorageFormElement, element: HTMLElement): void {
+  const elements = [element, ...Array.from(element.querySelectorAll("*"))];
   for (const e of elements) {
-    const o = self.componentObservers.get(e);
+    const o = self.componentObservers.get((e: any));
     if (o == null) continue;
-    self.componentObservers.delete(e);
+    self.componentObservers.delete((e: any));
     o.disconnect();
   }
 }
 
-// $FlowFixMe
-function elements(self: HTMLStorageFormElement): Array<FormComponentElement> {
-  return Array.from(self.elements).filter((e: any) => e.name);
+function elements(self: HTMLStorageFormElement): Array<Element> {
+  return Array.from(((self.elements): Iterable<any>)).filter(e => e.name);
 }
 
-async function initBinder(self: HTMLStorageFormElement) {
+async function initBinder(self: HTMLStorageFormElement): Promise<void> {
   self.binder = null;
 
   const h = getAreaHandler(self);
@@ -165,13 +163,13 @@ async function initBinder(self: HTMLStorageFormElement) {
   self.binder = new Binder(
     h,
     { write: writeForm,
-      read: readForm,
-    }
+      read: readForm }
   );
   await sync(self);
 }
 
-function writeForm(component: FormComponentElement, newValue: ?Value) {
+function writeForm(component: any, newValue: ?Value): void {
+  (component: FormComponentElement);
   const type = component.type;
   if (type === "checkbox" || type === "radio") {
     component.checked = newValue === component.value;
@@ -184,7 +182,8 @@ function writeForm(component: FormComponentElement, newValue: ?Value) {
   component.value = newValue;
 }
 
-function readForm(component: FormComponentElement): ?Value {
+function readForm(component: any): ?Value {
+  (component: FormComponentElement);
   const type = component.type;
   if (type === "checkbox" || type === "radio") {
     return component.checked ? component.value : null;
@@ -210,7 +209,7 @@ function getAttr(self: HTMLElement, name: string): string {
   const v = self.getAttribute(name);
   return v ? v : "";
 }
-function setAttr(self: HTMLElement, name: string, value: ?string) {
+function setAttr(self: HTMLElement, name: string, value: ?string): void {
   if (value == null) return;
   self.setAttribute(name, value);
 }
