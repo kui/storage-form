@@ -4,7 +4,7 @@
   "description": "custom elements to access local/sessionStorage or chrome.storage easily",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "mocha --compilers js:babel-register test",
     "build": "babel src -d lib",
     "lint": "eslint .",
     "fix": "eslint . --fix",
@@ -40,6 +40,7 @@
     "flow-bin": "^0.37.0",
     "flow-typed": "^2.0.0",
     "mocha": "^3.2.0",
+    "sinon": "^1.17.7",
     "webpack": "^1.14.0",
     "webpack-dev-server": "^1.16.2"
   },

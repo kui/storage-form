@@ -2,6 +2,15 @@ const DEBUG = process.env.NODE_ENV !== "production";
 const webpack = require("webpack");
 const BabiliPlugin = require("babili-webpack-plugin");
 
+const plugins = [
+  new webpack.optimize.DedupePlugin(),
+  new webpack.optimize.OccurrenceOrderPlugin(),
+];
+
+if (!DEBUG) {
+  plugins.push(new BabiliPlugin());
+}
+
 module.exports = {
   debug: DEBUG,
   devtool: DEBUG ? "inline-source-map" : "source-map",
@@ -17,13 +26,5 @@ module.exports = {
         loader: "babel-loader" }
     ]
   },
-  plugins: DEBUG ?
-    // debug
-  [new webpack.optimize.DedupePlugin(),
-    new webpack.optimize.OccurrenceOrderPlugin(),
-  ] : // production
-  [new webpack.optimize.DedupePlugin(),
-    new webpack.optimize.OccurrenceOrderPlugin(),
-    new BabiliPlugin(),
-  ],
+  plugins,
 };

@@ -3,7 +3,7 @@ export type Area = string;
 export interface AreaHandler {
   read(name: string): Promise<?string>;
   write(name: string, newValue: string): Promise<void>;
-  removeItem(name: string): Promise<void>;
+  remove(name: string): Promise<void>;
 }
 
 const handlers: { [area: Area]: AreaHandler } = {};
@@ -35,7 +35,7 @@ export class WebStorageAreaHandler {
     return Promise.resolve();
   }
 
-  removeItem(name: string): Promise<void> {
+  remove(name: string): Promise<void> {
     this.storage.removeItem(name);
     return Promise.resolve();
   }
@@ -56,7 +56,7 @@ export class ChromeStorageAreaHandler {
     return new Promise((resolve) => this.storage.set({ [name]: newValue }, resolve));
   }
 
-  removeItem(name: string): Promise<void> {
+  remove(name: string): Promise<void> {
     return new Promise((resolve) => this.storage.remove(name, resolve));
   }
 }
