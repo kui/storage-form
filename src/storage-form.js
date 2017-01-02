@@ -158,7 +158,10 @@ function elements(self: HTMLStorageFormElement): Array<FormComponentElement> {
 
 async function initBinder(self: HTMLStorageFormElement) {
   self.binder = null;
+
   const h = getAreaHandler(self);
+  if (!h) return;
+
   self.binder = new Binder(
     h,
     { write: writeForm,

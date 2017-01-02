@@ -89,7 +89,8 @@ async function load(self: Binder, elem: Element): Promise<void> {
 
 async function store(self: Binder, elem: Element): Promise<void> {
   const newN = elem.name;
-  const newV = self.f.read(elem);
+  const newV = fallbackIfNull(() => self.f.read(elem),
+                              () => getValueByName(self, newN));
   let nv: ?NameValue = self.v.get(elem);
   if (!nv) {
     nv = { name: elem.name, value: null };
@@ -104,4 +105,19 @@ async function store(self: Binder, elem: Element): Promise<void> {
     nv.name =  newN;
     nv.value =  newV;
   }
+}
+
+function fallbackIfNull<T>(...fns: Array<() => T>): ?T {
+  for (const fn of fns) {
+    const v = fn();
+    if (v != null) return v;
+  }
+  return null;
+}
+
+function getValueByName(self: Binder, name: Name): ?Value {
+  for (const nv of self.v.values()) {
+    if (nv.name === name) return nv.value;
+  }
+  return null;
 }
