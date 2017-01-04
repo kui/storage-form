@@ -121,7 +121,19 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
 }
 
 const mixed = mixinStorageForm(HTMLFormElement);
-export default class HTMLStorageFormElement extends mixed {}
+export default class HTMLStorageFormElement extends mixed {
+  static get extends() { return "form"; }
+
+  static register() {
+    // Custom Element v1 seems not to works right to extend <form> in Google Chrome 55
+    // See http://stackoverflow.com/a/41458692/3864351
+    // customElements.define("storage-form", StorageFormElement, { extends: "form" });
+    // window.StorageFormElement = StorageFormElement;
+
+    // Custom Element v0
+    document.registerElement("storage-form", HTMLStorageFormElement);
+  }
+}
 
 function isAutoSyncEnabled(self: HTMLFormElement): boolean {
   return self.hasAttribute("autosync");
