@@ -1,7 +1,7 @@
 {
   "name": "storage-element",
   "version": "0.0.1",
-  "description": "custom elements to access local/sessionStorage or chrome.storage easily",
+  "description": "custom elements for <input> as a storage, like localStorage, sessionStorage and chrome.storage",
   "main": "index.js",
   "scripts": {
     "test": "mocha --compilers js:babel-register test",
@@ -19,7 +19,7 @@
   },
   "keywords": [
     "custom elements",
-    "web stroage",
+    "stroage",
     "chrome storage"
   ],
   "author": "Keiichiro Ui",
