@@ -2,7 +2,7 @@
   "name": "storage-element",
   "version": "0.0.1",
   "description": "custom elements for <input> as a storage, like localStorage, sessionStorage and chrome.storage",
-  "main": "index.js",
+  "main": "lib/storage-form.js",
   "scripts": {
     "test": "mocha --compilers js:babel-register test",
     "build": "babel src -d lib",
