@@ -1,3 +1,5 @@
+/* global chrome */
+
 export type Area = string;
 
 export interface AreaHandler {
@@ -18,6 +20,8 @@ export function registerHandler(area: Area, handler: AreaHandler): void {
 export function findHandler(area: Area): ?AreaHandler {
   return handlers[area];
 }
+
+//
 
 export class WebStorageAreaHandler {
   storage: Storage;
@@ -41,6 +45,13 @@ export class WebStorageAreaHandler {
   }
 }
 
+if (localStorage)
+  registerHandler("local-storage", new WebStorageAreaHandler(localStorage));
+if (sessionStorage)
+  registerHandler("session-storage", new WebStorageAreaHandler(sessionStorage));
+
+//
+
 export class ChromeStorageAreaHandler {
   storage: ChromeStorageArea;
 
@@ -59,4 +70,11 @@ export class ChromeStorageAreaHandler {
   remove(name: string): Promise<void> {
     return new Promise((resolve) => this.storage.remove(name, resolve));
   }
+}
+
+if (chrome && chrome.storage) {
+  if (chrome.storage.local)
+    registerHandler("chrome-local", new ChromeStorageAreaHandler(chrome.storage.local));
+  if (chrome.storage.sync)
+    registerHandler("chrome-sync", new ChromeStorageAreaHandler(chrome.storage.sync));
 }
