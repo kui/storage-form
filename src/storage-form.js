@@ -1,7 +1,9 @@
 import * as u from "./utils";
-import * as ah from "./area-handler";
+
 import Binder from "./binder";
 import type { Element } from "./binder";
+
+import * as ah from "./area-handler";
 
 declare type Name = string;
 declare type Value = string;
@@ -19,6 +21,7 @@ export interface StorageForm extends HTMLFormElement {
 }
 
 declare interface InternalStorageForm extends StorageForm {
+  isInitLoad: boolean;
   binder: ?Binder;
   componentObservers: Map<FormComponentElement, MutationObserver>;
 }
@@ -28,6 +31,7 @@ const DEFAULT_SYNC_INTERVAL = 700;
 export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & StorageForm> {
   // $FlowFixMe Force cast to the returned type.
   return class extends c {
+    isInitLoad: boolean;
     binder: ?Binder;
     componentObservers: Map<FormComponentElement, MutationObserver>;
 
@@ -45,6 +49,7 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
 
     createdCallback() {
       initBinder(this);
+      this.isInitLoad = true;
       this.componentObservers = new Map();
 
       this.addEventListener("submit", (event) => {
@@ -120,8 +125,8 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
   };
 }
 
-const mixed = mixinStorageForm(HTMLFormElement);
-export default class HTMLStorageFormElement extends mixed {
+const mixedForm = mixinStorageForm(HTMLFormElement);
+export default class HTMLStorageFormElement extends mixedForm {
   static get extends() { return "form"; }
 
   static register() {
@@ -188,12 +193,13 @@ async function initBinder(self: InternalStorageForm): Promise<void> {
   const h = getAreaHandler(self);
   if (!h) return;
 
-  self.binder = new Binder(
-    h,
-    { write: writeForm,
-      read: readForm }
-  );
-  await sync(self);
+  self.binder = new Binder(h, { write: writeForm, read: readForm });
+  if (self.isInitLoad) {
+    self.isInitLoad = false;
+    await sync(self);
+  } else {
+    await submit(self);
+  }
 }
 
 function writeForm(component: any, newValue: ?Value): void {
