@@ -4,6 +4,7 @@ import Binder from "./binder";
 import type { Element } from "./binder";
 
 import * as ah from "./area-handler";
+import AreaSelect from "./area-select";
 
 declare type Name = string;
 declare type Value = string;
@@ -48,9 +49,10 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
     }
 
     createdCallback() {
-      initBinder(this);
       this.isInitLoad = true;
       this.componentObservers = new Map();
+
+      initBinder(this);
 
       this.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -90,6 +92,11 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
 
       scan(this);
 
+      // Periodical scan/sync
+      // To observe:
+      //   * storage value changings
+      //   * external form components (such as a <input form="..." ...>)
+      //   * form value changings by an external javascript
       (async () => {
         while (true) {
           await u.sleep(this.autosync);
@@ -137,6 +144,7 @@ export default class HTMLStorageFormElement extends mixedForm {
 
     // Custom Element v0
     document.registerElement("storage-form", HTMLStorageFormElement);
+    document.registerElement("area-select", AreaSelect);
   }
 }
 

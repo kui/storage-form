@@ -21,6 +21,10 @@ export function findHandler(area: Area): ?AreaHandler {
   return handlers[area];
 }
 
+export function listHandlers(): Array<[Area, AreaHandler]> {
+  return Object.entries(handlers);
+}
+
 //
 
 export class WebStorageAreaHandler {

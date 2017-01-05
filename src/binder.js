@@ -10,7 +10,7 @@ export interface Element {
 declare interface StorageHandler {
   read(n: Name): Promise<?Value>;
   write(n: Name, v: Value): Promise<void>;
-  remove(n: Name):Promise<void>;
+  remove(n: Name): Promise<void>;
 }
 declare interface FormHandler {
   write(e: Element, v: ?Value): void;
