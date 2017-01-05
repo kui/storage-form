@@ -192,7 +192,9 @@ function disconnectComponent(self: InternalStorageForm, element: HTMLElement): v
 }
 
 function elements(self: InternalStorageForm): Array<Element> {
-  return Array.from(((self.elements): Iterable<any>)).filter(e => e.name);
+  return Array.from(((self.elements): Iterable<any>))
+    .filter(e => e.name)
+    .filter(e => !(e instanceof AreaSelect));
 }
 
 async function initBinder(self: InternalStorageForm): Promise<void> {

@@ -40,7 +40,7 @@ export function mixinAreaSelect<T: HTMLSelectElement>(c: Class<T>): Class<T & Ar
         while (true) {
           await u.sleep(SYNC_INTERVAL);
           await sync(this);
-          writeArea(self);
+          writeArea(this);
         }
       })();
     }
@@ -104,8 +104,9 @@ async function sync(self: InternalAreaSelect): Promise<void> {
 }
 
 function writeArea(self: InternalAreaSelect) {
-  if (self.form == null) return;
-  self.form.setAttribute("area", self.value);
+  const form = self.form;
+  if (form == null) return;
+  form.setAttribute("area", self.value);
 }
 
 function getAreaHandler(self: InternalAreaSelect): ?ah.AreaHandler {

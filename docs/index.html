@@ -45,26 +45,43 @@
 <h2>Dynamic building using javascript</h2>
 
 <div id="example3-anchor"></div>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    // For the third example
+    const base = document.getElementById("example3-anchor");
+    const form = base.appendChild(document.createElement("form", "storage-form"));
+    form.area = "local-storage";
+
+    // Append <input>s on next tick.
+    setTimeout(() => {
+      const input1 = form.appendChild(document.createElement("input"));
+      input1.name = "ex3-1";
+      const input2 = form.appendChild(document.createElement("input"));
+      input2.type = "checkbox";
+      input2.name = "ex3-2";
+      const submit = form.appendChild(document.createElement("input"));
+      submit.type = "submit";
+    }, 1);
+  });
+</script>
+
+
+<h2><code>&lt;area-select&gt;</code> example</h2>
+
+<form is="storage-form"
+      id="example4"
+      autosync>
+  <label>Storage Area:
+    <select is="area-select" name="example4-area" area="local-storage">
+      <option value="local-storage">localStorage
+      <option value="session-storage">sessionStorage
+    </select>
+  </label><br>
+  <label>ex4: <input name="ex4"></label>
+</form>
 
 <script src="storage-elements-debug.js"></script>
 <!-- Use no -debug suffix one f you use in production environment -->
 <!-- <script src="storage-elements.js"></script> -->
-<script>
-  // For the third example
-  var base = document.getElementById("example3-anchor");
-  var form = base.appendChild(document.createElement("form", "storage-form"));
-  form.area = "local-storage";
-
-  // Append <input>s on next tick.
-  setTimeout(() => {
-    var input1 = form.appendChild(document.createElement("input"));
-    input1.name = "ex3-1";
-    var input2 = form.appendChild(document.createElement("input"));
-    input2.type = "checkbox";
-    input2.name = "ex3-2";
-    var submit = form.appendChild(document.createElement("input"));
-    submit.type = "submit";
-  }, 1);
-</script>
 
 <a href="https://github.com/kui/storage-elements"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_red_aa0000.png" alt="Fork me on GitHub"></a>
