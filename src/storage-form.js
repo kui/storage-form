@@ -213,7 +213,6 @@ async function initBinder(self: InternalStorageForm): Promise<void> {
 }
 
 function writeForm(component: any, newValue: ?Value): void {
-  (component: FormComponentElement);
   const type = component.type;
   if (type === "checkbox" || type === "radio") {
     component.checked = newValue === component.value;
@@ -227,7 +226,6 @@ function writeForm(component: any, newValue: ?Value): void {
 }
 
 function readForm(component: any): ?Value {
-  (component: FormComponentElement);
   const type = component.type;
   if (type === "checkbox" || type === "radio") {
     return component.checked ? component.value : null;

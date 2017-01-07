@@ -1,3 +1,3 @@
 declare class Object {
-  static entries<K, V>(object: { [k: K]: V }): Array<[K, V]>;
+  static entries<V>(object: { k: V }): Array<[string, V]>;
 }
