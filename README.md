@@ -65,11 +65,11 @@ Storing to `sessionStorage` and using other elements.
 Example4
 -------------
 
-Dynamic storage `area`. You can change the storage area using `<area-select>`.
+Dynamic storage `area`. You can change the storage area using `<area-select>`. The following example store the `area` value, where `foo` value is stored in, in the `_area` entry in `localStorage`
 
 ```html
 <form is="storage-form">
-  area: <select is="area-select" name="_area">
+  area: <select is="area-select" name="_area" area="local-storage">
     <option>local-storage
     <option>session-storage
   </select><br>
