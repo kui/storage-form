@@ -238,12 +238,12 @@ function readForm(component: any): ?Value {
 function getAreaHandler(self: InternalStorageForm): ?ah.AreaHandler {
   const a = self.area;
   if (!a) {
-    console.error("Require 'area' attribute");
+    console.debug("Require 'area' attribute", self);
     return null;
   }
   const h = ah.findHandler(a);
   if (!h) {
-    console.error("No such area handler: area=%s", self.area);
+    console.debug("No such area handler: area=%s, this=%o", self.area, self);
     return null;
   }
   return h;
