@@ -1,3 +1,5 @@
+// @flow
+
 import * as u from "./utils";
 
 import Binder from "./binder";

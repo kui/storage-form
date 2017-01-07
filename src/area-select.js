@@ -1,3 +1,5 @@
+// @flow
+
 import * as u from "./utils";
 import * as ah from "./area-handler";
 import Binder from "./binder";

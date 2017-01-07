@@ -1,11 +1,8 @@
 # -*- coding:utf-8-unix; mode:toml; -*-
 [ignore]
-.*/node_modules/.*
 .*/lib/.*
 .*/dist/.*
-.*/examples/.*
 .*/docs/.*
-.*/webpack.config.js
 
 [include]
 
@@ -17,5 +14,4 @@ decls/
 flow-typed/
 
 [options]
-all=true
 unsafe.enable_getters_and_setters=true

@@ -1,3 +1,5 @@
+// @flow
+
 import * as u from "./utils";
 
 declare type Name = string;

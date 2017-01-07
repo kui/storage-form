@@ -1,3 +1,4 @@
+// @flow
 /* global chrome */
 
 export type Area = string;

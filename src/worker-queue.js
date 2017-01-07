@@ -1,3 +1,5 @@
+// @flow
+
 export default class WorkerQueue {
   q: Array<() => Promise<void>>;
   current: ?Promise<void>;

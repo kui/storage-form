@@ -1,3 +1,5 @@
+// @flow
+
 export class CancellablePromise<R> extends Promise<R> {
   cancellFunction: () => void;
   constructor(
