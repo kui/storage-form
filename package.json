@@ -5,7 +5,7 @@
   "main": "lib/storage-form.js",
   "scripts": {
     "test": "mocha --compilers js:babel-register test",
-    "build": "babel src -d lib",
+    "lib": "babel src -d lib",
     "lint": "eslint .",
     "fix": "eslint . --fix",
     "flow": "flow check src & flow check test & wait",
@@ -43,6 +43,9 @@
     "sinon": "^1.17.7",
     "webpack": "^1.14.0",
     "webpack-dev-server": "^1.16.2"
+  },
+  "engine": {
+    "node": "^6.x"
   },
   "repository": "https://github.com/kui/storage-elements.git"
 }
