@@ -10,8 +10,6 @@ Example1
 Manually saving and store to `localStorage`
 
 ```html
-<h1>Manually store</h1>
-
 <form is="storage-form" area="local-storage">
   <input name="foo"><br>
   <input type="submit">
@@ -31,8 +29,6 @@ Auto saving, storing to `chrome.storage.local` and using `type=checkbox`.
 In your Google Chrome extention option page (require `chrome.storage`):
 
 ```html
-<h1>Auto save</h1>
-
 <form is="storage-form" area="chrome-local" autosync>
   <input type="checkbox" name="foo" value="bar">
 </form>
@@ -47,11 +43,9 @@ In your Google Chrome extention option page (require `chrome.storage`):
 Example3
 --------------
 
-storing to `sessionStorage` and using other elements.
+Storing to `sessionStorage` and using other elements.
 
 ```html
-<h1>Auto save</h1>
-
 <form is="storage-form" area="session-storage" autosync>
   <textarea name="ta">ba</textarea><br>
   <select name="ss">
@@ -63,3 +57,20 @@ storing to `sessionStorage` and using other elements.
 
 1. Input some text like "bar" to the `<textarea>`.
 2. You can confirm two entries `ta=bar` and `ss=111` in `sessionStorage`.
+
+
+Example4
+-------------
+
+Dynamic storage `area`. You can change the storage area using `<area-select>`.
+
+```html
+<form is="storage-form">
+  area: <select is="area-select" name="_area">
+    <option>local-storage
+    <option>session-storage
+  </select><br>
+  foo: <input name="foo"><br>
+  <input type="submit">
+</form>
+```

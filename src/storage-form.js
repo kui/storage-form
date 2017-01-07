@@ -139,6 +139,8 @@ export default class HTMLStorageFormElement extends mixedForm {
   static register() {
     // Custom Element v1 seems not to works right to extend <form> in Google Chrome 55
     // See http://stackoverflow.com/a/41458692/3864351
+    // Polyfill too: https://github.com/webcomponents/custom-elements/tree/master/src
+    // > To do: Implement built-in element extension (is=)
     // customElements.define("storage-form", StorageFormElement, { extends: "form" });
     // window.StorageFormElement = StorageFormElement;
 
