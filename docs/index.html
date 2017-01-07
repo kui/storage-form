@@ -4,6 +4,16 @@
 
   <title>storage-form Examples</title>
 
+  <style>
+    code {
+      background-color: #ddd;
+      padding: 3px;
+    }
+    h2 {
+      border-bottom: 1px solid #999;
+    }
+  </style>
+
   <!-- Custom Elements v0 polyfill -->
   <script src="CustomElements.min.js"></script>
 
@@ -14,9 +24,11 @@
 
 <h1><a href="https://github.com/kui/storage-elements"><code>storage-form</code></a> Examples</h1>
 
-<p>See <a href="https://github.com/kui/storage-elements/blob/master/docs/index.html">HTML souce</a>.
+<p>See <a href="https://github.com/kui/storage-elements/blob/master/docs/index.html">HTML souce</a>.</p>
 
 <h2>Manually save example</h2>
+
+<p>Using all supported form components. You need to click [Save] to store values.</p>
 
 <form is="storage-form"
       id="example1"
@@ -42,6 +54,8 @@
 
 
 <h2>Auto save/load example</h2>
+
+<p>An <code>autosync</code> attribute are a function that store the <code>bar</code>'s value automatically, and load it's value when it is changed by another javascript. You can confirm that the <code>bar</code> form value is changed when you change it from a developer console of your browser.</p>
 
 <form is="storage-form"
       id="example2"
@@ -76,6 +90,8 @@
 
 
 <h2><code>&lt;area-select&gt;</code> example</h2>
+
+<p>You can change the stored area for the <code>ex4</code>'s value using an <code>area-select</code> element.</p>
 
 <form is="storage-form"
       id="example4"
