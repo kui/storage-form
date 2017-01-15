@@ -214,6 +214,8 @@ async function initBinder(self: InternalStorageForm): Promise<void> {
   } else {
     await submit(self);
   }
+
+  self.dispatchEvent(new CustomEvent("storage-form-init", { detail: { target: self }}));
 }
 
 function writeForm(component: any, newValue: ?Value): void {
