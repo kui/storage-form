@@ -50,9 +50,9 @@ export class WebStorageAreaHandler {
   }
 }
 
-if (localStorage)
+if (typeof localStorage !== "undefined")
   registerHandler("local-storage", new WebStorageAreaHandler(localStorage));
-if (sessionStorage)
+if (typeof sessionStorage !== "undefined")
   registerHandler("session-storage", new WebStorageAreaHandler(sessionStorage));
 
 //
@@ -77,9 +77,37 @@ export class ChromeStorageAreaHandler {
   }
 }
 
-if (chrome && chrome.storage) {
+export class BatchWriteChromeStorageAreaHandler extends ChromeStorageAreaHandler {
+  delayMillis: number;
+  updatedEntries: ?{ [k: string]: string };
+
+  constructor(storage: ChromeStorageArea & { MAX_WRITE_OPERATIONS_PER_HOUR: number }) {
+    super(storage);
+    // what interval we should keep for a write operation.
+    this.delayMillis = (60 * 60 * 1000 / storage.MAX_WRITE_OPERATIONS_PER_HOUR) + 500;
+    this.updatedEntries = null;
+  }
+
+  write(name: string, newValue: string): Promise<void> {
+    if (this.updatedEntries != null) {
+      this.updatedEntries[name] = newValue;
+      return Promise.resolve();
+    }
+
+    this.updatedEntries = { [name]: newValue };
+    setTimeout(() => {
+      if (this.updatedEntries == null) return;
+      this.storage.set(this.updatedEntries);
+      this.updatedEntries = null;
+    }, this.delayMillis);
+
+    return Promise.resolve();
+  }
+}
+
+if (typeof chrome !== "undefined" && chrome.storage) {
   if (chrome.storage.local)
     registerHandler("chrome-local", new ChromeStorageAreaHandler(chrome.storage.local));
   if (chrome.storage.sync)
-    registerHandler("chrome-sync", new ChromeStorageAreaHandler(chrome.storage.sync));
+    registerHandler("chrome-sync", new BatchWriteChromeStorageAreaHandler(chrome.storage.sync));
 }

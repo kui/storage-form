@@ -67,7 +67,7 @@ describe("Binder", () => {
       await binder.sync([elem1, elem2]);
 
       assert.equal(storage.has(elem1.name), false);
-      assert.equal(storage.get(elem2.name), forms.get(elem2));
+      assert.equal(storage.get(elem2.name), "this value should overwrite the storage value");
     });
   });
   describe("#submit", () => {
