@@ -34,16 +34,13 @@ describe("Binder", () => {
       assert.equal(forms.get(elem1), storage.get(elem1.name));
       assert.equal(forms.get(elem2), storage.get(elem2.name));
     });
-    it("should write changed form values or remove", async () => {
+    it("should write changed form values", async () => {
       const elem1 = { name: "n1" };
-      const elem2 = { name: "n2" };
       const storage: Map<string, string> = new Map([
-        [elem1.name, "this entry should be removed"],
-        [elem2.name, "this value should be overwrited after first sync"],
+        [elem1.name, "this value should be overwrited after first sync"],
       ]);
       const forms: Map<{ name: string}, ?string> = new Map([
         [elem1, "this value should be overwrited by stored value"],
-        [elem2, "this value should be overwrited by stored value"],
       ]);
       const storageHandler = {
         write: sinon.spy(async (n, v) => storage.set(n, v)),
@@ -56,18 +53,16 @@ describe("Binder", () => {
       };
 
       const binder = new Binder(storageHandler, formHandler);
-      await binder.sync([elem1, elem2]);
+      await binder.sync([elem1]);
 
       assert.equal(forms.get(elem1), storage.get(elem1.name));
 
       // edit some input such as unchecking a checkbox
-      forms.set(elem1, null);
-      forms.set(elem2, "this value should overwrite the storage value");
+      forms.set(elem1, "this value should overwrite the storage value");
 
-      await binder.sync([elem1, elem2]);
+      await binder.sync([elem1]);
 
-      assert.equal(storage.has(elem1.name), false);
-      assert.equal(storage.get(elem2.name), "this value should overwrite the storage value");
+      assert.equal(storage.get(elem1.name), "this value should overwrite the storage value");
     });
   });
   describe("#submit", () => {

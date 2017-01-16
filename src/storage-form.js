@@ -84,7 +84,7 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
               flatten(records.map((r) => (r.removedNodes: Iterable<any>)))
               .filter((e) => e instanceof HTMLElement);
         if (removed.length > 0) {
-          // Use any to force cast to Array<FormComponentElements>
+          // Use "any" to force cast to Array<FormComponentElements>
           remove(this, (removed.filter((e) => (e: any).name): Array<any>));
           for (const e of removed) {
             disconnectComponent(this, e);
@@ -231,10 +231,17 @@ function writeForm(component: any, newValue: ?Value): void {
   component.value = newValue;
 }
 
-function readForm(component: any): ?Value {
+function readForm(component: any): Value {
   const type = component.type;
   if (type === "checkbox" || type === "radio") {
-    return component.checked ? component.value : null;
+    if (component.checked) {
+      return component.value;
+    }
+    const uncheckedValue = component.dataset.uncheckedValue;
+    if (uncheckedValue) {
+      return uncheckedValue;
+    }
+    return "";
   }
   return component.value;
 }
