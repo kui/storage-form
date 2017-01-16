@@ -1,108 +1,87 @@
 // @flow
 
-import * as u from "./utils";
-
-declare type Name = string;
-declare type Value = string;
-declare type NameValue = { name: Name, value: ?Value };
-declare type Values = Map<Element, NameValue>;
-export interface Element {
-  name: Name;
-}
-declare interface StorageHandler {
-  read(n: Name): Promise<?Value>;
-  write(n: Name, v: Value): Promise<void>;
-  remove(n: Name): Promise<void>;
-}
-declare interface FormHandler {
-  write(e: Element, v: ?Value): void;
-  read(e: Element): Value;
+declare interface DiffValue {
+  isChanged: boolean;
 }
 
-export default class Binder {
-  v: Values;
-  s: StorageHandler;
-  f: FormHandler;
-  lock: ?Promise<mixed>;
+export interface StorageHandler<Key, Value, Changes: DiffValue> {
+  write(c: Iterator<[Key, Changes]>, isForce: boolean): Promise<void>;
+  readAll(): Promise<Map<Key, Value>>;
+}
 
-  constructor(s: StorageHandler, f: FormHandler) {
-    this.v = new Map;
-    this.s = s;
-    this.f = f;
+export interface DataHandler<Key, Value, Changes: DiffValue> {
+  a: StorageHandler<Key, Value, Changes>;
+  b: StorageHandler<Key, Value, Changes>;
+  diff(oldValue: ?Value, newValue: ?Value): Changes;
+}
+
+export interface ValueChangeEvent {
+  type: "atob" | "btoa" | "sync";
+  isForce: boolean;
+}
+
+export default class Binder<Key, Value, Changes: DiffValue> {
+  handler: DataHandler<Key, Value, Changes>;
+  values: Map<Key, Value>;
+  lock: ?Promise<any>;
+  onChange: (e: ValueChangeEvent) => Promise<void>;
+
+  constructor(handler: DataHandler<Key, Value, Changes>) {
+    this.handler = handler;
+    this.values = new Map;
     this.lock = null;
   }
 
-  async sync(targets: Array<Element>): Promise<void> {
-    await syncBlock(this, () => doSync(this, targets));
+  async aToB(o?: { force: boolean } = { force: false }) {
+    const hasChanged =
+          await lockBlock(this, () => readAndWrite(this, this.handler.a, this.handler.b, o.force));
+    if (hasChanged && this.onChange) await this.onChange({ type: "atob", isForce: o.force});
   }
 
-  /// Force write form values to the storage
-  async submit(targets: Array<Element>): Promise<void> {
-    await syncBlock(this, () => Promise.all(targets.map(async (e) => {
-      await store(this, e);
-    })));
+  async bToA(o?: { force: boolean } = { force: false }) {
+    const hasChanged =
+          await lockBlock(this, () => readAndWrite(this, this.handler.b, this.handler.a, o.force));
+    if (hasChanged && this.onChange) await this.onChange({ type: "btoa", isForce: o.force});
   }
 
-  /// Sync only new elements
-  async scan(targets: Array<Element>): Promise<void> {
-    await syncBlock(this, async () => {
-      const newElements = u.subtractSet(new Set(targets), new Set(this.v.keys()));
-      await doSync(this, Array.from(newElements));
+  async sync() {
+    let hasChanged = false;
+    await lockBlock(this, async () => {
+      hasChanged = (await readAndWrite(this, this.handler.a, this.handler.b, false)) || hasChanged;
+      hasChanged = (await readAndWrite(this, this.handler.b, this.handler.a, false)) || hasChanged;
     });
-  }
-
-  /// Invork if an element was removed from a form.
-  async remove(elements: Array<Element>) {
-    await syncBlock(this, async () => {
-      for (const e of elements) this.v.delete(e);
-    });
+    if (hasChanged && this.onChange) await this.onChange({ type: "sync", isForce: false});
   }
 }
 
-async function doSync(self: Binder, targets: Array<Element>) {
-  await Promise.all(targets.map(async (e) => {
-    await load(self, e);
-    await store(self, e);
-  }));
-}
-
-async function syncBlock(self: Binder, fn: () => Promise<mixed>) {
+async function lockBlock<K, V, C: DiffValue, T>(self: Binder<K, V, C>, fn: () => Promise<T>): Promise<T> {
   while (self.lock) await self.lock;
   self.lock = fn();
-  await self.lock;
+  const t = await self.lock;
   self.lock = null;
+  return t;
 }
 
-async function load(self: Binder, elem: Element): Promise<void> {
-  const newN = elem.name;
-  const newV = await self.s.read(newN);
-  let nv: ?NameValue = self.v.get(elem);
-  if (!nv) {
-    nv = { name: elem.name, value: null };
-    self.v.set(elem, nv);
-  }
-  if (nv.name !== newN || nv.value !== newV) {
-    self.f.write(elem, newV);
-    nv.name =  newN;
-    nv.value =  newV;
-  }
+async function readAndWrite<K, V, C: DiffValue, H: StorageHandler<K, V, C>>(
+  self: Binder<K, V, C>, from: H, to: H, isForce: boolean): Promise<boolean> {
+  const newValues = await from.readAll();
+  const oldValues = self.values;
+  self.values = newValues;
+  const keys: Set<K> = new Set(concat(oldValues.keys(), newValues.keys()));
+  let hasChanged = false;
+  const changes = map(keys, (k) => {
+    const d = self.handler.diff(oldValues.get(k), newValues.get(k));
+    hasChanged = hasChanged || d.isChanged;
+    return [k, d];
+  });
+  await to.write(changes, isForce);
+  return hasChanged;
 }
 
-async function store(self: Binder, elem: Element): Promise<void> {
-  const newN = elem.name;
-  const newV = self.f.read(elem);
-  let nv: ?NameValue = self.v.get(elem);
-  if (!nv) {
-    nv = { name: elem.name, value: null };
-    self.v.set(elem, nv);
-  }
-  if (nv.name !== newN || nv.value !== newV) {
-    if (newV == null) {
-      await self.s.remove(newN);
-    } else {
-      await self.s.write(newN, newV);
-    }
-    nv.name =  newN;
-    nv.value =  newV;
-  }
+function* concat<K>(...iters: Iterable<K>[]): Iterator<K> {
+  for (const iter of iters) for (const k of iter) yield k;
+}
+
+function* map<T, U>(iter: Iterable<T>, fn: (t: T) => U): Iterator<U> {
+  for (const t of iter) yield fn(t);
 }

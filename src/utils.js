@@ -1,7 +1,7 @@
 // @flow
 
 export class CancellablePromise<R> extends Promise<R> {
-  cancellFunction: () => void;
+  cancell: () => void;
   constructor(
     callback: (
       resolve: (result: Promise<R> | R) => void,
@@ -10,11 +10,7 @@ export class CancellablePromise<R> extends Promise<R> {
     cancell: () => void
   ) {
     super(callback);
-    this.cancellFunction = cancell;
-  }
-
-  cancell() {
-    this.cancellFunction();
+    this.cancell = cancell;
   }
 }
 
@@ -26,6 +22,25 @@ export function sleep(msec: number): CancellablePromise<void> {
     },
     () => {
       clearTimeout(timeoutId);
+    }
+  );
+}
+
+declare type PeriodicalTask = { interval: () => number, task: () => Promise<void> };
+
+export function periodicalTask(o: PeriodicalTask): CancellablePromise<void> {
+  let sleepPromise;
+  return new CancellablePromise(
+    async () => {
+      do {
+        await o.task();
+        sleepPromise = sleep(o.interval());
+        await sleepPromise;
+      } while (sleepPromise);
+    },
+    () => {
+      if (sleepPromise) sleepPromise.cancell();
+      sleepPromise = null;
     }
   );
 }
@@ -62,6 +77,16 @@ export class ArrayValueMap<K, V> extends MultiValueMap<K, V, Array<V>> {
     a.push(value);
     return this;
   }
+  getOrSetEmpty(key: K): Array<V> {
+    const v = super.get(key);
+    if (v == null) {
+      const n = [];
+      super.set(key, n);
+      return n;
+    } else {
+      return v;
+    }
+  }
 }
 
 export class SetValueMap<K, V> extends MultiValueMap<K, V, Set<V>> {
@@ -74,4 +99,37 @@ export class SetValueMap<K, V> extends MultiValueMap<K, V, Set<V>> {
     a.add(value);
     return this;
   }
+}
+
+export function mergeNextPromise(task: () => Promise<void>): () => Promise<void> {
+  let currentPromise: ?Promise<void>;
+  let nextPromise: ?Promise<void>;
+  return async () => {
+    if (nextPromise) {
+      await nextPromise;
+      return;
+    }
+
+    if (currentPromise) {
+      nextPromise = (async () => {
+        if (currentPromise) {
+          await currentPromise;
+        }
+        nextPromise = null;
+
+        currentPromise = task();
+        await currentPromise;
+        currentPromise = null;
+      })();
+
+      await nextPromise;
+      return;
+    }
+
+    currentPromise = (async () => {
+      await task();
+      currentPromise = null;
+    })();
+    await currentPromise;
+  };
 }

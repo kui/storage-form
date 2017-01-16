@@ -16,6 +16,11 @@
   ],
   plugins: [
     "transform-flow-strip-types",
+    ["strip-function-call", {
+      strip: [
+        "console.debug"
+      ]
+    }],
   ],
   env: {
     production: {
@@ -35,6 +40,10 @@
       ],
       plugins: [
         "transform-flow-strip-types",
+        "unassert",
+        ["strip-function-call", {
+          strip: [ "console.debug" ]
+        }],
       ],
     },
   },
