@@ -62,6 +62,16 @@ export class ArrayValueMap<K, V> extends MultiValueMap<K, V, Array<V>> {
     a.push(value);
     return this;
   }
+  getOrSetEmpty(key: K): Array<V> {
+    const v = super.get(key);
+    if (v == null) {
+      const n = [];
+      super.set(key, n);
+      return n;
+    } else {
+      return v;
+    }
+  }
 }
 
 export class SetValueMap<K, V> extends MultiValueMap<K, V, Set<V>> {
