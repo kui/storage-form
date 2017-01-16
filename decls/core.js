@@ -1,3 +1,4 @@
 declare class Object {
-  static entries<V>(object: { k: V }): Array<[string, V]>;
+  static entries<K, V>(object: { [k: K]: V }): Array<[K, V]>;
+  static assign: Object$Assign;
 }

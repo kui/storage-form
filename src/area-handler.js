@@ -4,9 +4,8 @@
 export type Area = string;
 
 export interface AreaHandler {
-  read(name: string): Promise<?string>;
-  write(name: string, newValue: string): Promise<void>;
-  remove(name: string): Promise<void>;
+  read(names: string[]): Promise<{ [name: string]: ?string }>;
+  write(items: { [name: string]: string }): Promise<void>;
 }
 
 const handlers: { [area: Area]: AreaHandler } = {};
@@ -35,17 +34,16 @@ export class WebStorageAreaHandler {
     this.storage = storage;
   }
 
-  read(name: string): Promise<?string> {
-    return Promise.resolve(this.storage.getItem(name));
+  read(names: string[]): Promise<{ [name: string]: ?string }> {
+    const r = names
+          .map((n) => [n, this.storage.getItem(n)])
+          .reduce((o, [n, v]) => { o[n] = v; return o; }, {});
+    return Promise.resolve(r);
   }
 
-  write(name: string, newValue: string): Promise<void> {
-    this.storage.setItem(name, newValue);
-    return Promise.resolve();
-  }
-
-  remove(name: string): Promise<void> {
-    this.storage.removeItem(name);
+  write(items: { [name: string]: string }): Promise<void> {
+    for (const [n, v] of Object.entries(items))
+      this.storage.setItem(n, v);
     return Promise.resolve();
   }
 }
@@ -64,44 +62,44 @@ export class ChromeStorageAreaHandler {
     this.storage = storage;
   }
 
-  read(name: string): Promise<?string> {
-    return new Promise((resolve) => this.storage.get(name, (v) => resolve(v[name])));
+  read(names: string[]): Promise<{ [name: string]: ?string }> {
+    return new Promise((resolve) => this.storage.get(names, resolve));
   }
 
-  write(name: string, newValue: string): Promise<void> {
-    return new Promise((resolve) => this.storage.set({ [name]: newValue }, resolve));
-  }
-
-  remove(name: string): Promise<void> {
-    return new Promise((resolve) => this.storage.remove(name, resolve));
+  write(items: { [name: string]: string }): Promise<void> {
+    return new Promise((resolve) => this.storage.set(items, resolve));
   }
 }
 
-export class BatchWriteChromeStorageAreaHandler extends ChromeStorageAreaHandler {
+export class BufferedWriteChromeStorageAreaHandler extends ChromeStorageAreaHandler {
   delayMillis: number;
   updatedEntries: ?{ [k: string]: string };
+  writePromise: Promise<void>;
 
   constructor(storage: ChromeStorageArea & { MAX_WRITE_OPERATIONS_PER_HOUR: number }) {
     super(storage);
     // what interval we should keep for a write operation.
     this.delayMillis = (60 * 60 * 1000 / storage.MAX_WRITE_OPERATIONS_PER_HOUR) + 500;
     this.updatedEntries = null;
+    this.writePromise = Promise.reject(Error("Illegal state"));
   }
 
-  write(name: string, newValue: string): Promise<void> {
+  write(items: { [name: string]: string }): Promise<void> {
     if (this.updatedEntries != null) {
-      this.updatedEntries[name] = newValue;
-      return Promise.resolve();
+      Object.assign(this.updatedEntries, items);
+      return this.writePromise;
     }
 
-    this.updatedEntries = { [name]: newValue };
-    setTimeout(() => {
-      if (this.updatedEntries == null) return;
-      this.storage.set(this.updatedEntries);
-      this.updatedEntries = null;
-    }, this.delayMillis);
+    this.updatedEntries = Object.assign({}, items);
+    this.writePromise = new Promise((resolve) => {
+      setTimeout(() => {
+        if (this.updatedEntries == null) return;
+        this.storage.set(this.updatedEntries, resolve);
+        this.updatedEntries = null;
+      }, this.delayMillis);
+    });
 
-    return Promise.resolve();
+    return this.writePromise;
   }
 }
 
@@ -109,5 +107,5 @@ if (typeof chrome !== "undefined" && chrome.storage) {
   if (chrome.storage.local)
     registerHandler("chrome-local", new ChromeStorageAreaHandler(chrome.storage.local));
   if (chrome.storage.sync)
-    registerHandler("chrome-sync", new BatchWriteChromeStorageAreaHandler(chrome.storage.sync));
+    registerHandler("chrome-sync", new BufferedWriteChromeStorageAreaHandler(chrome.storage.sync));
 }
