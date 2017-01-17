@@ -102,24 +102,33 @@ export class SetValueMap<K, V> extends MultiValueMap<K, V, Set<V>> {
 }
 
 export function mergeNextPromise(task: () => Promise<void>): () => Promise<void> {
-  const promises = [];
-  async function f() {
-    if (promises[0]) await promises[0]();
-    await task();
-    promises.shift();
-  }
+  let currentPromise: ?Promise<void>;
+  let nextPromise: ?Promise<void>;
   return async () => {
-    if (promises.length === 0) {
-      promises.push(f);
-      await promises[0]();
+    if (nextPromise) {
+      await nextPromise;
       return;
     }
-    if (promises.length === 1) {
-      promises.push(f);
-      await promises[1]();
+
+    if (currentPromise) {
+      nextPromise = (async () => {
+        if (currentPromise) {
+          await currentPromise;
+        }
+        nextPromise = null;
+
+        currentPromise = task();
+        await currentPromise;
+        currentPromise = null;
+      })();
+      await nextPromise;
       return;
     }
-    await promises[1]();
-    return;
+
+    currentPromise = (async () => {
+      await task();
+      currentPromise = null;
+    })();
+    await currentPromise;
   };
 }
