@@ -40,5 +40,24 @@ describe("utils", () => {
 
       assert.equal(count, 4);
     });
+    it("should return the same promise with third task and second task.", async () => {
+      const t = utils.mergeNextPromise(async () => {
+        await utils.sleep(70);
+      });
+
+      const start = new Date().getTime();
+      const p1 = t().then(() => new Date().getTime() - start);
+      const p2 = t().then(() => new Date().getTime() - start);
+      const p3 = t().then(() => new Date().getTime() - start);
+
+      const times = await Promise.all([p1, p2, p3]);
+      console.log("elapsedTimeMillis: ", times);
+      const d12 = Math.abs(times[0] - times[1]);
+      const d13 = Math.abs(times[0] - times[2]);
+      const d23 = Math.abs(times[1] - times[2]);
+      assert(d12 > 70);
+      assert(d13 > 70);
+      assert(d23 < 10);
+    });
   });
 });

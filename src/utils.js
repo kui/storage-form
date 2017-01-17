@@ -121,6 +121,7 @@ export function mergeNextPromise(task: () => Promise<void>): () => Promise<void>
         await currentPromise;
         currentPromise = null;
       })();
+
       await nextPromise;
       return;
     }
