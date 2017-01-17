@@ -61,14 +61,14 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
         dispatchEvent(this, `storage-form-${type}`, this);
       };
 
+      this.binder.startAutoBinding();
+
       this.addEventListener("submit", (event) => {
         event.preventDefault();
-        this.binder.submit();
+        this.binder.submit({ force: true });
       });
 
       setObserver(this);
-
-      this.binder.startAutoBinding();
     }
 
     attachedCallback() {
@@ -97,7 +97,7 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
     }
 
     initBinder() { this.binder.init(); }
-    load() { return this.binder.load(); }
+    load() { return this.binder.load({ force: true }); }
     sync() { return this.binder.sync(); }
   };
 }
@@ -116,7 +116,7 @@ function generateBindee(self: InternalStorageForm): BindeeElement {
 function* getStorageElements(self: InternalStorageForm): Iterator<HTMLElement> {
   for (const e of self.elements) {
     if (e.area != null) continue; // filter out "area-select"
-    if (e.name) continue;
+    if (!e.name) continue;
     yield e;
   }
 }

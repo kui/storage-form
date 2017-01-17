@@ -40,8 +40,6 @@ export default class StorageBinder {
         return;
       }
     });
-
-    this.startAutoBinding();
   }
 
   init() {
@@ -53,12 +51,12 @@ export default class StorageBinder {
     };
   }
 
-  async load() {
-    await this.binder.aToB();
+  async load(o?: { force: boolean }) {
+    await this.binder.aToB(o);
   }
 
-  async submit() {
-    await this.binder.bToA();
+  async submit(o?: { force: boolean }) {
+    await this.binder.bToA(o);
   }
 
   async sync() {
@@ -91,27 +89,28 @@ function initBinder(bindee: BindeeElement): Binder<string, string, Change> {
 
 class StorageAreaHandler {
   bindee: BindeeElement;
-  handler: ah.AreaHandler;
+  handler: ?ah.AreaHandler;
 
   constructor(bindee: BindeeElement) {
     this.bindee = bindee;
     const h = getAreaHandler(bindee);
-    if (h == null) throw Error();
     this.handler = h;
   }
 
   async readAll(): Promise<Map<string, string>> {
-    const o = Object.entries(await this.handler.read(Array.from(this.bindee.getNames)))
-          .filter(([, v]) => v != null);
-    return new Map(o);
+    if (!this.handler) return new Map;
+    const o: { [n: string]: string } = (await this.handler.read(Array.from(this.bindee.getNames())): any);
+    const a = (Object.entries(o)).filter(([, v]) => v != null);
+    return new Map(a);
   }
 
-  write(changes: Iterator<[string, Change]>): Promise<void> {
+  async write(changes: Iterator<[string, Change]>, isForce: boolean): Promise<void> {
+    if (!this.handler) return;
     const items = {};
     for (const [key, { newValue, isChanged }] of changes) {
-      if (isChanged) items[key] = newValue || "";
+      if (isForce || isChanged) items[key] = newValue || "";
     }
-    return this.handler.write(items);
+    await this.handler.write(items);
   }
 }
 
@@ -141,25 +140,38 @@ class FormHandler {
     for (const e of this.bindee.getElements()) {
       const name: ?string = (e: any).name;
       if (!name) continue; // filter out empty named elements
-      if (items.has(name)) continue;
-      const value: ?string = (e: any).value;
+      const prevValue = items.get(name);
+      if (prevValue) continue; // empty value should update other values such as radio list.
+      const value = readValue(e);
       if (value == null) continue;
       items.set(name, value);
     }
     return Promise.resolve(items);
   }
 
-  write(changes: Iterator<[string, Change]>) {
+  write(changes: Iterator<[string, Change]>, isForce: boolean) {
     const changeMap = new Map(changes);
     for (const e of this.bindee.getElements()) {
       const name: ?string = (e: any).name;
       if (!name) continue; // filter out empty named elements
       const change = changeMap.get(name);
-      if (!change || !change.isChanged) continue;
+      if (!change) continue;
+      const isChanged = isForce || change.isChanged;
+      if (!isChanged) continue;
       const value = change.newValue || "";
       writeValue(e, value);
     }
     return Promise.resolve();
+  }
+}
+
+function readValue(e: HTMLElement): ?string {
+  if ((e instanceof HTMLInputElement) && ["checkbox", "radio"].includes(e.type)) {
+    if (e.checked) return e.value;
+    if (e.dataset.uncheckedValue) return e.dataset.uncheckedValue;
+    return "";
+  } else if (e.value != null) {
+    return (e: any).value;
   }
 }
 

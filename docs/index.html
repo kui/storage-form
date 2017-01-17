@@ -26,7 +26,7 @@
 
 <p>See <a href="https://github.com/kui/storage-elements/blob/master/docs/index.html">HTML souce</a>.</p>
 
-<h2>Manually save example</h2>
+<h2>Manually save/load example</h2>
 
 <p>Using all supported form components. You need to click [Save] to store values. These value are stored into <code>localStorage</code></p>
 
@@ -52,47 +52,61 @@
       <option>value-3</option>
     </select>
   </label></p>
-  <p><input type="submit" value="Save"></p>
-</form>
+  <p><button>Save</button> <button onclick="this.form.load(); return false;">Load</button></p>
+ </form>
 
 <script>
-  // You can hook the initialize complete.
-  document.getElementById("example1").addEventListener("storage-form-init", (event) => {
-    console.log("initialized example1: ", event);
-  });
+  // You can hook some events
+  const ex1 = document.getElementById("example1");
+  for (const type of ["storage-form-load", "storage-form-submit", "storage-form-sync"]) {
+    ex1.addEventListener("storage-form-", (event) => {
+      console.log("example1 event", event);
+    });
+  }
 </script>
 
 
-<h2>Auto save/load example</h2>
+<h2>Auto load example</h2>
 
-<p>An <code>autosync</code> attribute are a function that store the <code>bar</code>'s value automatically, and load it's value when it is changed by another javascript. You can confirm that the <code>bar</code> form value is changed when you change it from a developer console of your browser.</p>
+<p>An <code>autoload</code> attribute are a function that </p>
 
 <form is="storage-form"
       id="example2"
       area="session-storage"
+      autoload>
+  <label>bar: <input name="bar"></label>
+  <input type="submit" value="Save">
+</form>
+
+<h2>Auto sync example</h2>
+
+<p>An <code>autosync</code> attribute are a function that store the <code>bar</code>'s value automatically, and load it's value when it is changed by another javascript. You can confirm that the <code>bar</code> form value is changed when you change it from a developer console of your browser.</p>
+
+<form is="storage-form"
+      id="example3"
+      area="session-storage"
       autosync>
   <label>bar: <input name="bar"></label>
-  <label>chk: <input name="chk" type="checkbox"></label>
 </form>
 
 
 <h2>Dynamic building using javascript</h2>
 
-<div id="example3-anchor"></div>
+<div id="example4-anchor"></div>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
     // For the third example
-    const base = document.getElementById("example3-anchor");
+    const base = document.getElementById("example4-anchor");
     const form = base.appendChild(document.createElement("form", "storage-form"));
     form.area = "local-storage";
 
     // Append <input>s on next tick.
     setTimeout(() => {
       const input1 = form.appendChild(document.createElement("input"));
-      input1.name = "ex3-1";
+      input1.name = "ex4-1";
       const input2 = form.appendChild(document.createElement("input"));
       input2.type = "checkbox";
-      input2.name = "ex3-2";
+      input2.name = "ex4-2";
       const submit = form.appendChild(document.createElement("input"));
       submit.type = "submit";
     }, 1);
@@ -105,15 +119,15 @@
 <p>You can change the stored area for the <code>ex4</code>'s value using an <code>area-select</code> element.</p>
 
 <form is="storage-form"
-      id="example4"
+      id="example5"
       autosync>
   <label>Storage Area:
-    <select is="area-select" name="example4-area" area="local-storage">
+    <select is="area-select" name="example5-area" area="local-storage">
       <option value="local-storage">localStorage
       <option value="session-storage">sessionStorage
     </select>
   </label><br>
-  <label>ex4: <input name="ex4"></label>
+  <label>ex5: <input name="ex5"></label>
 </form>
 
 <!-- github ribbons -->

@@ -5,7 +5,7 @@ declare interface DiffValue {
 }
 
 export interface StorageHandler<Key, Value, Changes: DiffValue> {
-  write(c: Iterator<[Key, Changes]>): Promise<void>;
+  write(c: Iterator<[Key, Changes]>, isForce: boolean): Promise<void>;
   readAll(): Promise<Map<Key, Value>>;
 }
 
@@ -27,21 +27,23 @@ export default class Binder<Key, Value, Changes: DiffValue> {
     this.lock = null;
   }
 
-  async aToB() {
-    const hasChanged = await lockBlock(this, () => readAndWrite(this, this.handler.a, this.handler.b));
+  async aToB(o?: { force: boolean } = { force: false }) {
+    const hasChanged =
+          await lockBlock(this, () => readAndWrite(this, this.handler.a, this.handler.b, o.force));
     if (hasChanged && this.onChange) await this.onChange("atob");
   }
 
-  async bToA() {
-    const hasChanged = await lockBlock(this, () => readAndWrite(this, this.handler.b, this.handler.a));
+  async bToA(o?: { force: boolean } = { force: false }) {
+    const hasChanged =
+          await lockBlock(this, () => readAndWrite(this, this.handler.b, this.handler.a, o.force));
     if (hasChanged && this.onChange) await this.onChange("btoa");
   }
 
   async sync() {
     let hasChanged = false;
     await lockBlock(this, async () => {
-      hasChanged = (await readAndWrite(this, this.handler.a, this.handler.b)) || hasChanged;
-      hasChanged = (await readAndWrite(this, this.handler.b, this.handler.a)) || hasChanged;
+      hasChanged = (await readAndWrite(this, this.handler.a, this.handler.b, false)) || hasChanged;
+      hasChanged = (await readAndWrite(this, this.handler.b, this.handler.a, false)) || hasChanged;
     });
     if (hasChanged && this.onChange) await this.onChange("sync");
   }
@@ -55,8 +57,7 @@ async function lockBlock<K, V, C: DiffValue, T>(self: Binder<K, V, C>, fn: () =>
   return t;
 }
 
-async function readAndWrite<K, V, C: DiffValue, H: StorageHandler<K, V, C>>(
-  self: Binder<K, V, C>,from: H,to: H): Promise<boolean> {
+async function readAndWrite<K, V, C: DiffValue, H: StorageHandler<K, V, C>>(self: Binder<K, V, C>, from: H, to: H, isForce: boolean): Promise<boolean> {
   const newValues = await from.readAll();
   const oldValues = self.values;
   self.values = newValues;
@@ -67,7 +68,7 @@ async function readAndWrite<K, V, C: DiffValue, H: StorageHandler<K, V, C>>(
     hasChanged = hasChanged || d.isChanged;
     return [k, d];
   });
-  await to.write(changes);
+  await to.write(changes, isForce);
   return hasChanged;
 }
 
