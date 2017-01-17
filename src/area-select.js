@@ -26,8 +26,11 @@ export function mixinAreaSelect<T: HTMLSelectElement>(c: Class<T>): Class<T & Ar
 
     createdCallback() {
       this.binder = new StorageBinder(generateBindee(this));
-      observeValue(this, async () => {
+      this.binder.onChange = async (type) => {
         writeArea(this);
+        dispatchEvent(this, `area-select-${type}`, this);
+      };
+      observeValue(this, async () => {
         await this.binder.submit();
       });
     }
@@ -99,6 +102,10 @@ function addAllHandlers(self: InternalAreaSelect) {
     o.innerHTML = area;
     self.appendChild(o);
   }
+}
+
+function dispatchEvent(self: HTMLElement, type: string, detail?: any): boolean {
+  return self.dispatchEvent(new CustomEvent(type, detail));
 }
 
 function getAttr(self: HTMLElement, name: string): string {

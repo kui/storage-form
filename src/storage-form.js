@@ -44,7 +44,7 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
 
     get interval(): number {
       const n = parseInt(getAttr(this, "interval"));
-      return n > 0 ? n : DEFAULT_INTERVAL;
+      return n > 300 ? n : DEFAULT_INTERVAL;
     }
     set interval(v: any) { this.setAttribute("interval", v); }
 
@@ -57,6 +57,9 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
 
     createdCallback() {
       this.binder = new StorageBinder(generateBindee(this));
+      this.binder.onChange = async (type) => {
+        dispatchEvent(this, `storage-form-${type}`, this);
+      };
 
       this.addEventListener("submit", (event) => {
         event.preventDefault();

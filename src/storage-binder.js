@@ -23,6 +23,8 @@ export default class StorageBinder {
   doAutoTask: () => Promise<void>;
   autoTask: ?utils.CancellablePromise<void>;
 
+  onChange: (type: "load" | "submit" | "sync") => Promise<void>;
+
   constructor(bindee: BindeeElement) {
     this.bindee = bindee;
     this.autoTask = null;
@@ -44,6 +46,11 @@ export default class StorageBinder {
 
   init() {
     this.binder = initBinder(this.bindee);
+    this.binder.onChange = async (type) => {
+      if (this.onChange) {
+        await this.onChange({ atob: "load", btoa: "submit", sync: "sync"}[type]);
+      }
+    };
   }
 
   async load() {
