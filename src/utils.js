@@ -1,7 +1,7 @@
 // @flow
 
 export class CancellablePromise<R> extends Promise<R> {
-  cancellFunction: () => void;
+  cancell: () => void;
   constructor(
     callback: (
       resolve: (result: Promise<R> | R) => void,
@@ -10,11 +10,7 @@ export class CancellablePromise<R> extends Promise<R> {
     cancell: () => void
   ) {
     super(callback);
-    this.cancellFunction = cancell;
-  }
-
-  cancell() {
-    this.cancellFunction();
+    this.cancell = cancell;
   }
 }
 
@@ -26,6 +22,25 @@ export function sleep(msec: number): CancellablePromise<void> {
     },
     () => {
       clearTimeout(timeoutId);
+    }
+  );
+}
+
+declare type PeriodicalTask = { interval: () => number, task: () => Promise<void> };
+
+export function periodicalTask(o: PeriodicalTask): CancellablePromise<void> {
+  let sleepPromise;
+  return new CancellablePromise(
+    async () => {
+      do {
+        await o.task();
+        sleepPromise = sleep(o.interval());
+        await sleepPromise;
+      } while (sleepPromise);
+    },
+    () => {
+      if (sleepPromise) sleepPromise.cancell();
+      sleepPromise = null;
     }
   );
 }
@@ -84,4 +99,27 @@ export class SetValueMap<K, V> extends MultiValueMap<K, V, Set<V>> {
     a.add(value);
     return this;
   }
+}
+
+export function mergeNextPromise(task: () => Promise<void>): () => Promise<void> {
+  const promises = [];
+  async function f() {
+    if (promises[0]) await promises[0]();
+    await task();
+    promises.shift();
+  }
+  return async () => {
+    if (promises.length === 0) {
+      promises.push(f);
+      await promises[0]();
+      return;
+    }
+    if (promises.length === 1) {
+      promises.push(f);
+      await promises[1]();
+      return;
+    }
+    await promises[1]();
+    return;
+  };
 }
