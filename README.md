@@ -1,6 +1,8 @@
 Storage Elements
 ===================
 
+[![Build Status](https://travis-ci.org/kui/storage-elements.svg?branch=master)](https://travis-ci.org/kui/storage-elements)
+
 Custom elements to manipulate `localStorage`/`sessionStorage`/`chrome.storage.{sync,local}` as `<input>` elements. This make you to build easily configuration pages of your Google Chrome extention or web application.
 
 * [Demo](https://kui.github.io/storage-elements/)
