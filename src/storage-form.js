@@ -4,6 +4,7 @@ import * as utils from "./utils";
 import StorageBinder from "./storage-binder";
 import * as ah from "./area-handler";
 import AreaSelect from "./area-select";
+import LoadButton from "./load-button";
 
 import type { BindeeElement } from "./storage-binder";
 
@@ -140,6 +141,7 @@ export default class HTMLStorageFormElement extends mixedForm {
     // Custom Element v0
     document.registerElement("storage-form", HTMLStorageFormElement);
     document.registerElement("area-select", AreaSelect);
+    document.registerElement("load-button", LoadButton);
   }
 }
 
