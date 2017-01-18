@@ -16,7 +16,7 @@ module.exports = {
   devtool: DEBUG ? "inline-source-map" : "source-map",
   entry: "./src/storage-elements-registerer.js",
   output: {
-    path: "./dist",
+    path: "./dist/storage-form/",
     filename: DEBUG ? "storage-elements-debug.js" : "storage-elements.js"
   },
   module: {

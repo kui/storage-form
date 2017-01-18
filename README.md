@@ -88,3 +88,16 @@ Publish to npm
 $ npm run pre-npm-publish
 $ npm publish
 ```
+
+Release to github
+-------------------
+
+```sh
+# Create the current version tag
+$ ./version-tag.sh
+
+# Create release draft
+$ ./release-github.sh
+```
+ 
+ Then confirm the draft and release it.
