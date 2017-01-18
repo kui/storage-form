@@ -15,11 +15,16 @@ export interface DataHandler<Key, Value, Changes: DiffValue> {
   diff(oldValue: ?Value, newValue: ?Value): Changes;
 }
 
+export interface ValueChangeEvent {
+  type: "atob" | "btoa" | "sync";
+  isForce: boolean;
+}
+
 export default class Binder<Key, Value, Changes: DiffValue> {
   handler: DataHandler<Key, Value, Changes>;
   values: Map<Key, Value>;
   lock: ?Promise<any>;
-  onChange: (type: "atob" | "btoa" | "sync") => Promise<void>;
+  onChange: (e: ValueChangeEvent) => Promise<void>;
 
   constructor(handler: DataHandler<Key, Value, Changes>) {
     this.handler = handler;
@@ -30,13 +35,13 @@ export default class Binder<Key, Value, Changes: DiffValue> {
   async aToB(o?: { force: boolean } = { force: false }) {
     const hasChanged =
           await lockBlock(this, () => readAndWrite(this, this.handler.a, this.handler.b, o.force));
-    if (hasChanged && this.onChange) await this.onChange("atob");
+    if (hasChanged && this.onChange) await this.onChange({ type: "atob", isForce: o.force});
   }
 
   async bToA(o?: { force: boolean } = { force: false }) {
     const hasChanged =
           await lockBlock(this, () => readAndWrite(this, this.handler.b, this.handler.a, o.force));
-    if (hasChanged && this.onChange) await this.onChange("btoa");
+    if (hasChanged && this.onChange) await this.onChange({ type: "btoa", isForce: o.force});
   }
 
   async sync() {
@@ -45,7 +50,7 @@ export default class Binder<Key, Value, Changes: DiffValue> {
       hasChanged = (await readAndWrite(this, this.handler.a, this.handler.b, false)) || hasChanged;
       hasChanged = (await readAndWrite(this, this.handler.b, this.handler.a, false)) || hasChanged;
     });
-    if (hasChanged && this.onChange) await this.onChange("sync");
+    if (hasChanged && this.onChange) await this.onChange({ type: "sync", isForce: false});
   }
 }
 

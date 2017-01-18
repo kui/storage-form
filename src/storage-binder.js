@@ -44,9 +44,9 @@ export default class StorageBinder {
 
   init() {
     this.binder = initBinder(this.bindee);
-    this.binder.onChange = async (type) => {
+    this.binder.onChange = async (event) => {
       if (this.onChange) {
-        await this.onChange({ atob: "load", btoa: "submit", sync: "sync"}[type]);
+        await this.onChange({ atob: "load", btoa: "submit", sync: "sync"}[event.type]);
       }
     };
   }

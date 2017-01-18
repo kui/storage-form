@@ -59,8 +59,8 @@
   // You can hook some events
   const ex1 = document.getElementById("example1");
   for (const type of ["storage-form-load", "storage-form-submit", "storage-form-sync"]) {
-    ex1.addEventListener("storage-form-", (event) => {
-      console.log("example1 event", event);
+    ex1.addEventListener(type, (event) => {
+      console.log("example1 event", type, event);
     });
   }
 </script>
