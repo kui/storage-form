@@ -1,7 +1,7 @@
 {
-  "name": "storage-element",
-  "version": "0.0.1",
-  "description": "custom elements for <input> as a storage, like localStorage, sessionStorage and chrome.storage",
+  "name": "storage-form",
+  "version": "1.0.0",
+  "description": "Custom element to use <form> as storages such as localStorage, chrome.storage.",
   "main": "lib/storage-form.js",
   "scripts": {
     "test": "npm run check && mocha --compilers js:babel-register test",
@@ -18,9 +18,12 @@
     "clean": "rm -fr lib dist"
   },
   "keywords": [
-    "custom elements",
+    "web",
+    "web-components",
+    "custom-elements",
     "stroage",
-    "chrome storage"
+    "web-stroage",
+    "chrome-storage"
   ],
   "author": "Keiichiro Ui",
   "license": "MIT",
