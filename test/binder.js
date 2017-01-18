@@ -119,4 +119,5 @@ describe("Binder", () => {
       assert.equal(binder.handler.a.write.callCount, 0);
       assert.equal(binder.handler.b.write.callCount, 2);
     });
+  });
 });
