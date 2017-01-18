@@ -52,5 +52,5 @@
   "engine": {
     "node": "^6.x"
   },
-  "repository": "https://github.com/kui/storage-elements.git"
+  "repository": "https://github.com/kui/storage-form.git"
 }
