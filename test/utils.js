@@ -55,9 +55,9 @@ describe("utils", () => {
       const d12 = Math.abs(times[0] - times[1]);
       const d13 = Math.abs(times[0] - times[2]);
       const d23 = Math.abs(times[1] - times[2]);
-      assert(d12 >= 70);
-      assert(d13 >= 70);
-      assert(d23 <= 10);
+      assert(d12 >= 69);
+      assert(d13 >= 69);
+      assert(d23 <= 20);
     });
   });
 });
