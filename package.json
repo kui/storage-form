@@ -4,7 +4,7 @@
   "description": "custom elements for <input> as a storage, like localStorage, sessionStorage and chrome.storage",
   "main": "lib/storage-form.js",
   "scripts": {
-    "test": "mocha --compilers js:babel-register test",
+    "test": "npm run check && mocha --compilers js:babel-register test",
     "lib": "babel src -d lib",
     "lint": "eslint .",
     "fix": "eslint . --fix",
