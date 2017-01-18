@@ -79,3 +79,12 @@ Dynamic storage `area`. You can change the storage area using `<area-select>`. T
   <input type="submit">
 </form>
 ```
+
+
+Publish to npm
+--------------
+
+```sh
+$ npm run pre-npm-publish
+$ npm publish
+```
