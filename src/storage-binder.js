@@ -4,7 +4,7 @@ import * as utils from "./utils";
 import * as ah from "./area-handler";
 import Binder from "./binder";
 
-import type { DataHandler, StorageHandler } from "./binder";
+import type { Diff, DataHandler, StorageHandler } from "./binder";
 
 export interface Bindee {
   getArea(): ah.Area;
@@ -16,7 +16,7 @@ export interface Bindee {
   getTarget(): HTMLElement;
 }
 
-declare type Change = { oldValue: ?string, newValue: ?string, isChanged: boolean };
+declare type Change = { oldValue: ?string, newValue: ?string };
 
 declare type ChangeEvent = {
   type: "load" | "submit" | "sync",
@@ -91,8 +91,8 @@ function initBinder(bindee: Bindee): Binder<string, string, Change> {
   return new Binder(({
     a: (new StorageAreaHandler(bindee): StorageHandler<string, string, Change>),
     b: (new FormHandler(bindee): StorageHandler<string, string, Change>),
-    diff(oldValue: ?string, newValue: ?string): Change {
-      return { oldValue, newValue, isChanged: (oldValue !== newValue) };
+    diff(oldValue: ?string, newValue: ?string): Diff<Change> {
+      return { change: { oldValue, newValue }, isChanged: (oldValue !== newValue) };
     }
   }: DataHandler<string, string, Change>));
 }
@@ -114,11 +114,11 @@ class StorageAreaHandler {
     return new Map(a);
   }
 
-  async write(changes: Iterator<[string, Change]>, isForce: boolean): Promise<void> {
+  async write(changes: Map<string, Change>): Promise<void> {
     if (!this.handler) return;
     const items = {};
-    for (const [key, { newValue, isChanged }] of changes) {
-      if (isForce || isChanged) items[key] = newValue || "";
+    for (const [key, { newValue }] of changes) {
+      items[key] = newValue || "";
     }
     await this.handler.write(items);
   }
@@ -159,15 +159,12 @@ class FormHandler {
     return Promise.resolve(items);
   }
 
-  write(changes: Iterator<[string, Change]>, isForce: boolean) {
-    const changeMap = new Map(changes);
+  write(changes: Map<string, Change>) {
     for (const e of this.bindee.getElements()) {
       const name: ?string = (e: any).name;
       if (!name) continue; // filter out empty named elements
-      const change = changeMap.get(name);
+      const change = changes.get(name);
       if (!change) continue;
-      const isChanged = isForce || change.isChanged;
-      if (!isChanged) continue;
       const value = change.newValue || "";
       writeValue(e, value);
     }
