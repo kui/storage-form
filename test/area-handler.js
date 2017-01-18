@@ -2,7 +2,7 @@ import assert from "assert";
 import sinon from "sinon";
 import { BufferedWriteChromeStorageAreaHandler } from "../src/area-handler";
 
-describe("BatchWriteChromeStorageAreaHandler", () => {
+describe("BufferedWriteChromeStorageAreaHandler", () => {
   describe("#write", () => {
     it("should delay writing more than 500 msecs if MAX_WRITE_OPERATIONS_PER_HOUR return 7200", async () => {
       const spyset = sinon.spy((item, callback) => { callback(); });

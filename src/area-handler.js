@@ -81,7 +81,7 @@ export class BufferedWriteChromeStorageAreaHandler extends ChromeStorageAreaHand
     // what interval we should keep for a write operation.
     this.delayMillis = (60 * 60 * 1000 / storage.MAX_WRITE_OPERATIONS_PER_HOUR) + 500;
     this.updatedEntries = null;
-    this.writePromise = Promise.reject(Error("Illegal state"));
+    this.writePromise = Promise.resolve();
   }
 
   write(items: { [name: string]: string }): Promise<void> {
