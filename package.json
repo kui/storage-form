@@ -1,6 +1,6 @@
 {
   "name": "storage-form",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Custom element to use <form> as storages such as localStorage, chrome.storage.",
   "main": "lib/storage-form.js",
   "scripts": {
