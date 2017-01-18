@@ -20,15 +20,11 @@ npm run prod-dist
 
 # Require https://github.com/aktau/github-release
 
-github-release release \
-               --user kui \
-               --repo "$REPO" \
-               --tag "$TAG" \
+GH_REL_OPTS="--user kui --repo '$REPO' --tag '$TAG'"
+
+github-release release $GH_REL_OPTS \
                --draft
 
-github-release upload \
-               --user kui \
-               --repo "$REPO" \
-               --tag "$TAG" \
-               --name "$TAR_GZ" \
-               --file "dist/$TAR_GZ"
+github-release upload $GH_REL_OPTS \
+               --file "dist/$TAR_GZ" \
+               --name "$TAR_GZ"
