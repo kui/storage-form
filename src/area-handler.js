@@ -1,6 +1,8 @@
 // @flow
 /* global chrome */
 
+import * as utils from "./utils";
+
 export type Area = string;
 
 export interface AreaHandler {
@@ -75,29 +77,33 @@ export class BufferedWriteChromeStorageAreaHandler extends ChromeStorageAreaHand
   delayMillis: number;
   updatedEntries: ?{ [k: string]: string };
   writePromise: Promise<void>;
+  lastWriteTime: number;
 
   constructor(storage: ChromeStorageArea & { MAX_WRITE_OPERATIONS_PER_HOUR: number }) {
     super(storage);
-    // what interval we should keep for a write operation.
-    this.delayMillis = (60 * 60 * 1000 / storage.MAX_WRITE_OPERATIONS_PER_HOUR) + 500;
+    // how interval we should keep for a write operation.
+    this.delayMillis = (60 * 60 * 1000 / storage.MAX_WRITE_OPERATIONS_PER_HOUR) + 300;
     this.updatedEntries = null;
     this.writePromise = Promise.resolve();
+    this.lastWriteTime = 0;
   }
 
   write(items: { [name: string]: string }): Promise<void> {
-    if (this.updatedEntries != null) {
+    if (this.updatedEntries) {
       Object.assign(this.updatedEntries, items);
       return this.writePromise;
     }
 
-    this.updatedEntries = Object.assign({}, items);
-    this.writePromise = new Promise((resolve) => {
-      setTimeout(() => {
-        if (this.updatedEntries == null) return;
-        this.storage.set(this.updatedEntries, resolve);
-        this.updatedEntries = null;
-      }, this.delayMillis);
-    });
+    const updatedEntries = Object.assign({}, items);
+    this.updatedEntries = updatedEntries;
+    this.writePromise = (async () => {
+      const diffTime = Date.now() - this.lastWriteTime;
+      const sleepTime = this.delayMillis - diffTime;
+      if (sleepTime > 0) await utils.sleep(sleepTime);
+      await new Promise((resolve) => this.storage.set(updatedEntries, resolve));
+      this.updatedEntries = null;
+      this.lastWriteTime = Date.now();
+    })();
 
     return this.writePromise;
   }

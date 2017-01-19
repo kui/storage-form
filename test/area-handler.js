@@ -4,26 +4,36 @@ import { BufferedWriteChromeStorageAreaHandler } from "../src/area-handler";
 
 describe("BufferedWriteChromeStorageAreaHandler", () => {
   describe("#write", () => {
-    it("should delay writing more than 500 msecs if MAX_WRITE_OPERATIONS_PER_HOUR return 7200", async () => {
+    it("should delay the second writing", async () => {
       const spyset = sinon.spy((item, callback) => { callback(); });
       const handler = new BufferedWriteChromeStorageAreaHandler(({
         set: spyset,
-        MAX_WRITE_OPERATIONS_PER_HOUR: 7200,
+        MAX_WRITE_OPERATIONS_PER_HOUR: 14400,
       }: any));
 
-      const start = new Date;
-      handler.write({ n1: "v1" });
-      await handler.write({ n2: "v2" });
-      const elapsedMillis = (new Date).getTime() - start.getTime();
+      const start = Date.now();
+      await handler.write({ n1: "v1" });
+      const firstElapsedMillis = Date.now() - start;
+      handler.write({ n2: "v2" });
+      await handler.write({ n3: "v3" });
+      const secondElapsedMillis = Date.now() - start;
 
-      console.log("elapsedMillis:", elapsedMillis);
-      assert(elapsedMillis > 500);
+      console.log("firstElapsedMillis:", firstElapsedMillis);
+      console.log("secondElapsedMillis:", secondElapsedMillis);
 
-      assert(spyset.calledOnce);
-      const [items] = spyset.args[0];
-      assert.equal(Object.keys(items).length, 2);
-      assert.equal(items["n1"], "v1");
-      assert.equal(items["n2"], "v2");
+      assert(firstElapsedMillis < 100);
+      assert(secondElapsedMillis > 250);
+
+      assert.equal(spyset.callCount, 2);
+
+      const [firstItems] = spyset.args[0];
+      assert.equal(Object.keys(firstItems).length, 1);
+      assert.equal(firstItems["n1"], "v1");
+
+      const [secondItems] = spyset.args[1];
+      assert.equal(Object.keys(secondItems).length, 2);
+      assert.equal(secondItems["n2"], "v2");
+      assert.equal(secondItems["n3"], "v3");
     });
   });
 });
