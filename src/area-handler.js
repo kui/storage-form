@@ -6,7 +6,7 @@ import * as utils from "./utils";
 export type Area = string;
 
 export interface AreaHandler {
-  read(names: string[]): Promise<{ [name: string]: ?string }>;
+  read(names: string[]): Promise<{ [name: string]: string }>;
   write(items: { [name: string]: string }): Promise<void>;
 }
 
@@ -36,10 +36,10 @@ export class WebStorageAreaHandler {
     this.storage = storage;
   }
 
-  read(names: string[]): Promise<{ [name: string]: ?string }> {
+  read(names: string[]): Promise<{ [name: string]: string }> {
     const r = names
           .map((n) => [n, this.storage.getItem(n)])
-          .reduce((o, [n, v]) => { o[n] = v; return o; }, {});
+          .reduce((o, [n, v]) => { if (v != null) o[n] = v; return o; }, {});
     return Promise.resolve(r);
   }
 
@@ -64,7 +64,7 @@ export class ChromeStorageAreaHandler {
     this.storage = storage;
   }
 
-  read(names: string[]): Promise<{ [name: string]: ?string }> {
+  read(names: string[]): Promise<{ [name: string]: string }> {
     return new Promise((resolve) => this.storage.get(names, resolve));
   }
 

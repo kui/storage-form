@@ -1,4 +1,4 @@
-declare type ChromeStorageItems = { [key: string]: any }
+declare type ChromeStorageItems = { [key: string]: string };
 declare class ChromeStorageListenee {
   addListener(callback: (changes: ChromeStorageItems, areaName: string) => void): void;
 }
