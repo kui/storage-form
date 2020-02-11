@@ -64,7 +64,7 @@ function generateBindee(self) {
 function observeValue(self, onChange) {
   let value = self.value;
   (async () => {
-    while (true) {
+    for(;;) {
       await waitAnimationFrame();
       if (self.value === value) continue;
       value = self.value;

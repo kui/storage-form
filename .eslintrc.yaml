@@ -1,16 +1,12 @@
 root: true
 
-parser: 'babel-eslint'
-
 extends:
   - eslint:recommended
-  - babel
 
 env:
   node: true
+  es6: true
 
 parserOptions:
-  ecmaVersion: 7
-
-# List of available rules - ESLint http://eslint.org/docs/rules/
-# rules:
+  ecmaVersion: 2020
+  sourceType: module

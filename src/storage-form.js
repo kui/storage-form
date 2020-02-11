@@ -149,7 +149,7 @@ function setObserver(self) {
 function observeFormControls(self, callback) {
   let elements = self.elements;
   (async () => {
-    while (true) {
+    for(;;) {
       await waitAnimationFrame();
       const newElements = self.elements;
       if (isEqualsArray(elements, newElements)) continue;

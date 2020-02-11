@@ -1,28 +1,19 @@
 const path = require("path");
 const DEBUG = process.env.NODE_ENV !== "production";
-const webpack = require("webpack");
-const BabiliPlugin = require("babili-webpack-plugin");
 
-const plugins = [
-  new webpack.optimize.DedupePlugin(),
-  new webpack.optimize.OccurrenceOrderPlugin(),
-];
-
-if (!DEBUG) {
-  plugins.push(new BabiliPlugin());
-}
+const plugins = [];
 
 module.exports = {
-  debug: DEBUG,
+  mode: DEBUG ? "development" : "production",
   devtool: DEBUG ? "inline-source-map" : "source-map",
   entry: "./src/storage-elements-registerer.js",
   output: {
-    path: path.resolve(__dirname, "./dist/storage-form/"),
+    path: path.resolve(__dirname, "dist"),
     filename: DEBUG ? "storage-elements-debug.js" : "storage-elements.js"
   },
   module: {
-    loaders: [
-      { test: /\.js$/,
+    rules: [
+      { test: /\.m?js$/,
         exclude: /node_modules/,
         loader: "babel-loader" }
     ]
