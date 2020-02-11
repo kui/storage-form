@@ -1,66 +1,51 @@
-// @flow
-
 import * as utils from "./utils";
 import StorageBinder from "./storage-binder";
-import * as ah from "./area-handler";
 import AreaSelect from "./area-select";
 import LoadButton from "./load-button";
 
-import type { Bindee } from "./storage-binder";
-
-declare interface FormControlElement extends HTMLElement {
-  name: string;
-  value?: string;
-  type?: string;
-  checked?: boolean;
-}
-
-export interface StorageForm extends HTMLFormElement {
-  autosync: boolean;
-  autoload: boolean;
-  interval: number;
-  area: string;
-
-  load(): Promise<void>;
-  sync(): Promise<void>;
-}
-
-declare interface InternalStorageForm extends StorageForm {
-  binder: StorageBinder;
-}
-
 const DEFAULT_INTERVAL = 700;
 
-export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & StorageForm> {
-  // $FlowFixMe Force cast to the returned type.
+export function mixinStorageForm(c) {
   return class extends c {
-    initBinder: () => void;
-    binder: StorageBinder;
 
-    get autosync(): boolean { return this.hasAttribute("autosync"); }
-    set autosync(b: boolean) { setAttrAsBoolean(this, "autosync", b); }
+    get autosync() {
+      return this.hasAttribute("autosync");
+    }
+    set autosync(b) {
+      setAttrAsBoolean(this, "autosync", b);
+    }
 
-    get autoload(): boolean { return this.hasAttribute("autoload"); }
-    set autoload(b: boolean) { setAttrAsBoolean(this, "autoload", b); }
+    get autoload() {
+      return this.hasAttribute("autoload");
+    }
+    set autoload(b) {
+      setAttrAsBoolean(this, "autoload", b);
+    }
 
-    get interval(): number {
+    get interval() {
       const n = parseInt(getAttr(this, "interval"));
       return n > 300 ? n : DEFAULT_INTERVAL;
     }
-    set interval(v: any) { this.setAttribute("interval", v); }
+    set interval(v) {
+      this.setAttribute("interval", v);
+    }
 
-    get area(): ah.Area { return getAttr(this, "area"); }
-    set area(v: any) { this.setAttribute("area", v); }
+    get area() {
+      return getAttr(this, "area");
+    }
+    set area(v) {
+      this.setAttribute("area", v);
+    }
 
     connectedCallback() {
       this.binder = new StorageBinder(generateBindee(this));
-      this.binder.onChange = async (event) => {
+      this.binder.onChange = async event => {
         dispatchEvent(this, `storage-form-${event.type}`, event);
       };
 
       this.binder.startAutoBinding();
 
-      this.addEventListener("submit", (event) => {
+      this.addEventListener("submit", event => {
         event.preventDefault();
         this.binder.submit({ force: true });
       });
@@ -71,14 +56,10 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
     }
 
     static get observedAttributes() {
-      return [
-        "autosync",
-        "autoload",
-        "area",
-      ];
+      return ["autosync", "autoload", "area"];
     }
 
-    attributeChangedCallback(attrName: string) {
+    attributeChangedCallback(attrName) {
       if (!this.binder) return;
       switch (attrName) {
       case "autosync":
@@ -92,25 +73,31 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
       }
     }
 
-    initBinder() { this.binder.init(); }
-    load() { return this.binder.load({ force: true }); }
-    sync() { return this.binder.sync(); }
+    initBinder() {
+      this.binder.init();
+    }
+    load() {
+      return this.binder.load({ force: true });
+    }
+    sync() {
+      return this.binder.sync();
+    }
   };
 }
 
-function generateBindee(self: InternalStorageForm): Bindee {
+function generateBindee(self) {
   return {
     getArea: () => self.area,
     getInterval: () => self.interval,
     isAutoSync: () => self.autosync,
     isAutoLoad: () => self.autoload,
-    getNames: () => map(getStorageElements(self), e => (e: any).name),
+    getNames: () => map(getStorageElements(self), e => e.name),
     getElements: () => getStorageElements(self),
-    getTarget: () => self,
+    getTarget: () => self
   };
 }
 
-function* getStorageElements(self: InternalStorageForm): Iterator<HTMLElement> {
+function* getStorageElements(self) {
   for (const e of self.elements) {
     if (e.area != null) continue; // filter out "area-select"
     if (!e.name) continue;
@@ -118,7 +105,7 @@ function* getStorageElements(self: InternalStorageForm): Iterator<HTMLElement> {
   }
 }
 
-function dispatchEvent(self: HTMLElement, type: string, detail?: any): boolean {
+function dispatchEvent(self, type, detail) {
   return self.dispatchEvent(new CustomEvent(type, detail));
 }
 
@@ -131,16 +118,16 @@ export default class HTMLStorageFormElement extends mixedForm {
   }
 }
 
-function setObserver(self: InternalStorageForm) {
-  const formControlObservers = new Map;
+function setObserver(self) {
+  const formControlObservers = new Map();
 
-  function observeFormControl(element: FormControlElement): void {
+  function observeFormControl(element) {
     const o = new MutationObserver(() => self.binder.doAutoTask());
     o.observe(element, { attributes: true, atributeFilter: ["name"] });
     formControlObservers.set(element, o);
   }
 
-  function disconnectFormControl(element: FormControlElement): void {
+  function disconnectFormControl(element) {
     const o = formControlObservers.get(element);
     if (o == null) return;
     o.disconnect();
@@ -159,11 +146,7 @@ function setObserver(self: InternalStorageForm) {
   });
 }
 
-declare type FormControlChanges = {
-  addedElements: Set<FormControlElement>,
-  removedElements: Set<FormControlElement>,
-};
-function observeFormControls(self: InternalStorageForm, callback: (r: FormControlChanges) => Promise<void>) {
+function observeFormControls(self, callback) {
   let elements = self.elements;
   (async () => {
     while (true) {
@@ -188,12 +171,12 @@ function isEqualsArray(a, b) {
   return true;
 }
 
-function getAttr(self: HTMLElement, name: string): string {
+function getAttr(self, name) {
   const v = self.getAttribute(name);
   return v ? v : "";
 }
 
-function setAttrAsBoolean(self: HTMLElement, name: string, b: boolean) {
+function setAttrAsBoolean(self, name, b) {
   if (b) {
     self.setAttribute(name, "");
   } else {
@@ -202,7 +185,7 @@ function setAttrAsBoolean(self: HTMLElement, name: string, b: boolean) {
 }
 
 function waitAnimationFrame() {
-  return new Promise((r) => requestAnimationFrame(r));
+  return new Promise(r => requestAnimationFrame(r));
 }
 
 function* map(iter, mapper) {

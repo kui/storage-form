@@ -1,38 +1,10 @@
-// @flow
-
 import * as utils from "./utils";
 import * as ah from "./area-handler";
 import Binder from "./binder";
 
-import type { Diff, DataHandler, StorageHandler } from "./binder";
-
-export interface Bindee {
-  getArea(): ah.Area;
-  isAutoSync(): boolean;
-  isAutoLoad(): boolean;
-  getInterval(): number;
-  getElements(): Iterable<HTMLElement>;
-  getNames(): Iterable<string>;
-  getTarget(): HTMLElement;
-}
-
-declare type Change = { oldValue: ?string, newValue: ?string };
-
-declare type ChangeEvent = {
-  type: "load" | "submit" | "sync",
-  target: HTMLElement,
-  isForce: boolean,
-};
-
 export default class StorageBinder {
-  bindee: Bindee;
-  binder: Binder<string, string, Change>;
-  doAutoTask: () => Promise<void>;
-  autoTask: ?utils.CancellablePromise<void>;
 
-  onChange: (e: ChangeEvent) => Promise<void>;
-
-  constructor(bindee: Bindee) {
+  constructor(bindee) {
     this.bindee = bindee;
     this.autoTask = null;
     this.init();
@@ -51,8 +23,8 @@ export default class StorageBinder {
 
   init() {
     this.binder = initBinder(this.bindee);
-    this.binder.onChange = async (event) => {
-      const type = { atob: "load", btoa: "submit", sync: "sync"}[event.type];
+    this.binder.onChange = async event => {
+      const type = { atob: "load", btoa: "submit", sync: "sync" }[event.type];
       const e = { type, target: this.bindee.getTarget(), isForce: event.isForce };
       console.debug("onChange: ", e);
       if (this.onChange) {
@@ -61,11 +33,11 @@ export default class StorageBinder {
     };
   }
 
-  async load(o?: { force: boolean }) {
+  async load(o) {
     await this.binder.aToB(o);
   }
 
-  async submit(o?: { force: boolean }) {
+  async submit(o) {
     await this.binder.bToA(o);
   }
 
@@ -76,10 +48,10 @@ export default class StorageBinder {
   async startAutoBinding() {
     if (this.autoTask) this.autoTask.cancell();
 
-    if (this.bindee.isAutoLoad() || this.bindee.isAutoSync() ) {
+    if (this.bindee.isAutoLoad() || this.bindee.isAutoSync()) {
       this.autoTask = utils.periodicalTask({
         interval: () => this.bindee.getInterval(),
-        task: this.doAutoTask,
+        task: this.doAutoTask
       });
     } else {
       this.autoTask = null;
@@ -87,34 +59,32 @@ export default class StorageBinder {
   }
 }
 
-function initBinder(bindee: Bindee): Binder<string, string, Change> {
-  return new Binder(({
-    a: (new StorageAreaHandler(bindee): StorageHandler<string, string, Change>),
-    b: (new FormHandler(bindee): StorageHandler<string, string, Change>),
-    diff(oldValue: ?string, newValue: ?string): Diff<Change> {
-      return { change: { oldValue, newValue }, isChanged: (oldValue !== newValue) };
+function initBinder(bindee) {
+  return new Binder({
+    a: new StorageAreaHandler(bindee),
+    b: new FormHandler(bindee),
+    diff(oldValue, newValue) {
+      return { change: { oldValue, newValue }, isChanged: oldValue !== newValue };
     }
-  }: DataHandler<string, string, Change>));
+  });
 }
 
 class StorageAreaHandler {
-  bindee: Bindee;
-  handler: ?ah.AreaHandler;
 
-  constructor(bindee: Bindee) {
+  constructor(bindee) {
     this.bindee = bindee;
     const h = getAreaHandler(bindee);
     this.handler = h;
   }
 
-  async readAll(): Promise<Map<string, string>> {
-    if (!this.handler) return new Map;
-    const o: { [n: string]: string } = (await this.handler.read(Array.from(this.bindee.getNames())): any);
-    const a = (Object.entries(o)).filter(([, v]) => v != null);
+  async readAll() {
+    if (!this.handler) return new Map();
+    const o = await this.handler.read(Array.from(this.bindee.getNames()));
+    const a = Object.entries(o).filter(([, v]) => v != null);
     return new Map(a);
   }
 
-  async write(changes: Map<string, Change>): Promise<void> {
+  async write(changes) {
     if (!this.handler) return;
     const items = {};
     for (const [key, { newValue }] of changes) {
@@ -124,7 +94,7 @@ class StorageAreaHandler {
   }
 }
 
-function getAreaHandler(bindee: Bindee): ?ah.AreaHandler {
+function getAreaHandler(bindee) {
   const a = bindee.getArea();
   if (!a) {
     console.warn("Require 'area' attribute: ", bindee.getTarget());
@@ -139,16 +109,15 @@ function getAreaHandler(bindee: Bindee): ?ah.AreaHandler {
 }
 
 class FormHandler {
-  bindee: Bindee;
 
-  constructor(bindee: Bindee) {
+  constructor(bindee) {
     this.bindee = bindee;
   }
 
   readAll() {
-    const items = new Map;
+    const items = new Map();
     for (const e of this.bindee.getElements()) {
-      const name: ?string = (e: any).name;
+      const name = e.name;
       if (!name) continue; // filter out empty named elements
       const prevValue = items.get(name);
       if (prevValue) continue; // empty value should update other values such as radio list.
@@ -159,9 +128,9 @@ class FormHandler {
     return Promise.resolve(items);
   }
 
-  write(changes: Map<string, Change>) {
+  write(changes) {
     for (const e of this.bindee.getElements()) {
-      const name: ?string = (e: any).name;
+      const name = e.name;
       if (!name) continue; // filter out empty named elements
       const change = changes.get(name);
       if (!change) continue;
@@ -172,20 +141,20 @@ class FormHandler {
   }
 }
 
-function readValue(e: HTMLElement): ?string {
-  if ((e instanceof HTMLInputElement) && ["checkbox", "radio"].includes(e.type)) {
+function readValue(e) {
+  if (e instanceof HTMLInputElement && ["checkbox", "radio"].includes(e.type)) {
     if (e.checked) return e.value;
     if (e.dataset.uncheckedValue) return e.dataset.uncheckedValue;
     return "";
   } else if (e.value != null) {
-    return (e: any).value;
+    return e.value;
   }
 }
 
-function writeValue(e: HTMLElement, value: string) {
-  if ((e instanceof HTMLInputElement) && ["checkbox", "radio"].includes(e.type)) {
+function writeValue(e, value) {
+  if (e instanceof HTMLInputElement && ["checkbox", "radio"].includes(e.type)) {
     e.checked = e.value === value;
   } else if (e.value != null) {
-    (e: any).value = value;
+    e.value = value;
   }
 }

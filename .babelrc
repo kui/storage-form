@@ -15,7 +15,6 @@
     }],
   ],
   plugins: [
-    "transform-flow-strip-types",
   ],
   env: {
     production: {
@@ -34,7 +33,6 @@
         "babili",
       ],
       plugins: [
-        "transform-flow-strip-types",
         "unassert",
         ["strip-function-call", {
           strip: [ "console.debug" ]

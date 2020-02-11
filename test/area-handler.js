@@ -9,7 +9,7 @@ describe("BufferedWriteChromeStorageAreaHandler", () => {
       const handler = new BufferedWriteChromeStorageAreaHandler(({
         set: spyset,
         MAX_WRITE_OPERATIONS_PER_HOUR: 14400,
-      }: any));
+      }));
 
       const start = Date.now();
       await handler.write({ n1: "v1" });

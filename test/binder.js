@@ -2,13 +2,6 @@ import assert from "assert";
 import sinon from "sinon";
 import Binder from "../src/binder";
 
-import type { Diff,
-              // DataHandler,
-              // StorageHandler
-            } from "./binder";
-
-declare type Change = { isChange: boolean, newValue: ?string };
-
 describe("Binder", () => {
   describe("#aToB", () => {
     it("should write all value of 'a' to 'b' on init.", async () => {
@@ -21,7 +14,7 @@ describe("Binder", () => {
           readAll: sinon.spy(),
           write: sinon.spy(),
         },
-        diff: (oldValue, newValue): Diff<Change> =>
+        diff: (oldValue, newValue) =>
           ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
       });
 
@@ -33,7 +26,7 @@ describe("Binder", () => {
       assert.equal(binder.handler.b.write.callCount, 1);
 
       const args = binder.handler.b.write.args[0];
-      const diffs: Map<string, Diff> = args[0];
+      const diffs = args[0];
       assert.equal(diffs.size, 2);
       const d1 = diffs.get("n1");
       assert.equal(d1 && d1.newValue, "v1");
@@ -50,7 +43,7 @@ describe("Binder", () => {
           readAll: sinon.spy(),
           write: sinon.spy(),
         },
-        diff: (oldValue, newValue): Diff<Change> =>
+        diff: (oldValue, newValue) =>
           ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
       });
 
@@ -71,7 +64,7 @@ describe("Binder", () => {
           readAll: sinon.spy(),
           write: sinon.spy(),
         },
-        diff: (oldValue, newValue): Diff<Change> =>
+        diff: (oldValue, newValue) =>
           ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
       });
 
@@ -100,7 +93,7 @@ describe("Binder", () => {
           readAll: sinon.spy(),
           write: sinon.spy(),
         },
-        diff: (oldValue, newValue): Diff<Change> =>
+        diff: (oldValue, newValue) =>
           ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
       });
 
