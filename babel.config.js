@@ -11,15 +11,16 @@ const envOptions = {
   corejs: 3,
 };
 
-module.exports = {
+const development = {
   presets: [
     [
       "@babel/preset-env",
       envOptions,
     ],
   ],
-  env: {
-    production: {
+};
+
+const production = {
       presets: [
         [
           "@babel/preset-env",
@@ -32,6 +33,6 @@ module.exports = {
           strip: [ "console.debug" ]
         }],
       ],
-    },
-  },
 };
+
+module.exports = Object.assign(development, { env: { production } });

@@ -4,7 +4,7 @@
   "description": "Custom element to use <form> as storages such as localStorage, chrome.storage.",
   "main": "lib/storage-form.js",
   "scripts": {
-    "test": "npm run check && mocha --compilers js:babel-register test",
+    "test": "npm run check && mocha --require '@babel/register' test",
     "lib": "NODE_ENV=production babel src -d lib",
     "lint": "eslint .",
     "fix": "eslint . --fix",
@@ -14,7 +14,7 @@
     "dist": "npm run debug-dist && npm run prod-dist",
     "docs": "npm run check && npm run dist && mkdir -vp docs && cp -v dist/* docs",
     "serve": "webpack-dev-server --output-path docs --content-base docs --open",
-    "pre-npm-publish": "npm run clean && npm run check && npm run dist && npm run lib",
+    "pre-npm-publish": "npm run clean && npm run test && npm run dist && npm run lib",
     "clean": "rm -fr lib dist"
   },
   "keywords": [
@@ -37,9 +37,10 @@
     "babel-plugin-strip-function-call": "^1.0.2",
     "babel-plugin-unassert": "^3.0.1",
     "babel-preset-minify": "^0.5.1",
+    "core-js": "^3.6.4",
     "eslint": "^6.8.0",
-    "mocha": "^3.2.0",
-    "sinon": "^1.17.7",
+    "mocha": "^7.0.1",
+    "sinon": "^8.1.1",
     "webpack": "^4.41.6",
     "webpack-cli": "^3.3.10",
     "webpack-dev-server": "^3.10.3"
