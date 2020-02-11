@@ -3,7 +3,6 @@ import * as ah from "./area-handler";
 import Binder from "./binder";
 
 export default class StorageBinder {
-
   constructor(bindee) {
     this.bindee = bindee;
     this.autoTask = null;
@@ -25,7 +24,11 @@ export default class StorageBinder {
     this.binder = initBinder(this.bindee);
     this.binder.onChange = async event => {
       const type = { atob: "load", btoa: "submit", sync: "sync" }[event.type];
-      const e = { type, target: this.bindee.getTarget(), isForce: event.isForce };
+      const e = {
+        type,
+        target: this.bindee.getTarget(),
+        isForce: event.isForce
+      };
       console.debug("onChange: ", e);
       if (this.onChange) {
         await this.onChange(e);
@@ -64,13 +67,15 @@ function initBinder(bindee) {
     a: new StorageAreaHandler(bindee),
     b: new FormHandler(bindee),
     diff(oldValue, newValue) {
-      return { change: { oldValue, newValue }, isChanged: oldValue !== newValue };
+      return {
+        change: { oldValue, newValue },
+        isChanged: oldValue !== newValue
+      };
     }
   });
 }
 
 class StorageAreaHandler {
-
   constructor(bindee) {
     this.bindee = bindee;
     const h = getAreaHandler(bindee);
@@ -109,7 +114,6 @@ function getAreaHandler(bindee) {
 }
 
 class FormHandler {
-
   constructor(bindee) {
     this.bindee = bindee;
   }

@@ -22,15 +22,17 @@ export function listHandlers() {
 //
 
 export class WebStorageAreaHandler {
-
   constructor(storage) {
     this.storage = storage;
   }
 
   read(names) {
-    const r = names.map(n => [n, this.storage.getItem(n)]).reduce((o, [n, v]) => {
-      if (v != null) o[n] = v;return o;
-    }, {});
+    const r = names
+      .map(n => [n, this.storage.getItem(n)])
+      .reduce((o, [n, v]) => {
+        if (v != null) o[n] = v;
+        return o;
+      }, {});
     return Promise.resolve(r);
   }
 
@@ -48,7 +50,6 @@ if (typeof sessionStorage !== "undefined")
 //
 
 export class ChromeStorageAreaHandler {
-
   constructor(storage) {
     this.storage = storage;
   }
@@ -63,11 +64,11 @@ export class ChromeStorageAreaHandler {
 }
 
 export class BufferedWriteChromeStorageAreaHandler extends ChromeStorageAreaHandler {
-
   constructor(storage) {
     super(storage);
     // how interval we should keep for a write operation.
-    this.delayMillis = 60 * 60 * 1000 / storage.MAX_WRITE_OPERATIONS_PER_HOUR + 300;
+    this.delayMillis =
+      (60 * 60 * 1000) / storage.MAX_WRITE_OPERATIONS_PER_HOUR + 300;
     this.updatedEntries = null;
     this.writePromise = Promise.resolve();
     this.lastWriteTime = 0;
@@ -96,7 +97,13 @@ export class BufferedWriteChromeStorageAreaHandler extends ChromeStorageAreaHand
 
 if (typeof chrome !== "undefined" && chrome.storage) {
   if (chrome.storage.local)
-    registerHandler("chrome-local", new ChromeStorageAreaHandler(chrome.storage.local));
+    registerHandler(
+      "chrome-local",
+      new ChromeStorageAreaHandler(chrome.storage.local)
+    );
   if (chrome.storage.sync)
-    registerHandler("chrome-sync", new BufferedWriteChromeStorageAreaHandler(chrome.storage.sync));
+    registerHandler(
+      "chrome-sync",
+      new BufferedWriteChromeStorageAreaHandler(chrome.storage.sync)
+    );
 }

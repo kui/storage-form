@@ -7,15 +7,23 @@ describe("Binder", () => {
     it("should write all value of 'a' to 'b' on init.", async () => {
       const binder = new Binder({
         a: {
-          readAll: sinon.spy(async () => new Map([["n1", "v1"], ["n2", "v2"]])),
-          write: sinon.spy(),
+          readAll: sinon.spy(
+            async () =>
+              new Map([
+                ["n1", "v1"],
+                ["n2", "v2"]
+              ])
+          ),
+          write: sinon.spy()
         },
         b: {
           readAll: sinon.spy(),
-          write: sinon.spy(),
+          write: sinon.spy()
         },
-        diff: (oldValue, newValue) =>
-          ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
+        diff: (oldValue, newValue) => ({
+          change: { newValue },
+          isChanged: oldValue !== newValue
+        })
       });
 
       await binder.aToB();
@@ -36,15 +44,17 @@ describe("Binder", () => {
     it("should do nothing if no value in 'a'.", async () => {
       const binder = new Binder({
         a: {
-          readAll: sinon.spy(async () => new Map),
-          write: sinon.spy(),
+          readAll: sinon.spy(async () => new Map()),
+          write: sinon.spy()
         },
         b: {
           readAll: sinon.spy(),
-          write: sinon.spy(),
+          write: sinon.spy()
         },
-        diff: (oldValue, newValue) =>
-          ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
+        diff: (oldValue, newValue) => ({
+          change: { newValue },
+          isChanged: oldValue !== newValue
+        })
       });
 
       await binder.aToB();
@@ -57,17 +67,24 @@ describe("Binder", () => {
     it("should do nothing on second call.", async () => {
       const binder = new Binder({
         a: {
-          readAll: sinon.spy(async () => new Map([["n1", "v1"], ["n2", "v2"]])),
-          write: sinon.spy(),
+          readAll: sinon.spy(
+            async () =>
+              new Map([
+                ["n1", "v1"],
+                ["n2", "v2"]
+              ])
+          ),
+          write: sinon.spy()
         },
         b: {
           readAll: sinon.spy(),
-          write: sinon.spy(),
+          write: sinon.spy()
         },
-        diff: (oldValue, newValue) =>
-          ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
+        diff: (oldValue, newValue) => ({
+          change: { newValue },
+          isChanged: oldValue !== newValue
+        })
       });
-
 
       await binder.aToB();
 
@@ -86,17 +103,24 @@ describe("Binder", () => {
     it("should write twice if provided 'force' on second call.", async () => {
       const binder = new Binder({
         a: {
-          readAll: sinon.spy(async () => new Map([["n1", "v1"], ["n2", "v2"]])),
-          write: sinon.spy(),
+          readAll: sinon.spy(
+            async () =>
+              new Map([
+                ["n1", "v1"],
+                ["n2", "v2"]
+              ])
+          ),
+          write: sinon.spy()
         },
         b: {
           readAll: sinon.spy(),
-          write: sinon.spy(),
+          write: sinon.spy()
         },
-        diff: (oldValue, newValue) =>
-          ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
+        diff: (oldValue, newValue) => ({
+          change: { newValue },
+          isChanged: oldValue !== newValue
+        })
       });
-
 
       await binder.aToB();
 

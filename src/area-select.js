@@ -3,7 +3,6 @@ import * as ah from "./area-handler";
 
 export function mixinAreaSelect(c) {
   return class extends c {
-
     get area() {
       return getAttr(this, "area");
     }
@@ -32,10 +31,10 @@ export function mixinAreaSelect(c) {
     attributeChangedCallback(attrName) {
       if (!this.binder) return;
       switch (attrName) {
-      case "area":
-        this.binder.init();
-        this.binder.doAutoTask();
-        break;
+        case "area":
+          this.binder.init();
+          this.binder.doAutoTask();
+          break;
       }
     }
 
@@ -64,7 +63,7 @@ function generateBindee(self) {
 function observeValue(self, onChange) {
   let value = self.value;
   (async () => {
-    for(;;) {
+    for (;;) {
       await waitAnimationFrame();
       if (self.value === value) continue;
       value = self.value;

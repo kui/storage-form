@@ -13,10 +13,8 @@ module.exports = {
   },
   module: {
     rules: [
-      { test: /\.m?js$/,
-        exclude: /node_modules/,
-        loader: "babel-loader" }
+      { test: /\.m?js$/, exclude: /node_modules/, loader: "babel-loader" }
     ]
   },
-  plugins,
+  plugins
 };

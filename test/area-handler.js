@@ -5,11 +5,13 @@ import { BufferedWriteChromeStorageAreaHandler } from "../src/area-handler";
 describe("BufferedWriteChromeStorageAreaHandler", () => {
   describe("#write", () => {
     it("should delay the second writing", async () => {
-      const spyset = sinon.spy((item, callback) => { callback(); });
-      const handler = new BufferedWriteChromeStorageAreaHandler(({
+      const spyset = sinon.spy((item, callback) => {
+        callback();
+      });
+      const handler = new BufferedWriteChromeStorageAreaHandler({
         set: spyset,
-        MAX_WRITE_OPERATIONS_PER_HOUR: 14400,
-      }));
+        MAX_WRITE_OPERATIONS_PER_HOUR: 14400
+      });
 
       const start = Date.now();
       await handler.write({ n1: "v1" });

@@ -7,7 +7,6 @@ const DEFAULT_INTERVAL = 700;
 
 export function mixinStorageForm(c) {
   return class extends c {
-
     get autosync() {
       return this.hasAttribute("autosync");
     }
@@ -62,14 +61,14 @@ export function mixinStorageForm(c) {
     attributeChangedCallback(attrName) {
       if (!this.binder) return;
       switch (attrName) {
-      case "autosync":
-      case "autoload":
-        this.binder.startAutoBinding();
-        break;
-      case "area":
-        this.initBinder();
-        this.binder.doAutoTask();
-        break;
+        case "autosync":
+        case "autoload":
+          this.binder.startAutoBinding();
+          break;
+        case "area":
+          this.initBinder();
+          this.binder.doAutoTask();
+          break;
       }
     }
 
@@ -112,7 +111,9 @@ function dispatchEvent(self, type, detail) {
 const mixedForm = mixinStorageForm(HTMLFormElement);
 export default class HTMLStorageFormElement extends mixedForm {
   static register() {
-    customElements.define("storage-form", HTMLStorageFormElement, { extends: "form" });
+    customElements.define("storage-form", HTMLStorageFormElement, {
+      extends: "form"
+    });
     customElements.define("area-select", AreaSelect, { extends: "select" });
     customElements.define("load-button", LoadButton, { extends: "button" });
   }
@@ -149,7 +150,7 @@ function setObserver(self) {
 function observeFormControls(self, callback) {
   let elements = self.elements;
   (async () => {
-    for(;;) {
+    for (;;) {
       await waitAnimationFrame();
       const newElements = self.elements;
       if (isEqualsArray(elements, newElements)) continue;

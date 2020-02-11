@@ -7,25 +7,31 @@ export class CancellablePromise extends Promise {
 
 export function sleep(msec) {
   let timeoutId;
-  return new CancellablePromise(resolve => {
-    timeoutId = setTimeout(() => resolve(), msec);
-  }, () => {
-    clearTimeout(timeoutId);
-  });
+  return new CancellablePromise(
+    resolve => {
+      timeoutId = setTimeout(() => resolve(), msec);
+    },
+    () => {
+      clearTimeout(timeoutId);
+    }
+  );
 }
 
 export function periodicalTask(o) {
   let sleepPromise;
-  return new CancellablePromise(async () => {
-    do {
-      await o.task();
-      sleepPromise = sleep(o.interval());
-      await sleepPromise;
-    } while (sleepPromise);
-  }, () => {
-    if (sleepPromise) sleepPromise.cancell();
-    sleepPromise = null;
-  });
+  return new CancellablePromise(
+    async () => {
+      do {
+        await o.task();
+        sleepPromise = sleep(o.interval());
+        await sleepPromise;
+      } while (sleepPromise);
+    },
+    () => {
+      if (sleepPromise) sleepPromise.cancell();
+      sleepPromise = null;
+    }
+  );
 }
 
 export function dedup(array, predicate = (t, o) => t === o) {
