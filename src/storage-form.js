@@ -52,11 +52,7 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
     get area(): ah.Area { return getAttr(this, "area"); }
     set area(v: any) { this.setAttribute("area", v); }
 
-    constructor() {
-      super();
-    }
-
-    createdCallback() {
+    connectedCallback() {
       this.binder = new StorageBinder(generateBindee(this));
       this.binder.onChange = async (event) => {
         dispatchEvent(this, `storage-form-${event.type}`, event);
@@ -70,9 +66,7 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
       });
 
       setObserver(this);
-    }
 
-    attachedCallback() {
       this.binder.startAutoBinding();
     }
 
@@ -85,6 +79,7 @@ export function mixinStorageForm<T: HTMLFormElement>(c: Class<T>): Class<T & Sto
     }
 
     attributeChangedCallback(attrName: string) {
+      if (!this.binder) return;
       switch (attrName) {
       case "autosync":
       case "autoload":
@@ -129,20 +124,10 @@ function dispatchEvent(self: HTMLElement, type: string, detail?: any): boolean {
 
 const mixedForm = mixinStorageForm(HTMLFormElement);
 export default class HTMLStorageFormElement extends mixedForm {
-  static get extends() { return "form"; }
-
   static register() {
-    // Custom Element v1 seems not to works right to extend <form> in Google Chrome 55
-    // See http://stackoverflow.com/a/41458692/3864351
-    // Polyfill too: https://github.com/webcomponents/custom-elements/tree/master/src
-    // > To do: Implement built-in element extension (is=)
-    // customElements.define("storage-form", StorageFormElement, { extends: "form" });
-    // window.StorageFormElement = StorageFormElement;
-
-    // Custom Element v0
-    document.registerElement("storage-form", HTMLStorageFormElement);
-    document.registerElement("area-select", AreaSelect);
-    document.registerElement("load-button", LoadButton);
+    customElements.define("storage-form", HTMLStorageFormElement, { extends: "form" });
+    customElements.define("area-select", AreaSelect, { extends: "select" });
+    customElements.define("load-button", LoadButton, { extends: "button" });
   }
 }
 

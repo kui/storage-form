@@ -20,11 +20,7 @@ export function mixinAreaSelect<T: HTMLSelectElement>(c: Class<T>): Class<T & Ar
     get area(): ah.Area { return getAttr(this, "area"); }
     set area(v: any) { this.setAttribute("area", v); }
 
-    constructor() {
-      super();
-    }
-
-    createdCallback() {
+    connectedCallback() {
       this.binder = new StorageBinder(generateBindee(this));
       this.binder.onChange = async (event) => {
         writeArea(this);
@@ -33,9 +29,7 @@ export function mixinAreaSelect<T: HTMLSelectElement>(c: Class<T>): Class<T & Ar
       observeValue(this, async () => {
         await this.binder.submit();
       });
-    }
 
-    attachedCallback() {
       if (this.length === 0) addAllHandlers(this);
       this.binder.doAutoTask();
       writeArea(this);
@@ -43,6 +37,7 @@ export function mixinAreaSelect<T: HTMLSelectElement>(c: Class<T>): Class<T & Ar
 
     static get observedAttributes() { return ["area"]; }
     attributeChangedCallback(attrName: string) {
+      if (!this.binder) return;
       switch (attrName) {
       case "area":
         this.binder.init();
@@ -59,9 +54,7 @@ export function mixinAreaSelect<T: HTMLSelectElement>(c: Class<T>): Class<T & Ar
 }
 
 const mixedSelect = mixinAreaSelect(HTMLSelectElement);
-export default class HTMLAreaSelectElement extends mixedSelect {
-  static get extends() { return "select"; }
-}
+export default class HTMLAreaSelectElement extends mixedSelect {}
 
 function generateBindee(self: InternalAreaSelect): Bindee {
   return {
