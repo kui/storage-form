@@ -1,20 +1,18 @@
 root: true
 
-parser: 'babel-eslint'
-
-plugins:
-  - flowtype
-
 extends:
   - eslint:recommended
-  - babel
-  - plugin:flowtype/recommended
 
 env:
   node: true
+  es6: true
 
 parserOptions:
-  ecmaVersion: 7
+  ecmaVersion: 2020
+  sourceType: module
 
-# List of available rules - ESLint http://eslint.org/docs/rules/
-# rules:
+plugins:
+  - prettier
+
+rules:
+  prettier/prettier: error

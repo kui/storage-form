@@ -1,53 +1,40 @@
-// @flow
-
 import StorageBinder from "./storage-binder";
 import * as ah from "./area-handler";
 
-import type { Bindee } from "./storage-binder";
-
-interface AreaSelect extends HTMLSelectElement {
-  area: string;
-}
-
-interface InternalAreaSelect extends AreaSelect {
-}
-
-export function mixinAreaSelect<T: HTMLSelectElement>(c: Class<T>): Class<T & AreaSelect> {
-  // $FlowFixMe Force cast to the returned type.
+export function mixinAreaSelect(c) {
   return class extends c {
-    binder: StorageBinder;
-
-    get area(): ah.Area { return getAttr(this, "area"); }
-    set area(v: any) { this.setAttribute("area", v); }
-
-    constructor() {
-      super();
+    get area() {
+      return getAttr(this, "area");
+    }
+    set area(v) {
+      this.setAttribute("area", v);
     }
 
-    createdCallback() {
+    connectedCallback() {
       this.binder = new StorageBinder(generateBindee(this));
-      this.binder.onChange = async (event) => {
+      this.binder.onChange = async event => {
         writeArea(this);
         dispatchEvent(this, `area-select-${event.type}`, event);
       };
       observeValue(this, async () => {
         await this.binder.submit();
       });
-    }
 
-    attachedCallback() {
       if (this.length === 0) addAllHandlers(this);
       this.binder.doAutoTask();
       writeArea(this);
     }
 
-    static get observedAttributes() { return ["area"]; }
-    attributeChangedCallback(attrName: string) {
+    static get observedAttributes() {
+      return ["area"];
+    }
+    attributeChangedCallback(attrName) {
+      if (!this.binder) return;
       switch (attrName) {
-      case "area":
-        this.binder.init();
-        this.binder.doAutoTask();
-        break;
+        case "area":
+          this.binder.init();
+          this.binder.doAutoTask();
+          break;
       }
     }
 
@@ -59,11 +46,9 @@ export function mixinAreaSelect<T: HTMLSelectElement>(c: Class<T>): Class<T & Ar
 }
 
 const mixedSelect = mixinAreaSelect(HTMLSelectElement);
-export default class HTMLAreaSelectElement extends mixedSelect {
-  static get extends() { return "select"; }
-}
+export default class HTMLAreaSelectElement extends mixedSelect {}
 
-function generateBindee(self: InternalAreaSelect): Bindee {
+function generateBindee(self) {
   return {
     getArea: () => self.area,
     getInterval: () => 700,
@@ -71,14 +56,14 @@ function generateBindee(self: InternalAreaSelect): Bindee {
     isAutoLoad: () => false,
     getNames: () => [self.name],
     getElements: () => [self],
-    getTarget: () => self,
+    getTarget: () => self
   };
 }
 
-function observeValue(self: InternalAreaSelect, onChange: () => Promise<void>) {
+function observeValue(self, onChange) {
   let value = self.value;
   (async () => {
-    while (true) {
+    for (;;) {
       await waitAnimationFrame();
       if (self.value === value) continue;
       value = self.value;
@@ -88,16 +73,16 @@ function observeValue(self: InternalAreaSelect, onChange: () => Promise<void>) {
 }
 
 function waitAnimationFrame() {
-  return new Promise((r) => requestAnimationFrame(r));
+  return new Promise(r => requestAnimationFrame(r));
 }
 
-function writeArea(self: InternalAreaSelect) {
+function writeArea(self) {
   const form = self.form;
   if (form == null) return;
   form.setAttribute("area", self.value);
 }
 
-function addAllHandlers(self: InternalAreaSelect) {
+function addAllHandlers(self) {
   for (const [area] of ah.listHandlers()) {
     const o = document.createElement("option");
     o.innerHTML = area;
@@ -105,11 +90,11 @@ function addAllHandlers(self: InternalAreaSelect) {
   }
 }
 
-function dispatchEvent(self: HTMLElement, type: string, detail?: any): boolean {
+function dispatchEvent(self, type, detail) {
   return self.dispatchEvent(new CustomEvent(type, detail));
 }
 
-function getAttr(self: HTMLElement, name: string): string {
+function getAttr(self, name) {
   const v = self.getAttribute(name);
   return v ? v : "";
 }

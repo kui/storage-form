@@ -2,27 +2,28 @@ import assert from "assert";
 import sinon from "sinon";
 import Binder from "../src/binder";
 
-import type { Diff,
-              // DataHandler,
-              // StorageHandler
-            } from "./binder";
-
-declare type Change = { isChange: boolean, newValue: ?string };
-
 describe("Binder", () => {
   describe("#aToB", () => {
     it("should write all value of 'a' to 'b' on init.", async () => {
       const binder = new Binder({
         a: {
-          readAll: sinon.spy(async () => new Map([["n1", "v1"], ["n2", "v2"]])),
-          write: sinon.spy(),
+          readAll: sinon.spy(
+            async () =>
+              new Map([
+                ["n1", "v1"],
+                ["n2", "v2"]
+              ])
+          ),
+          write: sinon.spy()
         },
         b: {
           readAll: sinon.spy(),
-          write: sinon.spy(),
+          write: sinon.spy()
         },
-        diff: (oldValue, newValue): Diff<Change> =>
-          ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
+        diff: (oldValue, newValue) => ({
+          change: { newValue },
+          isChanged: oldValue !== newValue
+        })
       });
 
       await binder.aToB();
@@ -33,7 +34,7 @@ describe("Binder", () => {
       assert.equal(binder.handler.b.write.callCount, 1);
 
       const args = binder.handler.b.write.args[0];
-      const diffs: Map<string, Diff> = args[0];
+      const diffs = args[0];
       assert.equal(diffs.size, 2);
       const d1 = diffs.get("n1");
       assert.equal(d1 && d1.newValue, "v1");
@@ -43,15 +44,17 @@ describe("Binder", () => {
     it("should do nothing if no value in 'a'.", async () => {
       const binder = new Binder({
         a: {
-          readAll: sinon.spy(async () => new Map),
-          write: sinon.spy(),
+          readAll: sinon.spy(async () => new Map()),
+          write: sinon.spy()
         },
         b: {
           readAll: sinon.spy(),
-          write: sinon.spy(),
+          write: sinon.spy()
         },
-        diff: (oldValue, newValue): Diff<Change> =>
-          ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
+        diff: (oldValue, newValue) => ({
+          change: { newValue },
+          isChanged: oldValue !== newValue
+        })
       });
 
       await binder.aToB();
@@ -64,17 +67,24 @@ describe("Binder", () => {
     it("should do nothing on second call.", async () => {
       const binder = new Binder({
         a: {
-          readAll: sinon.spy(async () => new Map([["n1", "v1"], ["n2", "v2"]])),
-          write: sinon.spy(),
+          readAll: sinon.spy(
+            async () =>
+              new Map([
+                ["n1", "v1"],
+                ["n2", "v2"]
+              ])
+          ),
+          write: sinon.spy()
         },
         b: {
           readAll: sinon.spy(),
-          write: sinon.spy(),
+          write: sinon.spy()
         },
-        diff: (oldValue, newValue): Diff<Change> =>
-          ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
+        diff: (oldValue, newValue) => ({
+          change: { newValue },
+          isChanged: oldValue !== newValue
+        })
       });
-
 
       await binder.aToB();
 
@@ -93,17 +103,24 @@ describe("Binder", () => {
     it("should write twice if provided 'force' on second call.", async () => {
       const binder = new Binder({
         a: {
-          readAll: sinon.spy(async () => new Map([["n1", "v1"], ["n2", "v2"]])),
-          write: sinon.spy(),
+          readAll: sinon.spy(
+            async () =>
+              new Map([
+                ["n1", "v1"],
+                ["n2", "v2"]
+              ])
+          ),
+          write: sinon.spy()
         },
         b: {
           readAll: sinon.spy(),
-          write: sinon.spy(),
+          write: sinon.spy()
         },
-        diff: (oldValue, newValue): Diff<Change> =>
-          ({ change: { newValue }, isChanged: (oldValue !== newValue) }),
+        diff: (oldValue, newValue) => ({
+          change: { newValue },
+          isChanged: oldValue !== newValue
+        })
       });
-
 
       await binder.aToB();
 

@@ -1,10 +1,10 @@
-// @flow
-
-export function mixinLoadButton<T: HTMLButtonElement>(c: Class<T>): Class<T> {
+export function mixinLoadButton(c) {
   // $FlowFixMe Force cast to the returned type.
   return class extends c {
-    createdCallback() {
-      this.addEventListener("click", (event: MouseEvent) => {
+    constructor() {
+      super();
+
+      this.addEventListener("click", event => {
         event.preventDefault();
         if (this.form && typeof this.form.load === "function") {
           this.form.load();
@@ -17,6 +17,4 @@ export function mixinLoadButton<T: HTMLButtonElement>(c: Class<T>): Class<T> {
 }
 
 const mixedButton = mixinLoadButton(HTMLButtonElement);
-export default class LoadButton extends mixedButton {
-  static get extends() { return "button"; }
-}
+export default class LoadButton extends mixedButton {}

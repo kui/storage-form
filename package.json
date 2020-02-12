@@ -1,21 +1,20 @@
 {
   "name": "storage-form",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Custom element to use <form> as storages such as localStorage, chrome.storage.",
   "main": "lib/storage-form.js",
   "scripts": {
-    "test": "npm run check && mocha --compilers js:babel-register test",
+    "test": "npm run check && mocha --require '@babel/register' test",
     "lib": "NODE_ENV=production babel src -d lib",
     "lint": "eslint .",
     "fix": "eslint . --fix",
-    "flow": "flow check src && flow check test",
-    "check": "npm run flow && npm run lint",
+    "check": "npm run lint",
     "debug-dist": "webpack",
     "prod-dist": "NODE_ENV=production webpack",
     "dist": "npm run debug-dist && npm run prod-dist",
     "docs": "npm run check && npm run dist && mkdir -vp docs && cp -v dist/* docs",
     "serve": "webpack-dev-server --output-path docs --content-base docs --open",
-    "pre-npm-publish": "npm run clean && npm run check && npm run dist && npm run lib",
+    "pre-npm-publish": "npm run clean && npm run test && npm run dist && npm run lib",
     "clean": "rm -fr lib dist"
   },
   "keywords": [
@@ -29,29 +28,27 @@
   "author": "Keiichiro Ui",
   "license": "MIT",
   "devDependencies": {
-    "babel-cli": "^6.18.0",
-    "babel-eslint": "^6.1.2",
-    "babel-loader": "^6.2.10",
+    "@babel/cli": "^7.8.4",
+    "@babel/core": "^7.8.4",
+    "@babel/preset-env": "^7.8.4",
+    "@babel/register": "^7.8.3",
+    "babel-eslint": "^10.0.3",
+    "babel-loader": "^8.0.6",
     "babel-plugin-strip-function-call": "^1.0.2",
-    "babel-plugin-transform-flow-strip-types": "^6.18.0",
-    "babel-plugin-unassert": "^2.1.2",
-    "babel-preset-babili": "0.0.9",
-    "babel-preset-env": "^1.1.1",
-    "babel-register": "^6.18.0",
-    "babili-webpack-plugin": "0.0.7",
-    "eslint": "^3.12.2",
-    "eslint-config-babel": "^1.0.2",
-    "eslint-plugin-babel": "^4.0.0",
-    "eslint-plugin-flowtype": "^2.29.1",
-    "flow-bin": "^0.37.0",
-    "flow-typed": "^2.0.0",
-    "mocha": "^3.2.0",
-    "sinon": "^1.17.7",
-    "webpack": "^1.14.0",
-    "webpack-dev-server": "^1.16.2"
+    "babel-plugin-unassert": "^3.0.1",
+    "babel-preset-minify": "^0.5.1",
+    "core-js": "^3.6.4",
+    "eslint": "^6.8.0",
+    "eslint-plugin-prettier": "^3.1.2",
+    "mocha": "^7.0.1",
+    "prettier": "^1.19.1",
+    "sinon": "^8.1.1",
+    "webpack": "^4.41.6",
+    "webpack-cli": "^3.3.10",
+    "webpack-dev-server": "^3.10.3"
   },
   "engine": {
-    "node": "^6.x"
+    "node": "^12.x"
   },
   "repository": "https://github.com/kui/storage-form.git"
 }
