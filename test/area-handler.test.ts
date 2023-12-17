@@ -1,41 +1,40 @@
-import assert from "assert";
-import sinon from "sinon";
-import { BufferedWriteChromeStorageAreaHandler } from "../src/area-handler";
+import { BufferedWriteAreaHandler } from "../src/area-handler.ts";
+
+interface AreaHandler {
+  read(names: string[]): Promise<Record<string, string>>;
+  write(items: Record<string, string>): Promise<void>;
+}
 
 describe("BufferedWriteChromeStorageAreaHandler", () => {
   describe("#write", () => {
     it("should delay the second writing", async () => {
-      const spyset = sinon.spy((item, callback) => {
-        callback();
-      });
-      const handler = new BufferedWriteChromeStorageAreaHandler({
-        set: spyset,
-        MAX_WRITE_OPERATIONS_PER_HOUR: 14400
-      });
+      const mockedWrite = jest.fn();
+      const handler = new BufferedWriteAreaHandler(
+        { write: mockedWrite } as unknown as AreaHandler,
+        14400,
+      );
 
-      const start = Date.now();
+      const start = performance.now();
       await handler.write({ n1: "v1" });
-      const firstElapsedMillis = Date.now() - start;
-      handler.write({ n2: "v2" });
+      const firstElapsedMillis = performance.now() - start;
+      void handler.write({ n2: "v2" });
       await handler.write({ n3: "v3" });
-      const secondElapsedMillis = Date.now() - start;
+      const secondElapsedMillis = performance.now() - start;
 
       console.log("firstElapsedMillis:", firstElapsedMillis);
       console.log("secondElapsedMillis:", secondElapsedMillis);
 
-      assert(firstElapsedMillis < 100);
-      assert(secondElapsedMillis > 250);
+      expect(firstElapsedMillis).toBeLessThan(100);
+      expect(secondElapsedMillis).toBeGreaterThanOrEqual(400);
 
-      assert.equal(spyset.callCount, 2);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(mockedWrite).toHaveBeenCalledTimes(2);
 
-      const [firstItems] = spyset.args[0];
-      assert.equal(Object.keys(firstItems).length, 1);
-      assert.equal(firstItems["n1"], "v1");
+      const [firstItems] = mockedWrite.mock.calls[0] as unknown[];
+      expect(firstItems).toEqual({ n1: "v1" });
 
-      const [secondItems] = spyset.args[1];
-      assert.equal(Object.keys(secondItems).length, 2);
-      assert.equal(secondItems["n2"], "v2");
-      assert.equal(secondItems["n3"], "v3");
+      const [secondItems] = mockedWrite.mock.calls[1] as unknown[];
+      expect(secondItems).toEqual({ n2: "v2", n3: "v3" });
     });
   });
 });

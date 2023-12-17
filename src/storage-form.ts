@@ -1,64 +1,138 @@
 import * as utils from "./utils";
-import StorageBinder from "./storage-binder";
-import AreaSelect from "./area-select";
-import LoadButton from "./load-button";
+import StorageBinder, { Change } from "./storage-binder";
 
 const DEFAULT_INTERVAL = 700;
 
-export function mixinStorageForm(c) {
+export function mixinStorage(c: typeof HTMLFormElement) {
   return class extends c {
-    get autosync() {
+    private binder: StorageBinder | null = null;
+
+    get autosync(): boolean {
       return this.hasAttribute("autosync");
     }
-    set autosync(b) {
+    set autosync(b: boolean) {
       setAttrAsBoolean(this, "autosync", b);
     }
 
-    get autoload() {
+    get autoload(): boolean {
       return this.hasAttribute("autoload");
     }
-    set autoload(b) {
+    set autoload(b: boolean) {
       setAttrAsBoolean(this, "autoload", b);
     }
 
-    get interval() {
-      const n = parseInt(getAttr(this, "interval"));
+    get interval(): number {
+      const n = parseInt(this.getAttribute("interval") ?? "");
       return n > 300 ? n : DEFAULT_INTERVAL;
     }
-    set interval(v) {
-      this.setAttribute("interval", v);
+    set interval(v: number) {
+      this.setAttribute("interval", String(v));
     }
 
-    get area() {
-      return getAttr(this, "area");
+    get area(): string {
+      return this.getAttribute("area") ?? "";
     }
-    set area(v) {
+    set area(v: string) {
       this.setAttribute("area", v);
     }
 
     connectedCallback() {
-      this.binder = new StorageBinder(generateBindee(this));
-      this.binder.onChange = async event => {
-        dispatchEvent(this, `storage-form-${event.type}`, event);
+      this.binder = new StorageBinder(this.generateBindee());
+      this.binder.onChange = (event: Change) => {
+        this.dispatchEvent(
+          new CustomEvent(`storage-form-${event.type}`, { detail: event }),
+        );
       };
 
       this.binder.startAutoBinding();
 
-      this.addEventListener("submit", event => {
+      this.addEventListener("submit", (event) => {
         event.preventDefault();
-        this.binder.submit({ force: true });
+        this.binder?.submit({ force: true }).catch(console.error);
       });
 
-      setObserver(this);
+      this.setObserver();
 
       this.binder.startAutoBinding();
+    }
+
+    generateBindee() {
+      return {
+        getArea: () => this.area,
+        getInterval: () => this.interval,
+        isAutoSync: () => this.autosync,
+        isAutoLoad: () => this.autoload,
+        getNames: () => map(this.getStorageElements(), (e) => e.name),
+        getElements: () => this.getStorageElements(),
+        getTarget: () => this,
+      };
+    }
+
+    *getStorageElements(): Iterable<Element & { name: string }> {
+      for (const e of this.elements) {
+        if ("area" in e) continue; // filter out "area-select"
+        if ("name" in e) yield e as Element & { name: string };
+      }
+    }
+
+    setObserver() {
+      const formControlObservers = new Map<Element, MutationObserver>();
+
+      const observeFormControl = (element: Element) => {
+        const o = new MutationObserver(() => {
+          this.binder?.doAutoTask().catch(console.error);
+        });
+        o.observe(element, { attributes: true, attributeFilter: ["name"] });
+        formControlObservers.set(element, o);
+      };
+
+      const disconnectFormControl = (element: Element) => {
+        const o = formControlObservers.get(element);
+        if (o == null) return;
+        o.disconnect();
+        formControlObservers.delete(element);
+      };
+
+      // Observe added/removed form-controls
+      // Do NOT use MutationObserver. form controls are not always the DOM children of the form
+      // such as <input form="..." ...>.
+      // And MutationObserver might be too heavy to observe all descendants of a body element.
+      this.observeFormControls(async ({ addedElements, removedElements }) => {
+        console.debug("detect added/removed form-controls", self);
+        for (const e of addedElements) observeFormControl(e);
+        for (const e of removedElements) disconnectFormControl(e);
+        await this.binder?.doAutoTask();
+      });
+    }
+
+    observeFormControls(
+      callback: (e: {
+        addedElements: Set<Element>;
+        removedElements: Set<Element>;
+      }) => Promise<void>,
+    ) {
+      let elements = this.elements;
+      (async () => {
+        for (;;) {
+          await waitAnimationFrame();
+          const newElements = this.elements;
+          if (isEqualsArray(elements, newElements)) continue;
+
+          const oldSet = new Set(elements);
+          const newSet = new Set(newElements);
+          const addedElements = utils.subtractSet(newSet, oldSet);
+          const removedElements = utils.subtractSet(oldSet, newSet);
+          elements = newElements;
+          await callback({ addedElements, removedElements });
+        }
+      })().catch(console.error);
     }
 
     static get observedAttributes() {
       return ["autosync", "autoload", "area"];
     }
 
-    attributeChangedCallback(attrName) {
+    attributeChangedCallback(attrName: string) {
       if (!this.binder) return;
       switch (attrName) {
         case "autosync":
@@ -67,117 +141,52 @@ export function mixinStorageForm(c) {
           break;
         case "area":
           this.initBinder();
-          this.binder.doAutoTask();
+          this.binder.doAutoTask().catch(console.error);
           break;
       }
     }
 
     initBinder() {
-      this.binder.init();
+      this.binder?.init();
     }
-    load() {
-      return this.binder.load({ force: true });
+    async load(): Promise<void> {
+      await this.binder?.load({ force: true });
     }
-    sync() {
-      return this.binder.sync();
+    async sync() {
+      await this.binder?.sync();
     }
   };
 }
 
-function generateBindee(self) {
-  return {
-    getArea: () => self.area,
-    getInterval: () => self.interval,
-    isAutoSync: () => self.autosync,
-    isAutoLoad: () => self.autoload,
-    getNames: () => map(getStorageElements(self), e => e.name),
-    getElements: () => getStorageElements(self),
-    getTarget: () => self
-  };
-}
-
-function* getStorageElements(self) {
-  for (const e of self.elements) {
-    if (e.area != null) continue; // filter out "area-select"
-    if (!e.name) continue;
-    yield e;
+export class HTMLStorageFormElement extends mixinStorage(HTMLFormElement) {
+  constructor() {
+    super();
   }
-}
 
-function dispatchEvent(self, type, detail) {
-  return self.dispatchEvent(new CustomEvent(type, detail));
-}
-
-const mixedForm = mixinStorageForm(HTMLFormElement);
-export default class HTMLStorageFormElement extends mixedForm {
   static register() {
-    customElements.define("storage-form", HTMLStorageFormElement, {
-      extends: "form"
-    });
-    customElements.define("area-select", AreaSelect, { extends: "select" });
-    customElements.define("load-button", LoadButton, { extends: "button" });
+    register();
   }
 }
 
-function setObserver(self) {
-  const formControlObservers = new Map();
-
-  function observeFormControl(element) {
-    const o = new MutationObserver(() => self.binder.doAutoTask());
-    o.observe(element, { attributes: true, atributeFilter: ["name"] });
-    formControlObservers.set(element, o);
-  }
-
-  function disconnectFormControl(element) {
-    const o = formControlObservers.get(element);
-    if (o == null) return;
-    o.disconnect();
-    formControlObservers.delete(element);
-  }
-
-  // Observe added/removed form-controls
-  // Do NOT use MutationObserver. form controls are not always the DOM children of the form
-  // such as <input form="..." ...>.
-  // And MutationObserver might be too heaby to observe all descendants of a body element.
-  observeFormControls(self, async ({ addedElements, removedElements }) => {
-    console.debug("detect added/removed form-controls", self);
-    for (const e of addedElements) observeFormControl(e);
-    for (const e of removedElements) disconnectFormControl(e);
-    await self.binder.doAutoTask();
+export function register() {
+  customElements.define("storage-form", HTMLStorageFormElement, {
+    extends: "form",
   });
 }
 
-function observeFormControls(self, callback) {
-  let elements = self.elements;
-  (async () => {
-    for (;;) {
-      await waitAnimationFrame();
-      const newElements = self.elements;
-      if (isEqualsArray(elements, newElements)) continue;
-
-      const oldSet = new Set(elements);
-      const newSet = new Set(newElements);
-      const addedElements = utils.subtractSet(newSet, oldSet);
-      const removedElements = utils.subtractSet(oldSet, newSet);
-      elements = newElements;
-      await callback({ addedElements, removedElements });
-    }
-  })();
+interface ArrayLike<T> {
+  length: number;
+  [index: number]: T;
 }
 
-function isEqualsArray(a, b) {
+function isEqualsArray(a: ArrayLike<unknown>, b: ArrayLike<unknown>) {
   if (a.length !== b.length) return false;
   const len = a.length;
   for (let i = 0; i < len; i++) if (a[i] !== b[i]) return false;
   return true;
 }
 
-function getAttr(self, name) {
-  const v = self.getAttribute(name);
-  return v ? v : "";
-}
-
-function setAttrAsBoolean(self, name, b) {
+function setAttrAsBoolean(self: HTMLElement, name: string, b: boolean) {
   if (b) {
     self.setAttribute(name, "");
   } else {
@@ -186,9 +195,9 @@ function setAttrAsBoolean(self, name, b) {
 }
 
 function waitAnimationFrame() {
-  return new Promise(r => requestAnimationFrame(r));
+  return new Promise((r) => requestAnimationFrame(r));
 }
 
-function* map(iter, mapper) {
+function* map<T, U>(iter: Iterable<T>, mapper: (e: T) => U) {
   for (const e of iter) yield mapper(e);
 }

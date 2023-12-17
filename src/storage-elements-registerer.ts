@@ -1,3 +1,7 @@
-import StorageFormElement from "./storage-form";
+import { HTMLStorageFormElement } from "./storage-form";
+import { HTMLLoadButton } from "./load-button";
+import { HTMLAreaSelectElement } from "./area-select";
 
-StorageFormElement.register();
+HTMLStorageFormElement.register();
+HTMLLoadButton.register();
+HTMLAreaSelectElement.register();

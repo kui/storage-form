@@ -1,5 +1,4 @@
-import assert from "assert";
-import * as utils from "../src/utils";
+import * as utils from "../src/utils.ts";
 
 describe("utils", () => {
   describe("#mergeNextPromise", () => {
@@ -10,10 +9,10 @@ describe("utils", () => {
         count++;
       });
 
-      for (let i = 0; i < 5; i++) t();
+      for (let i = 0; i < 5; i++) void t();
       await t();
 
-      assert.equal(count, 2);
+      expect(count).toBe(2);
     });
     it("should run the third task when waiting the second task.", async () => {
       let count = 0;
@@ -22,11 +21,11 @@ describe("utils", () => {
         count++;
       });
 
-      t();
+      void t();
       await t();
       await t();
 
-      assert.equal(count, 3);
+      expect(count).toBe(3);
     });
     it("should run the all tasks when waiting all.", async () => {
       let count = 0;
@@ -37,7 +36,7 @@ describe("utils", () => {
 
       for (let i = 0; i < 4; i++) await t();
 
-      assert.equal(count, 4);
+      expect(count).toBe(4);
     });
     it("should return the same promise with third task and second task.", async () => {
       const t = utils.mergeNextPromise(async () => {
@@ -54,9 +53,9 @@ describe("utils", () => {
       const d12 = Math.abs(times[0] - times[1]);
       const d13 = Math.abs(times[0] - times[2]);
       const d23 = Math.abs(times[1] - times[2]);
-      assert(d12 >= 69);
-      assert(d13 >= 69);
-      assert(d23 <= 20);
+      expect(d12).toBeGreaterThanOrEqual(69);
+      expect(d13).toBeGreaterThanOrEqual(69);
+      expect(d23).toBeLessThanOrEqual(20);
     });
   });
 });

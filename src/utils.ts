@@ -1,51 +1,64 @@
-export class CancellablePromise extends Promise {
-  constructor(callback, cancell) {
+export class CancellablePromise<T> extends Promise<T> {
+  constructor(
+    callback: (
+      resolve: (value: T | PromiseLike<T>) => void,
+      reject: (reason?: unknown) => void,
+    ) => void,
+    readonly cancell: () => void,
+  ) {
     super(callback);
-    this.cancell = cancell;
   }
 }
 
-export function sleep(msec) {
-  let timeoutId;
+export function sleep(msec: number): CancellablePromise<void> {
+  let timeoutId: ReturnType<typeof setTimeout>;
   return new CancellablePromise(
-    resolve => {
+    (resolve) => {
       timeoutId = setTimeout(() => resolve(), msec);
     },
     () => {
       clearTimeout(timeoutId);
-    }
+    },
   );
 }
 
-export function periodicalTask(o) {
-  let sleepPromise;
+export function periodicalTask({
+  task,
+  interval,
+}: {
+  task: () => Promise<void>;
+  interval: () => number;
+}): CancellablePromise<void> {
+  let sleepPromise: CancellablePromise<void> | null = null;
   return new CancellablePromise(
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     async () => {
       do {
-        await o.task();
-        sleepPromise = sleep(o.interval());
+        await task();
+        sleepPromise = sleep(interval());
         await sleepPromise;
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
       } while (sleepPromise);
     },
     () => {
       if (sleepPromise) sleepPromise.cancell();
       sleepPromise = null;
-    }
+    },
   );
 }
 
-export function dedup(array, predicate = (t, o) => t === o) {
-  return array.reduce((result, element) => {
-    if (result.some(i => predicate(i, element))) result;
+export function dedup<T>(array: T[], predicate = (t: T, o: T) => t === o): T[] {
+  return array.reduce<T[]>((result, element) => {
+    if (result.some((i) => predicate(i, element))) result;
     return result.concat(element);
   }, []);
 }
 
-export function subtractSet(targetSet, removedSet) {
-  return new Set(Array.from(targetSet).filter(e => !removedSet.has(e)));
+export function subtractSet<T>(targetSet: Set<T>, removedSet: Set<T>) {
+  return new Set(Array.from(targetSet).filter((e) => !removedSet.has(e)));
 }
 
-class MultiValueMap extends Map {
+class MultiValueMap<K, V, VV extends Iterable<V>> extends Map<K, VV> {
   *flattenValues() {
     for (const arr of this.values()) {
       for (const v of arr) {
@@ -55,8 +68,8 @@ class MultiValueMap extends Map {
   }
 }
 
-export class ArrayValueMap extends MultiValueMap {
-  add(key, value) {
+export class ArrayValueMap<K, V> extends MultiValueMap<K, V, V[]> {
+  add(key: K, value: V) {
     let a = this.get(key);
     if (!a) {
       a = [];
@@ -65,20 +78,18 @@ export class ArrayValueMap extends MultiValueMap {
     a.push(value);
     return this;
   }
-  getOrSetEmpty(key) {
-    const v = super.get(key);
-    if (v == null) {
-      const n = [];
-      super.set(key, n);
-      return n;
-    } else {
-      return v;
+  getOrSetEmpty(key: K) {
+    let v = super.get(key);
+    if (!v) {
+      v = [];
+      super.set(key, v);
     }
+    return v;
   }
 }
 
-export class SetValueMap extends MultiValueMap {
-  add(key, value) {
+export class SetValueMap<K, V> extends MultiValueMap<K, V, Set<V>> {
+  add(key: K, value: V) {
     let a = this.get(key);
     if (!a) {
       a = new Set();
@@ -89,9 +100,9 @@ export class SetValueMap extends MultiValueMap {
   }
 }
 
-export function mergeNextPromise(task) {
-  let currentPromise;
-  let nextPromise;
+export function mergeNextPromise(task: () => Promise<void>) {
+  let currentPromise: Promise<void> | null = null;
+  let nextPromise: Promise<void> | null = null;
   return async () => {
     if (nextPromise) {
       await nextPromise;
@@ -100,6 +111,7 @@ export function mergeNextPromise(task) {
 
     if (currentPromise) {
       nextPromise = (async () => {
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         if (currentPromise) {
           await currentPromise;
         }
