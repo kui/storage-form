@@ -1,6 +1,8 @@
-/dist/
-/lib/
+/js/
+/types/
 /node_modules/
+/docs/js/
+/docs/ts/
 
 .lock-wscript
 .wafpickle-N

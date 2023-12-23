@@ -1,26 +1,54 @@
 <!doctype html>
-<head>
-  <meta charset="utf-8" />
+<meta charset="utf-8" />
 
-  <title>storage-form Examples</title>
+<title>storage-form Examples</title>
 
-  <style>
-    code {
-      background-color: #eee;
-      padding: 1px 3px;
+<style>
+  code {
+    background-color: #eee;
+    padding: 3px;
+  }
+  pre {
+    display: inline-block;
+    background-color: #eee;
+    padding: 1em;
+    & > code {
+      background-color: transparent;
+      padding: 0;
     }
-    h2 {
-      border-bottom: 1px solid #999;
+  }
+  h2 {
+    border-bottom: 1px solid #999;
+  }
+</style>
+
+<script type="module" src="./js/storage-elements-registerer.js" async></script>
+
+<script>
+  // Implement <script type="code"> element which shows the code as a code block.
+  // TODO trim indent
+  addEventListener("DOMContentLoaded", () => {
+    for (const e of document.querySelectorAll("script[type=code]")) {
+      const pre = document.createElement("pre");
+      const content = e.textContent
+        .replace(/^\n*/, "")
+        .replace(/(\n\s*)*$/, "")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      pre.innerHTML = `<code>${trimIndent(content)}</code>`;
+      e.parentNode.insertBefore(pre, e);
     }
-  </style>
+  });
 
-  <!-- Custom Elements v0 polyfill -->
-  <script src="CustomElements.min.js"></script>
-
-  <script src="storage-elements-debug.js" async></script>
-  <!-- Use no -debug suffix one f you use in production environment -->
-  <!-- <script src="storage-elements.js"></script> -->
-</head>
+  function trimIndent(text) {
+    const lines = text.split("\n");
+    const indent = lines
+      .filter((line) => line.trim() !== "")
+      .map((line) => line.match(/^\s*/)[0].length)
+      .reduce((a, b) => Math.min(a, b));
+    return lines.map((line) => line.slice(indent)).join("\n");
+  }
+</script>
 
 <h1>
   <a href="https://github.com/kui/storage-elements"
@@ -30,40 +58,105 @@
 </h1>
 
 <p>
+  <code>storage-form</code> is a custom element that can edit and store the
+  values in some storages.
+</p>
+
+<p>
   See
   <a href="https://github.com/kui/storage-elements/blob/master/docs/index.html"
     >HTML souce</a
   >.
 </p>
 
-<h2>Manually save/load example</h2>
+<h2>Supported storages</h2>
 
 <p>
-  Using all supported form components. You need to click [Save] to store values.
-  These value are stored into <code>localStorage</code>
+  the storage is selected by <code>area</code> attribute. The
+  <code>area</code> attribute can be one of the following values:
 </p>
 
-<form is="storage-form" id="example1" area="local-storage">
-  <p>
+<dl>
+  <dt><code>local-storage</code></dt>
+  <dd>Use <code>localStorage</code> as a storage.</dd>
+  <dt><code>session-storage</code></dt>
+  <dd>Use <code>sessionStorage</code> as a storage.</dd>
+  <dt><code>chrome-local</code></dt>
+  <dd>Use <code>chrome.storage.local</code> as a storage.</dd>
+  <dt><code>chrome-sync</code></dt>
+  <dd>Use <code>chrome.storage.sync</code> as a storage.</dd>
+</dl>
+
+<h3>Example</h3>
+
+<p>
+  You can edit and store the <code>foo</code> value in the
+  <code>localStorage</code>.
+</p>
+
+<p>Code:</p>
+
+<script type="code">
+  <storage-form area="local-storage">
     <label>foo: <input name="foo" /></label>
+  </storage-form>
+</script>
+
+<p>Result:</p>
+
+<storage-form area="local-storage">
+  <label>foo: <input name="foo" /></label>
+</storage-form>
+
+<h2>Supported form elements</h2>
+
+<p>
+  Some form elements are supported. You can use <code>input</code>,
+  <code>select</code>, <code>textarea</code> and <code>output</code> elements.
+</p>
+
+<storage-form area="local-storage">
+  <h3>type="text"</h3>
+  <p>
+    <label>foo input: <input name="foo" /></label>
   </p>
   <p>
-    <label
-      >checkbox-sample1:
-      <input type="checkbox" name="checkbox-sample1" /> </label
-    >: checked-value="on", unchecked-value=""(empty)
+    <label>foo output: <output name="foo"></output></label>
   </p>
+
+  <h3>type="checkbox"</h3>
+
   <p>
-    <label
-      >checkbox-sample2:
+    if checked, the value of <code>checkbox-sample1</code> is <code>on</code>,
+    otherwise an empty string.
+  </p>
+
+  <script type="code">
+    <label>
+      checkbox-sample1:
+      <input type="checkbox" name="checkbox-sample1" />
+    </label>
+  </script>
+
+  <p>
+    <label>
+      checkbox-sample1:
+      <input type="checkbox" name="checkbox-sample1" />
+    </label>
+  </p>
+
+  <p>
+    <label>
+      checkbox-sample2:
       <input
         type="checkbox"
         name="checkbox-sample2"
         value="nyan"
         data-unchecked-value="wan"
         checked
-      /> </label
-    >: checked-value="nyan", unchecked-value="wan", and default checked
+      />
+    </label>
+    : checked-value="nyan", unchecked-value="wan", and default checked
   </p>
   <p>
     radio-sample:
@@ -86,8 +179,8 @@
     <textarea name="sometextarea">this is a default textarea value.</textarea>
   </p>
   <p>
-    <label
-      >select-sample:
+    <label>
+      select-sample:
       <select name="select-sample">
         <option>value-1</option>
         <option selected>value-2</option>
@@ -95,69 +188,7 @@
       </select>
     </label>
   </p>
-  <p><button>Save</button> <button is="load-button">Load</button></p>
-</form>
-
-<script>
-  // You can hook some events
-  const ex1 = document.getElementById("example1");
-  for (const type of [
-    "storage-form-load",
-    "storage-form-submit",
-    "storage-form-sync",
-  ]) {
-    ex1.addEventListener(type, (event) => {
-      console.log("example1 event", type, event);
-    });
-  }
-</script>
-
-<h2>Auto load example</h2>
-
-<p>An <code>autoload</code> attribute are a function that</p>
-
-<form is="storage-form" id="example2" area="session-storage" autoload>
-  <label>bar: <input name="bar" /></label>
-  <input type="submit" value="Save" />
-</form>
-
-<h2>Auto sync example</h2>
-
-<p>
-  An <code>autosync</code> attribute are a function that store the
-  <code>bar</code>'s value automatically, and load it's value when it is changed
-  by another javascript. You can confirm that the <code>bar</code> form value is
-  changed when you change it from a developer console of your browser.
-</p>
-
-<form is="storage-form" id="example3" area="session-storage" autosync>
-  <label>bar: <input name="bar" /></label>
-</form>
-
-<h2>Dynamic building using javascript</h2>
-
-<div id="example4-anchor"></div>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    // For the third example
-    const base = document.getElementById("example4-anchor");
-    const form = base.appendChild(
-      document.createElement("form", "storage-form"),
-    );
-    form.area = "local-storage";
-
-    // Append <input>s on next tick.
-    setTimeout(() => {
-      const input1 = form.appendChild(document.createElement("input"));
-      input1.name = "ex4-1";
-      const input2 = form.appendChild(document.createElement("input"));
-      input2.type = "checkbox";
-      input2.name = "ex4-2";
-      const submit = form.appendChild(document.createElement("input"));
-      submit.type = "submit";
-    }, 1);
-  });
-</script>
+</storage-form>
 
 <h2><code>&lt;area-select&gt;</code> example</h2>
 
@@ -166,21 +197,11 @@
   <code>area-select</code> element.
 </p>
 
-<form is="storage-form" id="example5" autosync>
-  <label
-    >Storage Area:
-    <select is="area-select" name="example5-area" area="local-storage">
-      <option value="local-storage">localStorage</option>
-      <option value="session-storage">sessionStorage</option>
-    </select> </label
-  ><br />
-  <label>ex5: <input name="ex5" /></label>
-</form>
-
-<!-- github ribbons -->
-<a href="https://github.com/kui/storage-elements"
-  ><img
-    style="position: absolute; top: 0; right: 0; border: 0"
-    src="https://s3.amazonaws.com/github/ribbons/forkme_right_red_aa0000.png"
-    alt="Fork me on GitHub"
-/></a>
+<storage-form id="example5">
+  <label>
+    Storage Area:
+    <select is="area-select" name="example5-area" area="local-storage"></select>
+  </label>
+  <br />
+  <label>example5: <input name="example5" /></label>
+</storage-form>

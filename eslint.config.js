@@ -31,11 +31,11 @@ function ts(files, project) {
 }
 
 export default [
-  { ignores: ["dist", "lib", "docs"] },
+  { ignores: ["js", "types", "docs"] },
   js.configs.recommended,
   eslintConfigPrettier,
-  ...ts(["*.ts", "test/*.ts"], "./tsconfig.json"),
-  ...ts(["src/**/*.ts"], "./src/tsconfig.json"),
+  ...ts(["*.ts", "tests/*.ts"], "./tsconfig.json"),
+  ...ts(["ts/**/*.ts"], "./ts/tsconfig.json"),
   {
     files: ["*.config.{js,ts}"],
     languageOptions: {

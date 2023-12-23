@@ -2,8 +2,11 @@
   "name": "storage-form",
   "version": "2.0.0",
   "description": "Custom element to use <form> as storages such as localStorage, chrome.storage.",
-  "main": "lib/storage-form.js",
+  "type": "module",
+  "exports": "./js/storage-form.js",
   "scripts": {
+    "build": "tsc --project ts",
+    "docs": "npm run build && cp -vur js ts docs",
     "test": "jest",
     "lint:eslint": "eslint .",
     "lint:prettier": "prettier --check .",
@@ -12,7 +15,8 @@
     "fix:eslint": "eslint . --fix",
     "fix:prettier": "prettier --write .",
     "fix": "run-p fix:*",
-    "clean": "rm -fr lib dist"
+    "clean": "rm -fr js types dist",
+    "serve-docs": "npx http-server -c=-1 docs"
   },
   "keywords": [
     "web",
@@ -24,7 +28,6 @@
   ],
   "author": "Keiichiro Ui",
   "license": "MIT",
-  "type": "module",
   "devDependencies": {
     "@eslint/js": "^8.55.0",
     "@types/chrome": "^0.0.254",

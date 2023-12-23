@@ -1,1 +1,3 @@
-/docs/*.js
+/docs/js/
+/js/
+/types/
