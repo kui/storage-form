@@ -81,6 +81,7 @@ class StorageFormIO implements DOMBinderIO {
       if (!name) continue;
       this.elements.add(name, e);
     }
+    this.writeToDOM(this.values);
   }
 
   private buildObserver() {
