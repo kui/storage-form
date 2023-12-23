@@ -3,7 +3,20 @@
   "version": "2.0.0",
   "description": "Custom element to use <form> as storages such as localStorage, chrome.storage.",
   "type": "module",
-  "exports": "./js/storage-form.js",
+  "exports": {
+    ".": {
+      "import": "./js/storage-form-register.js",
+      "types": "./js/storage-form-register.d.ts"
+    },
+    "./js/storage-form.js": {
+      "import": "./js/storage-form.js",
+      "types": "./js/storage-form.d.ts"
+    },
+    "./js/area-select.js": {
+      "import": "./js/area-select.js",
+      "types": "./js/area-select.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc --project ts",
     "docs": "npm run build && cp -vur js ts docs",

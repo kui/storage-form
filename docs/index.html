@@ -22,7 +22,10 @@
   }
 </style>
 
-<script type="module" src="./js/storage-elements-registerer.js" async></script>
+<script type="module">
+  import { register } from "./js/storage-elements-registerer.js";
+  register();
+</script>
 
 <script>
   // Implement <script type="code"> element which shows the code as a code block.
