@@ -10,3 +10,12 @@ export function remove<T>(array: T[], item: T): boolean {
   array.splice(index, 1);
   return true;
 }
+
+export function buildWithIndex<T>(
+  length: number,
+  builder: (i: number) => T,
+): T[] {
+  const arr = new Array<T>(length);
+  for (let i = 0; i < length; i++) arr[i] = builder(i);
+  return arr;
+}

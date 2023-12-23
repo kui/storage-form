@@ -1,3 +1,5 @@
+import { remove } from "./arrays.js";
+
 class MultiValueMap<K, V, VV extends Iterable<V>> extends Map<K, VV> {
   *flattenValues() {
     for (const arr of this.values()) yield* arr;
@@ -13,6 +15,10 @@ export class ArrayValueMap<K, V> extends MultiValueMap<K, V, V[]> {
     }
     a.push(value);
     return this;
+  }
+  deleteByKey(key: K, value: V): boolean {
+    const a = this.get(key);
+    return a && remove(a, value) && a.length === 0 ? this.delete(key) : false;
   }
 }
 

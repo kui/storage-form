@@ -1,4 +1,4 @@
-import { remove } from "./arrays.js";
+import { buildWithIndex, remove } from "./arrays.js";
 import { setAll } from "./maps.js";
 import { sleep } from "./promises.js";
 import type {
@@ -67,6 +67,13 @@ export class FacadeAreaBinderIO implements AreaBinderIO {
   }
 }
 
+interface StorageChange {
+  key: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  storageArea: Storage | null;
+}
+
 export class WebStorageBinderIO implements AreaBinderIO {
   constructor(private readonly storage: Storage) {}
 
@@ -79,19 +86,32 @@ export class WebStorageBinderIO implements AreaBinderIO {
   }
 
   readAll(): StoredValues {
-    const num = this.storage.length;
-    const keys = new Array<string>(num);
-    for (let i = 0; i < num; i++) {
+    return this.read(this.allKeys());
+  }
+
+  private allKeys(): string[] {
+    return buildWithIndex(this.storage.length, (i) => {
       const k = this.storage.key(i);
-      if (k != null) keys[i] = k;
-    }
-    return this.read(keys);
+      if (k === null) throw Error("Unexpected null key");
+      return k;
+    });
   }
 
   write(items: WroteValues): void {
-    for (const [n, v] of items) {
-      if (v === undefined) this.storage.removeItem(n);
-      else this.storage.setItem(n, v);
+    for (const [key, newValue] of items) {
+      const oldValue = this.storage.getItem(key);
+      if (oldValue === newValue) continue;
+      if (newValue === undefined) {
+        this.storage.removeItem(key);
+      } else {
+        this.storage.setItem(key, newValue);
+      }
+      WebStorageBinderIO.dispatchStorageEvent({
+        key,
+        oldValue,
+        newValue: newValue ?? null,
+        storageArea: this.storage,
+      });
     }
   }
 
@@ -101,21 +121,36 @@ export class WebStorageBinderIO implements AreaBinderIO {
       storageArea,
       oldValue,
       newValue,
-    }: StorageEvent) => {
+    }: StorageChange) => {
       if (storageArea !== this.storage) return;
-      if (key == null) return;
-      const c: ValueChange = {};
-      if (oldValue != null) c.oldValue = oldValue;
-      if (newValue != null) c.newValue = newValue;
-      callback(new Map([[key, c]]))?.catch(console.error);
+      let changes: ValueChanges;
+      if (key === null) {
+        changes = new Map(this.allKeys().map((k) => [k, {}]));
+      } else {
+        const c: ValueChange = {};
+        if (oldValue !== null) c.oldValue = oldValue;
+        if (newValue !== null) c.newValue = newValue;
+        changes = new Map([[key, c]]);
+      }
+      callback(changes)?.catch(console.error);
     };
 
+    // We need to implement the listener because
+    // "storage" event is not fired in the same window.
+    WebStorageBinderIO.storageEventListeners.push(listener);
     addEventListener("storage", listener);
     return {
       stop: () => {
+        remove(WebStorageBinderIO.storageEventListeners, listener);
         removeEventListener("storage", listener);
       },
     };
+  }
+
+  static readonly storageEventListeners: ((change: StorageChange) => void)[] =
+    [];
+  static dispatchStorageEvent(change: StorageChange) {
+    for (const l of WebStorageBinderIO.storageEventListeners) l(change);
   }
 }
 

@@ -132,8 +132,7 @@ class StorageFormIO implements DOMBinderIO {
   private startValuePolling() {
     this.polling = repeatAsPolling(async () => {
       const changes = this.updateValues();
-      if (changes.size > 0)
-        await this.dispatchChangeListeners(changes);
+      if (changes.size > 0) await this.dispatchChangeListeners(changes);
     });
   }
 
@@ -142,7 +141,7 @@ class StorageFormIO implements DOMBinderIO {
   }
 
   private updateValues(): ValueChanges {
-    const newValues = new Map<string, string | undefined>();
+    const changes = new Map<string, ValueChange>();
     for (const e of this.elements.flattenValues()) {
       if (
         e instanceof HTMLInputElement &&
@@ -150,11 +149,16 @@ class StorageFormIO implements DOMBinderIO {
         !e.checked
       )
         continue;
-      newValues.set(e.name, e.value);
+      const oldValue = this.values.get(e.name);
+      const newValue = e.value;
+      if (newValue === oldValue) continue;
+      const change: ValueChange = { newValue };
+      if (this.values.has(e.name)) change.oldValue = oldValue;
+      if (changes.has(e.name))
+        console.warn("Ignore change: element=%o, name=%s, change=%o", e, e.name, change);
+      else changes.set(e.name, change);
+      this.values.set(e.name, newValue);
     }
-    const changes = updateValues(this.values, newValues);
-    if (this.isDOMBinding() && changes.size > 0)
-      this.writeToDOM(newValues);
     return changes;
   }
 
@@ -242,19 +246,4 @@ export class HTMLStorageFormElement extends mixinStorage(HTMLElement) {
 
 export function register() {
   customElements.define("storage-form", HTMLStorageFormElement);
-}
-
-function updateValues(
-  map: Map<string, string>,
-  newEntries: Iterable<[string, string | undefined]>,
-): ValueChanges {
-  const changes = new Map<string, ValueChange>();
-  for (const [key, newValue] of newEntries) {
-    const oldValue = map.get(key);
-    if (newValue === oldValue) continue;
-    changes.set(key, { oldValue, newValue });
-    if (newValue === undefined) map.delete(key);
-    else map.set(key, newValue);
-  }
-  return changes;
 }
