@@ -10,14 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run tests
-        run: docker compose run make check
-      - neme: Setup Node
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: npm
       - name: Install dependencies
         run: npm install
+      - name: Run linter
+        run: npm run lint
       - name: Run tests
         run: npm test
