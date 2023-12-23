@@ -132,7 +132,7 @@ class StorageFormIO implements DOMBinderIO {
   private startValuePolling() {
     this.polling = repeatAsPolling(async () => {
       const changes = this.updateValues();
-      if (Object.keys(changes).length > 0)
+      if (changes.size > 0)
         await this.dispatchChangeListeners(changes);
     });
   }
@@ -153,7 +153,7 @@ class StorageFormIO implements DOMBinderIO {
       newValues.set(e.name, e.value);
     }
     const changes = updateValues(this.values, newValues);
-    if (this.isDOMBinding() && Object.keys(changes).length > 0)
+    if (this.isDOMBinding() && changes.size > 0)
       this.writeToDOM(newValues);
     return changes;
   }
