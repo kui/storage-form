@@ -10,7 +10,7 @@ const compat = new FlatCompat();
 function ts(files, project) {
   return compat
     .extends(
-      "plugin:@typescript-eslint/recommended-type-checked",
+      "plugin:@typescript-eslint/strict-type-checked",
       "plugin:@typescript-eslint/stylistic-type-checked",
     )
     .map((config) => ({
@@ -34,7 +34,7 @@ export default [
   { ignores: ["js", "types", "docs"] },
   js.configs.recommended,
   eslintConfigPrettier,
-  ...ts(["*.ts", "tests/*.ts"], "./tsconfig.json"),
+  ...ts(["*.ts", "tests/**/*.ts"], "./tsconfig.json"),
   ...ts(["ts/**/*.ts"], "./ts/tsconfig.json"),
   {
     files: ["*.config.{js,ts}"],
@@ -45,7 +45,7 @@ export default [
     },
   },
   {
-    files: ["src/**/*.{js,ts}"],
+    files: ["ts/**/*.ts"],
     languageOptions: {
       globals: {
         ...globals.browser,

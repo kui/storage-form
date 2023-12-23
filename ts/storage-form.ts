@@ -2,7 +2,12 @@ import { remove } from "./arrays.js";
 import { SetValueMap } from "./maps.js";
 import { SerialTaskExecutor, repeatAsPolling } from "./promises.js";
 import { StorageBinder } from "./storage-binder.js";
-import type { DOMBinderIO, ValueChange, ValueChanges, WroteValues } from "./storage-binder.js";
+import type {
+  DOMBinderIO,
+  ValueChange,
+  ValueChanges,
+  WroteValues,
+} from "./storage-binder.js";
 
 const STORAGE_CONTROL_TAGS = ["input", "select", "textarea", "output"] as const;
 type HTMLStorageFormControllElements =
@@ -148,7 +153,8 @@ class StorageFormIO implements DOMBinderIO {
       newValues.set(e.name, e.value);
     }
     const changes = updateValues(this.values, newValues);
-    if (this.isDOMBinding() && Object.keys(changes).length > 0) this.writeToDOM(newValues);
+    if (this.isDOMBinding() && Object.keys(changes).length > 0)
+      this.writeToDOM(newValues);
     return changes;
   }
 
@@ -189,9 +195,9 @@ class StorageFormIO implements DOMBinderIO {
   }
 }
 
-type HTMLElementConstructor<T extends HTMLElement = HTMLElement> = new (
-  ...args: any[]
-) => T;
+type HTMLElementConstructor<T extends HTMLElement = HTMLElement> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  new (...args: any[]) => T;
 
 export function mixinStorage<T extends HTMLElementConstructor>(
   base: T,

@@ -30,7 +30,12 @@ describe("BufferedWriteChromeStorageAreaHandler", () => {
       expect(firstItems).toEqual(new Map([["n1", "v1"]]));
 
       const [secondItems] = mockedWrite.mock.calls[1] as unknown[];
-      expect(secondItems).toEqual(new Map([["n3", "v3"], ["n2", "v2"]]));
+      expect(secondItems).toEqual(
+        new Map([
+          ["n3", "v3"],
+          ["n2", "v2"],
+        ]),
+      );
     });
   });
 });

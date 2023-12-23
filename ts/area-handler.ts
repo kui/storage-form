@@ -112,7 +112,9 @@ export class WebStorageBinderIO implements AreaBinderIO {
 
     addEventListener("storage", listener);
     return {
-      stop: () => removeEventListener("storage", listener),
+      stop: () => {
+        removeEventListener("storage", listener);
+      },
     };
   }
 }
@@ -184,7 +186,9 @@ export class ChromeStorageBinderIO implements AreaBinderIO {
     };
     this.storage.onChanged.addListener(listener);
     return {
-      stop: () => this.storage.onChanged.removeListener(listener),
+      stop: () => {
+        this.storage.onChanged.removeListener(listener);
+      },
     };
   }
 }
@@ -207,9 +211,7 @@ export class BufferedWriteBinderIO implements AreaBinderIO {
       BufferedWriteBinderIO.WRITE_INTERVAL_MERGIN_MILLIS;
   }
 
-  read(
-    names: string[],
-  ): Promise<StoredValues> | StoredValues {
+  read(names: string[]): Promise<StoredValues> | StoredValues {
     return this.delegate.read(names);
   }
 
@@ -244,6 +246,8 @@ export class BufferedWriteBinderIO implements AreaBinderIO {
   }
 }
 
+// chrome.storage is not available if the permission is not granted.
+/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 if ("chrome" in globalThis && chrome.storage) {
   if (chrome.storage.local)
     registerHandler(
@@ -259,3 +263,4 @@ if ("chrome" in globalThis && chrome.storage) {
       ),
     );
 }
+/* eslint-enable @typescript-eslint/no-unnecessary-condition */

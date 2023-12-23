@@ -29,7 +29,7 @@ export class SerialTaskExecutor {
   private isRunning = false;
 
   async enqueue(task: () => Promise<void>): Promise<void> {
-    const { promise, resolve, reject } = withResolves<void>();
+    const { promise, resolve, reject } = withResolves();
     this.queue.push(() => task().then(resolve).catch(reject));
 
     if (this.isRunning) return promise;
@@ -59,6 +59,8 @@ export function repeatAsPolling(task: () => Promise<void>): {
 } {
   let isRunning = true;
   const promise = (async () => {
+    // Update isRunning by stop()
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (isRunning) {
       await task();
       await waitAnimationFrame();
@@ -72,9 +74,15 @@ export function repeatAsPolling(task: () => Promise<void>): {
   };
 }
 
-let waitAnimationFrame: () => Promise<DOMHighResTimeStamp> = (() => {
+const waitAnimationFrame: () => Promise<DOMHighResTimeStamp> = (() => {
   if (typeof requestAnimationFrame === "undefined") {
-    return () => new Promise((r) => setTimeout(() => r(Date.now()), 100));
+    const offset = Date.now();
+    return () =>
+      new Promise((r) =>
+        setTimeout(() => {
+          r(Date.now() - offset);
+        }, 100),
+      );
   }
   return () => new Promise((r) => requestAnimationFrame(r));
 })();
@@ -85,7 +93,7 @@ let waitAnimationFrame: () => Promise<DOMHighResTimeStamp> = (() => {
  * @return A promise and its resolvers.
  * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/withResolvers
  */
-export function withResolves<T>(): {
+export function withResolves<T = void>(): {
   promise: Promise<T>;
   resolve: (value: T) => void;
   reject: (reason?: unknown) => void;
@@ -96,5 +104,6 @@ export function withResolves<T>(): {
     resolve = r;
     reject = rj;
   });
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   return { promise, resolve: resolve!, reject: reject! };
 }

@@ -54,10 +54,7 @@ class AreaSelectIO implements DOMBinderIO {
     this.observer = new MutationObserver((records) => {
       for (const r of records) {
         if (r.attributeName === "area") {
-          this.updateArea(
-            r.oldValue ?? undefined,
-            this.baseElement.area ?? undefined,
-          );
+          this.updateArea(r.oldValue ?? undefined, this.baseElement.area);
         }
       }
     });
@@ -126,7 +123,9 @@ interface AreaMixin extends HTMLElement {
 
 type HTMLSelectElementConstructor<
   T extends HTMLSelectElement = HTMLSelectElement,
-> = new (...args: any[]) => T;
+> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  new (...args: any[]) => T;
 
 export function mixinAreaSelect<T extends HTMLSelectElementConstructor>(
   base: T,
@@ -162,8 +161,8 @@ export function mixinAreaSelect<T extends HTMLSelectElementConstructor>(
         if (this.options.length === 0) this.addAllHandlers();
         this.io = new AreaSelectIO(this);
         this.binder = new StorageBinder(this.io);
-        await this.binder?.start();
-        this.io?.startBinding();
+        await this.binder.start();
+        this.io.startBinding();
       });
     }
 

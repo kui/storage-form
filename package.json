@@ -10,12 +10,12 @@
     "test": "jest",
     "lint:eslint": "eslint .",
     "lint:prettier": "prettier --check .",
-    "lint:ts": "tsc --noEmit --project src",
+    "lint:ts": "tsc --noEmit --project ts",
     "lint": "run-p lint:*",
     "fix:eslint": "eslint . --fix",
     "fix:prettier": "prettier --write .",
     "fix": "run-p fix:*",
-    "clean": "rm -fr js types dist",
+    "clean": "rm -fr js types docs/{ts,js}",
     "serve-docs": "npx http-server -c=-1 docs"
   },
   "keywords": [

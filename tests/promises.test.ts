@@ -74,13 +74,13 @@ describe("SerialTaskExecutor", () => {
 
 describe("withResolves", () => {
   it("should resolve when the resolve is called", async () => {
-    const { promise, resolve } = withResolves<void>();
+    const { promise, resolve } = withResolves();
     const p = promise.then(() => "test");
     resolve();
     await expect(p).resolves.toBe("test");
   });
   it("should reject when the reject is called", async () => {
-    const { promise, reject } = withResolves<void>();
+    const { promise, reject } = withResolves();
     const p = promise.then(() => "test");
     reject(Error("test"));
     await expect(p).rejects.toThrow("test");
