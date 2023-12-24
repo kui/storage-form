@@ -9,6 +9,7 @@ export interface ValueChange {
 export type ValueChanges = Map<string, ValueChange>;
 
 export type StoredValues = Map<string, string>;
+
 export type WroteValues = Map<string, string | undefined>;
 
 interface BinderIO {

@@ -1,5 +1,5 @@
 import { remove } from "./arrays.js";
-import { SetValueMap } from "./maps.js";
+import { NamedSetMap } from "./maps.js";
 import { SerialTaskExecutor, repeatAsPolling } from "./promises.js";
 import { StorageBinder } from "./storage-binder.js";
 import type {
@@ -26,10 +26,10 @@ interface StorageFormMixin extends HTMLElement {
 
 class StorageFormIO implements DOMBinderIO {
   private values = new Map<string, string>();
-  private readonly elements = new SetValueMap<
-    string,
+  private readonly elements = new NamedSetMap<
+    SameNameElementSet,
     HTMLStorageFormControllElements
-  >();
+  >(SameNameElementSet);
   private readonly changeListeners: ((
     changes: ValueChanges,
   ) => void | Promise<void>)[] = [];
@@ -76,38 +76,32 @@ class StorageFormIO implements DOMBinderIO {
       this.baseElement.querySelectorAll<HTMLStorageFormControllElements>(
         STORAGE_CONTROL_SELECTOR,
       );
-    for (const e of elements) {
-      const name = e.name;
-      if (!name) continue;
-      this.elements.add(name, e);
-    }
+    for (const e of elements) if (e.name) this.elements.add(e);
     this.writeToDOM(this.values);
   }
 
   private buildObserver() {
     this.observer = new MutationObserver((records) => {
-      let isChanged = false;
+      let isValueChanged = false;
       for (const r of records) {
         if (r.type === "childList") {
           for (const e of r.addedNodes) {
             if (!matchesStorageControl(e)) continue;
-            isChanged = true;
-            const name = e.name;
-            if (name) this.elements.add(name, e);
+            isValueChanged = true;
+            if (e.name) this.elements.add(e);
           }
           for (const e of r.removedNodes) {
             if (!matchesStorageControl(e)) continue;
-            isChanged = true;
-            const name = e.name;
-            if (name) this.elements.deleteByKey(name, e);
+            isValueChanged = true;
+            this.elements.deleteByValue(e);
           }
         } else if (r.type === "attributes" && r.attributeName === "name") {
           if (!matchesStorageControl(r.target)) continue;
-          isChanged = true;
+          isValueChanged = true;
           const oldName = r.oldValue;
-          if (oldName) this.elements.deleteByKey(oldName, r.target);
+          if (oldName) this.elements.deleteByValue(r.target);
           const newName = r.target.name;
-          if (newName) this.elements.add(newName, r.target);
+          if (newName) this.elements.add(r.target);
         } else if (r.type === "attributes" && r.attributeName === "area") {
           const oldValue = r.oldValue ?? undefined;
           const newValue = this.baseElement.area;
@@ -115,7 +109,7 @@ class StorageFormIO implements DOMBinderIO {
             for (const l of this.areaChangeListeners) l({ oldValue, newValue });
         }
       }
-      if (isChanged) {
+      if (isValueChanged) {
         this.writeToDOM(this.values);
       }
     });
@@ -143,22 +137,12 @@ class StorageFormIO implements DOMBinderIO {
 
   private updateValues(): ValueChanges {
     const changes = new Map<string, ValueChange>();
-    for (const e of this.elements.flattenValues()) {
-      if (
-        e instanceof HTMLInputElement &&
-        (e.type === "checkbox" || e.type === "radio") &&
-        !e.checked
-      )
-        continue;
-      const oldValue = this.values.get(e.name);
-      const newValue = e.value;
-      if (newValue === oldValue) continue;
-      const change: ValueChange = { newValue };
-      if (this.values.has(e.name)) change.oldValue = oldValue;
-      if (changes.has(e.name))
-        console.warn("Ignore change: element=%o, name=%s, change=%o", e, e.name, change);
-      else changes.set(e.name, change);
-      this.values.set(e.name, newValue);
+    for (const elementSet of this.elements.values()) {
+      const change = elementSet.update();
+      if (!change) continue;
+      changes.set(elementSet.name, change);
+      if (change.newValue === undefined) this.values.delete(elementSet.name);
+      else this.values.set(elementSet.name, change.newValue);
     }
     return changes;
   }
@@ -173,18 +157,8 @@ class StorageFormIO implements DOMBinderIO {
 
   private writeToDOM(items: WroteValues) {
     for (const [name, value] of items) {
-      const elements = this.elements.get(name);
-      if (!elements) continue;
-      for (const e of elements) {
-        if (
-          e instanceof HTMLInputElement &&
-          (e.type === "checkbox" || e.type === "radio")
-        ) {
-          e.checked = e.value === value;
-        } else if (value !== undefined) {
-          e.value = value;
-        }
-      }
+      const elementSet = this.elements.get(name);
+      if (elementSet) elementSet.value = value;
     }
   }
 
@@ -197,6 +171,93 @@ class StorageFormIO implements DOMBinderIO {
         remove(this.changeListeners, callback);
       },
     };
+  }
+}
+
+class SameNameElementSet {
+  private readonly elements = new Set<HTMLStorageFormControllElements>();
+
+  #name: string | undefined = undefined;
+  #value: string | undefined = undefined;
+
+  add(e: HTMLStorageFormControllElements) {
+    this.elements.add(e);
+    return this;
+  }
+
+  delete(e: HTMLStorageFormControllElements) {
+    return this.elements.delete(e);
+  }
+
+  get size(): number {
+    return this.elements.size;
+  }
+
+  get name(): string {
+    if (this.#name !== undefined) return this.#name;
+    for (const e of this.elements) {
+      const name = e.name;
+      if (name) return (this.#name = name);
+    }
+    throw Error("No element has name");
+  }
+
+  set value(v: string | undefined) {
+    if (this.#value === v) return;
+    this.#value = v;
+    for (const e of this.elements) {
+      if (
+        e instanceof HTMLInputElement &&
+        (e.type === "checkbox" || e.type === "radio")
+      ) {
+        e.checked = e.value === v;
+      } else {
+        e.value = v ?? "";
+      }
+    }
+  }
+
+  /**
+   * @returns undefined if no changes, otherwise ValueChange
+   */
+  update(): ValueChange | undefined {
+    const oldValue = this.#value;
+    let newValue: string | undefined = undefined;
+    let unselected = false;
+    for (const e of this.elements) {
+      if (
+        e instanceof HTMLInputElement &&
+        (e.type === "checkbox" || e.type === "radio")
+      ) {
+        // e is a checkable element
+        if (e.checked) {
+          if (oldValue === e.value) continue;
+          newValue = e.value;
+          break;
+        } else if (oldValue === e.value) {
+          unselected = true;
+          // Do not break here, because we should check other elements.
+          // break;
+        }
+      } else if (e instanceof HTMLSelectElement && e.selectedIndex < 0) {
+        // Do nothing
+        // Should not read <select> element's value
+      } else {
+        // e is a non-checkable element
+        if (oldValue === e.value) continue;
+        newValue = e.value;
+        break;
+      }
+    }
+
+    // There are 4 cases by the combination of unchecked and newvalue:
+    // 1) unselected=true,  newvalue=string:    If an element was made unselected and the value was changed, It indicates to have a change.
+    // 2) unselected=true,  newvalue=undefined: If an element was made unselected and the value was not changed, It indicates that the value was deleted.
+    // 3) unselected=false, newvalue=string:    If an element was not made unselected and the value was changed, It indicates to have a change.
+    // 4) unselected=false, newvalue=undefined: If an element was not made unselected and the value was not changed, It indicates to have no changes.
+    if (newValue === undefined && !unselected) return undefined;
+    this.value = newValue;
+    return { oldValue, newValue };
   }
 }
 

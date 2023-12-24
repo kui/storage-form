@@ -1,41 +1,34 @@
-import { remove } from "./arrays.js";
-
-class MultiValueMap<K, V, VV extends Iterable<V>> extends Map<K, VV> {
-  *flattenValues() {
-    for (const arr of this.values()) yield* arr;
-  }
+interface Named {
+  name: string;
 }
 
-export class ArrayValueMap<K, V> extends MultiValueMap<K, V, V[]> {
-  add(key: K, value: V) {
-    let a = this.get(key);
-    if (!a) {
-      a = [];
-      this.set(key, a);
-    }
-    a.push(value);
-    return this;
-  }
-  deleteByKey(key: K, value: V): boolean {
-    const a = this.get(key);
-    return a && remove(a, value) && a.length === 0 ? this.delete(key) : false;
-  }
+interface NamedSetLike<V> {
+  add(value: V): void;
+  delete(value: V): boolean;
+  size: number;
 }
 
-export class SetValueMap<K, V> extends MultiValueMap<K, V, Set<V>> {
-  add(key: K, value: V) {
-    let s = this.get(key);
+export class NamedSetMap<
+  S extends NamedSetLike<V>,
+  V extends Named,
+> extends Map<string, S> {
+  constructor(private readonly setConstructor: new () => S) {
+    super();
+  }
+
+  add(v: V) {
+    let s = this.get(v.name);
     if (!s) {
-      s = new Set();
-      this.set(key, s);
+      s = new this.setConstructor();
+      this.set(v.name, s);
     }
-    s.add(value);
+    s.add(v);
     return this;
   }
 
-  deleteByKey(key: K, value: V): boolean {
-    const s = this.get(key);
-    return s && s.delete(value) && s.size === 0 ? this.delete(key) : false;
+  deleteByValue(v: V): boolean {
+    const s = this.get(v.name);
+    return s && s.delete(v) && s.size === 0 ? this.delete(v.name) : false;
   }
 }
 
