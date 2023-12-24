@@ -5,14 +5,14 @@
 
 <style>
   code {
-    background-color: #eee;
-    border: 1px solid #ccc;
+    color: #fff;
+    background-color: #333;
     padding: 4px;
   }
   pre {
     display: inline-block;
-    background-color: #eee;
-    border: 1px solid #ccc;
+    color: #fff;
+    background-color: #333;
     padding: 8px;
     margin: 0 8px;
     & > code {
@@ -96,14 +96,14 @@
 <p>Source:</p>
 
 <script type="code">
-  <storage-form area="local-storage">
+  <storage-form storage-area="local-storage">
     <label>foo: <input name="foo" /></label>
   </storage-form>
 </script>
 
 <p>Result:</p>
 
-<storage-form area="local-storage">
+<storage-form storage-area="local-storage">
   <label>foo: <input name="foo" /></label>
 </storage-form>
 
@@ -132,7 +132,7 @@
   <code>select</code>, <code>textarea</code> and <code>output</code> elements.
 </p>
 
-<storage-form area="local-storage">
+<storage-form storage-area="local-storage">
   <h3>input type="text"</h3>
 
   <p>Source:</p>
@@ -251,7 +251,7 @@
 
 <p>The following example named <code>foo</code> elements are synchronized.</p>
 
-<storage-form area="local-storage">
+<storage-form storage-area="local-storage">
   <ul>
     <li>
       <label>
@@ -321,7 +321,57 @@
   type=date.
 </p>
 
-<h2>Support custom element: <code>&lt;area-select&gt;</code></h2>
+<h2>Support custom elements</h2>
+
+<p>You can use support custom elements for some utilities.</p>
+
+<h3>Support custom element: <code>storage-select</code></h3>
+
+<p>
+  <code>storage-select</code> is a custom element that is shorthand for the
+  single select element in the <code>storage-form</code>.
+</p>
+
+<p>Source:</p>
+
+<script type="code">
+  <label>
+    foo:
+    <select is="storage-select" name="foo" storage-area="local-storage">
+      <option>select-value1</option>
+      <option>select-value2</option>
+      <option>select-value3</option>
+    </select>
+  </label>
+</script>
+
+<p>Result:</p>
+
+<label>
+  foo:
+  <select is="storage-select" name="foo" storage-area="local-storage">
+    <option>select-value1</option>
+    <option>select-value2</option>
+    <option>select-value3</option>
+  </select>
+</label>
+
+<p>The following example is the same as the above example:</p>
+
+<script type="code">
+  <storage-form storage-area="local-storage">
+    <label>
+      foo:
+      <select name="foo">
+        <option>value-1</option>
+        <option>value-2</option>
+        <option>value-3</option>
+      </select>
+    </label>
+  </storage-form>
+</script>
+
+<h3>Support custom element: <code>area-select</code></h3>
 
 <p>
   You can change the stored area for the <code>ex4</code>'s value using an

@@ -8,6 +8,7 @@ import type {
   ValueChanges,
   WroteValues,
 } from "./storage-binder.js";
+import type { StorageElementMixin } from "./storage-element.js";
 
 const STORAGE_CONTROL_TAGS = ["input", "select", "textarea", "output"] as const;
 type HTMLStorageFormControllElements =
@@ -18,10 +19,6 @@ function matchesStorageControl(
   e: unknown,
 ): e is HTMLStorageFormControllElements {
   return e instanceof Element && e.matches(STORAGE_CONTROL_SELECTOR);
-}
-
-interface StorageFormMixin extends HTMLElement {
-  area: string;
 }
 
 class StorageFormIO implements DOMBinderIO {
@@ -37,10 +34,10 @@ class StorageFormIO implements DOMBinderIO {
   private polling: { stop(): Promise<void> } | null = null;
   private readonly areaChangeListeners: ((change: ValueChange) => void)[] = [];
 
-  constructor(private readonly baseElement: StorageFormMixin) {}
+  constructor(private readonly baseElement: StorageElementMixin) {}
 
   getArea(): string {
-    return this.baseElement.area;
+    return this.baseElement.storageArea;
   }
 
   onAreaChange(callback: (changes: ValueChange) => void): { stop: () => void } {
@@ -76,7 +73,12 @@ class StorageFormIO implements DOMBinderIO {
       this.baseElement.querySelectorAll<HTMLStorageFormControllElements>(
         STORAGE_CONTROL_SELECTOR,
       );
-    for (const e of elements) if (e.name) this.elements.add(e);
+    for (const e of elements) {
+      if (!e.name) continue;
+      // Child storage custom elements should be ignored
+      if ("storageArea" in e) continue;
+      this.elements.add(e);
+    }
     this.writeToDOM(this.values);
   }
 
@@ -102,9 +104,9 @@ class StorageFormIO implements DOMBinderIO {
           if (oldName) this.elements.deleteByValue(r.target);
           const newName = r.target.name;
           if (newName) this.elements.add(r.target);
-        } else if (r.type === "attributes" && r.attributeName === "area") {
+        } else if (r.type === "attributes" && r.attributeName === "storage-area") {
           const oldValue = r.oldValue ?? undefined;
-          const newValue = this.baseElement.area;
+          const newValue = this.baseElement.storageArea;
           if (oldValue !== newValue)
             for (const l of this.areaChangeListeners) l({ oldValue, newValue });
         }
@@ -117,7 +119,7 @@ class StorageFormIO implements DOMBinderIO {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["name", "area"],
+      attributeFilter: ["name", "storage-area"],
       attributeOldValue: true,
     });
   }
@@ -390,17 +392,17 @@ type HTMLElementConstructor<T extends HTMLElement = HTMLElement> =
 
 export function mixinStorage<T extends HTMLElementConstructor>(
   base: T,
-): T & HTMLElementConstructor<StorageFormMixin> {
+): T & HTMLElementConstructor<StorageElementMixin> {
   return class extends base {
     private binder: StorageBinder | null = null;
     private io: StorageFormIO | null = null;
     private readonly taskExecutor = new SerialTaskExecutor();
 
-    get area(): string {
-      return this.getAttribute("area") ?? "";
+    get storageArea(): string {
+      return this.getAttribute("storage-area") ?? "";
     }
-    set area(v: string) {
-      this.setAttribute("area", v);
+    set storageArea(v: string) {
+      this.setAttribute("storage-area", v);
     }
 
     connectedCallback() {
