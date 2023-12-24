@@ -202,17 +202,86 @@ class SameNameElementSet {
     throw Error("No element has name");
   }
 
-  set value(v: string | undefined) {
-    if (this.#value === v) return;
-    this.#value = v;
+  set value(newValue: string | undefined) {
+    if (this.#value === newValue) return;
+    this.#value = newValue;
     for (const e of this.elements) {
-      if (
-        e instanceof HTMLInputElement &&
-        (e.type === "checkbox" || e.type === "radio")
+      if (e instanceof HTMLInputElement) {
+        if (
+          e.type === "button" ||
+          e.type === "reset" ||
+          e.type === "submit" ||
+          e.type === "image" ||
+          e.type === "hidden"
+        ) {
+          // Do nothing
+          // Should not set the value of these types of <input> element.
+        } else if (e.type === "checkbox" || e.type === "radio") {
+          e.checked = e.value === newValue;
+        } else if (e.type === "color") {
+          if (newValue?.match(/^#[0-9a-f]{6}$/i)) {
+            e.value = newValue;
+          } else {
+            e.value = "#000000";
+          }
+        } else if (e.type === "date") {
+          if (newValue?.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            e.value = newValue;
+          } else {
+            e.value = "";
+          }
+        } else if (e.type === "datetime-local") {
+          if (newValue?.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+            e.value = newValue;
+          } else {
+            e.value = "";
+          }
+        } else if (e.type === "file") {
+          if (e.value !== newValue) e.value = "";
+        } else if (e.type === "month") {
+          if (newValue?.match(/^\d{4}-\d{2}$/)) {
+            e.value = newValue;
+          } else {
+            e.value = "";
+          }
+        } else if (e.type === "number" || e.type === "range") {
+          if (newValue?.match(/^[-+]?\d+(\.\d+)?$/)) {
+            e.value = newValue;
+          } else {
+            e.value = "";
+          }
+        } else if (
+          e.type === "password" ||
+          e.type === "text" ||
+          e.type === "search" ||
+          e.type === "tel" ||
+          e.type === "url" ||
+          e.type === "email"
+        ) {
+          e.value = newValue ?? "";
+        } else if (e.type === "time") {
+          if (newValue?.match(/^\d{2}:\d{2}$/)) {
+            e.value = newValue;
+          } else {
+            e.value = "";
+          }
+        } else if (e.type === "week") {
+          if (newValue?.match(/^\d{4}-W\d{2}$/)) {
+            e.value = newValue;
+          } else {
+            e.value = "";
+          }
+        } else {
+          console.warn("Unexpected element type: %o", e);
+        }
+      } else if (
+        e instanceof HTMLSelectElement ||
+        e instanceof HTMLTextAreaElement ||
+        e instanceof HTMLOutputElement
       ) {
-        e.checked = e.value === v;
+        e.value = newValue ?? "";
       } else {
-        e.value = v ?? "";
+        console.warn("Unexpected element type: %o", e);
       }
     }
   }
@@ -225,28 +294,82 @@ class SameNameElementSet {
     let newValue: string | undefined = undefined;
     let unselected = false;
     for (const e of this.elements) {
-      if (
-        e instanceof HTMLInputElement &&
-        (e.type === "checkbox" || e.type === "radio")
-      ) {
-        // e is a checkable element
-        if (e.checked) {
+      if (e instanceof HTMLInputElement) {
+        if (e.type === "checkbox" || e.type === "radio") {
+          if (e.checked) {
+            // e is a checkable element
+            if (oldValue === e.value) continue;
+            newValue = e.value;
+            break;
+          } else if (oldValue === e.value) {
+            unselected = true;
+            // Do not break here, because we should check other elements.
+            // break;
+          }
+        } else if (
+          e.type === "date" ||
+          e.type === "datetime-local" ||
+          e.type === "file" ||
+          e.type === "time" ||
+          e.type === "week" ||
+          e.type === "month"
+        ) {
+          // Should not read the value of these types when the value is empty.
+          if (e.value !== "") {
+            if (oldValue === e.value) continue;
+            newValue = e.value;
+            break;
+          }
+        } else if (e.type === "email" || e.type === "tel" || e.type === "url") {
+          // Should not read the value of these types looks like type=text when the value is invalid.
+          if (e.validity.valid) {
+            if (oldValue === e.value) continue;
+            newValue = e.value;
+            break;
+          }
+        } else if (
+          e.type === "hidden" ||
+          e.type === "image" ||
+          e.type === "reset" ||
+          e.type === "submit" ||
+          e.type === "button"
+        ) {
+          // Do nothing
+          // Should not read the value of these types of <input> element.
+        } else if (e.type === "color" || e.type === "range") {
+          // TODO Should not read the value when the value is not set by the user.
+          // But there might be no way to detect it.
           if (oldValue === e.value) continue;
           newValue = e.value;
           break;
-        } else if (oldValue === e.value) {
-          unselected = true;
-          // Do not break here, because we should check other elements.
-          // break;
+        } else if (
+          e.type === "number" ||
+          e.type === "password" ||
+          e.type === "text" ||
+          e.type === "search"
+        ) {
+          if (oldValue === e.value) continue;
+          newValue = e.value;
+          break;
+        } else {
+          console.warn("Unexpected element type: %o", e);
         }
-      } else if (e instanceof HTMLSelectElement && e.selectedIndex < 0) {
-        // Do nothing
-        // Should not read <select> element's value
-      } else {
-        // e is a non-checkable element
+      } else if (e instanceof HTMLSelectElement) {
+        // Should not read the value when no option is selected.
+        if (e.selectedIndex >= 0) {
+          if (oldValue === e.value) continue;
+          newValue = e.value;
+          break;
+        }
+      } else if (
+        e instanceof HTMLTextAreaElement ||
+        e instanceof HTMLOutputElement
+      ) {
         if (oldValue === e.value) continue;
         newValue = e.value;
         break;
+      } else {
+        console.warn("Unexpected element type: %o", e);
       }
     }
 

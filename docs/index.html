@@ -6,19 +6,20 @@
 <style>
   code {
     background-color: #eee;
-    padding: 3px;
+    border: 1px solid #ccc;
+    padding: 4px;
   }
   pre {
     display: inline-block;
     background-color: #eee;
-    padding: 1em;
+    border: 1px solid #ccc;
+    padding: 8px;
+    margin: 0 8px;
     & > code {
       background-color: transparent;
+      border: none;
       padding: 0;
     }
-  }
-  h2 {
-    border-bottom: 1px solid #999;
   }
 </style>
 
@@ -29,7 +30,6 @@
 
 <script>
   // Implement <script type="code"> element which shows the code as a code block.
-  // TODO trim indent
   addEventListener("DOMContentLoaded", () => {
     for (const e of document.querySelectorAll("script[type=code]")) {
       const pre = document.createElement("pre");
@@ -72,6 +72,41 @@
   >.
 </p>
 
+<h2>Basic usage</h2>
+
+<p>
+  To enable <code>storage-form</code>, you need to register the custom
+  storage-elements.
+</p>
+
+<p>Source:</p>
+
+<script type="code">
+  <script type="module">
+    import { register } from "./js/storage-elements-registerer.js";
+    register();
+  &lt;/script>
+</script>
+
+<p>
+  Then, you can edit and store the <code>foo</code> value in the
+  <code>localStorage</code>.
+</p>
+
+<p>Source:</p>
+
+<script type="code">
+  <storage-form area="local-storage">
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</script>
+
+<p>Result:</p>
+
+<storage-form area="local-storage">
+  <label>foo: <input name="foo" /></label>
+</storage-form>
+
 <h2>Supported storages</h2>
 
 <p>
@@ -90,49 +125,36 @@
   <dd>Use <code>chrome.storage.sync</code> as a storage.</dd>
 </dl>
 
-<h3>Example</h3>
+<h2>Supported elements</h2>
 
 <p>
-  You can edit and store the <code>foo</code> value in the
-  <code>localStorage</code>.
-</p>
-
-<p>Code:</p>
-
-<script type="code">
-  <storage-form area="local-storage">
-    <label>foo: <input name="foo" /></label>
-  </storage-form>
-</script>
-
-<p>Result:</p>
-
-<storage-form area="local-storage">
-  <label>foo: <input name="foo" /></label>
-</storage-form>
-
-<h2>Supported form elements</h2>
-
-<p>
-  Some form elements are supported. You can use <code>input</code>,
+  Some elements are supported. You can use <code>input</code>,
   <code>select</code>, <code>textarea</code> and <code>output</code> elements.
 </p>
 
 <storage-form area="local-storage">
-  <h3>type="text"</h3>
+  <h3>input type="text"</h3>
+
+  <p>Source:</p>
+
+  <script type="code">
+    <label>foo: <input name="foo" /></label>
+  </script>
+
+  <p>Result:</p>
+
   <p>
     <label>foo input: <input name="foo" /></label>
   </p>
-  <p>
-    <label>foo output: <output name="foo"></output></label>
-  </p>
 
-  <h3>type="checkbox"</h3>
+  <h3>input type="checkbox"</h3>
 
   <p>
     if checked, the value of <code>checkbox-sample1</code> is <code>on</code>,
-    otherwise an empty string.
+    otherwise the value is deleted.
   </p>
+
+  <p>Source:</p>
 
   <script type="code">
     <label>
@@ -141,6 +163,8 @@
     </label>
   </script>
 
+  <p>Result:</p>
+
   <p>
     <label>
       checkbox-sample1:
@@ -148,37 +172,55 @@
     </label>
   </p>
 
-  <p>
+  <h3>input type="radio"</h3>
+
+  <p>If checked, the value of <code>radio-sample</code> is the value.</p>
+
+  <p>Source:</p>
+  <script type="code">
+    radio-sample:
     <label>
-      checkbox-sample2:
-      <input
-        type="checkbox"
-        name="checkbox-sample2"
-        value="nyan"
-        data-unchecked-value="wan"
-        checked
-      />
+      <input type="radio" name="radio-sample" value="value-1" />
+      value-1
     </label>
-    : checked-value="nyan", unchecked-value="wan", and default checked
-  </p>
+    <label>
+      <input type="radio" name="radio-sample" value="value-2" />
+      value-2
+    </label>
+    <label>
+      <input type="radio" name="radio-sample" value="value-3" checked />
+      value-3
+    </label>
+  </script>
+
+  <p>Result:</p>
   <p>
     radio-sample:
-    <label
-      ><input type="radio" name="radio-sample" value="value-1" />value-1</label
-    >,
-    <label
-      ><input type="radio" name="radio-sample" value="value-2" />value-2</label
-    >,
-    <label
-      ><input
-        type="radio"
-        name="radio-sample"
-        value="value-3"
-        checked
-      />value-3</label
-    >
+    <label>
+      <input type="radio" name="radio-sample" value="value-1" />
+      value-1
+    </label>
+    <label>
+      <input type="radio" name="radio-sample" value="value-2" />
+      value-2
+    </label>
+    <label>
+      <input type="radio" name="radio-sample" value="value-3" checked />
+      value-3
+    </label>
+  </p>
+
+  <h3>And more...</h3>
+  <p>
+    type=color:
+    <input type="color" name="color-sample" />
   </p>
   <p>
+    type=date:
+    <input type="date" name="date-sample" />
+  </p>
+  <p>
+    textarea:
     <textarea name="sometextarea">this is a default textarea value.</textarea>
   </p>
   <p>
@@ -191,9 +233,95 @@
       </select>
     </label>
   </p>
+  <p>
+    Note:
+    type=<code>button</code>/<code>submit</code>/<code>reset</code>/<code>image</code>/<code
+      >hidden</code
+    >
+    are ignored.
+  </p>
 </storage-form>
 
-<h2><code>&lt;area-select&gt;</code> example</h2>
+<h2>The value of elements are synchronized with the same "name"</h2>
+
+<p>
+  If you have multiple elements with the same <code>name</code>, the value of
+  the elements are synchronized.
+</p>
+
+<p>The following example named <code>foo</code> elements are synchronized.</p>
+
+<storage-form area="local-storage">
+  <ul>
+    <li>
+      <label>
+        text input: <input name="foo" list="textinput-datalist" />
+        <button onclick="this.previousElementSibling.value = ''">✕</button>
+      </label>
+      <datalist id="textinput-datalist">
+        <option value="c1">
+          Same value with a checkbox. This value checks the checkbox.
+        </option>
+        <option value="r3">
+          Same value with a radio. This value checks the radio.
+        </option>
+        <option value="1985-06-18">Accept a format for type=date</option>
+        <option value="select-value2">
+          Same value with a select option. This value selects the option.
+        </option>
+      </datalist>
+    </li>
+    <li>
+      <label>output: <output name="foo"></output></label>
+    </li>
+    <li>
+      <label
+        >checkbox(value=c1): <input type="checkbox" name="foo" value="c1"
+      /></label>
+    </li>
+    <li>
+      radio:
+      <label><input type="radio" name="foo" value="r1" />r1</label>,
+      <label><input type="radio" name="foo" value="r2" />r2</label>,
+      <label><input type="radio" name="foo" value="r3" />r3</label>
+    </li>
+    <li>
+      <label>date input: <input type="date" name="foo" /></label>
+    </li>
+    <li>
+      <label
+        >checkbox(value=1985-06-18):
+        <input type="checkbox" name="foo" value="1985-06-18"
+      /></label>
+    </li>
+    <li>
+      <label>url input: <input type="url" name="foo" /></label>
+    </li>
+    <li>
+      <label>file input: <input type="file" name="foo" /></label>
+    </li>
+    <li>
+      select:
+      <select name="foo">
+        <option>select-value1</option>
+        <option>select-value2</option>
+        <option>select-value3</option>
+      </select>
+    </li>
+    <li>
+      <label>textarea: <textarea name="foo"></textarea></label>
+    </li>
+  </ul>
+</storage-form>
+
+<p>
+  Note: <code>input type=color</code> and <code>input type=range</code> does not
+  work right in the synchronization. They always force to set the default value,
+  because these types can not set the unset value like empty string in
+  type=date.
+</p>
+
+<h2>Support custom element: <code>&lt;area-select&gt;</code></h2>
 
 <p>
   You can change the stored area for the <code>ex4</code>'s value using an
