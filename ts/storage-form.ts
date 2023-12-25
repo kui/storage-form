@@ -178,6 +178,12 @@ class StorageFormIO implements DOMBinderIO {
       },
     };
   }
+
+  clear(): void {
+    this.values.clear();
+    if (this.isDOMBinding())
+      for (const elementSet of this.elements.values()) elementSet.clear();
+  }
 }
 
 class SameNameElementSet {
@@ -239,6 +245,10 @@ class SameNameElementSet {
     if (newValue === undefined && !unselected) return undefined;
     this.value = newValue;
     return { oldValue, newValue };
+  }
+
+  clear() {
+    this.value = undefined;
   }
 }
 

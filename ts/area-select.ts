@@ -115,6 +115,10 @@ class AreaSelectIO implements DOMBinderIO {
       },
     };
   }
+
+  clear() {
+    this.baseElement.value = this.baseElement.getAttribute("value") ?? "";
+  }
 }
 
 interface AreaMixin extends HTMLElement {

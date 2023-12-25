@@ -94,7 +94,6 @@ registerHandler("INPUT", {
       return textLikeInputHandler.diff(element, oldValue);
     }
   },
-
   write(element: HTMLInputElement, value) {
     const h = inputHandlers.get(element.type as InputType);
     if (h) {
@@ -120,7 +119,12 @@ registerHandler("SELECT", {
     }
   },
   write(element: HTMLSelectElement, value) {
-    element.value = value ?? "";
+    if (value === undefined) {
+      for (const options of element.options)
+        options.selected = options.defaultSelected;
+    } else {
+      element.value = value;
+    }
   },
 });
 
@@ -130,9 +134,8 @@ const plainValueHandler: StorageControlsHandler = {
       ? NOCHANGE
       : { type: "value", value: element.value };
   },
-
   write(element: HTMLTextAreaElement | HTMLOutputElement, value) {
-    element.value = value ?? "";
+    element.value = value ?? element.defaultValue;
   },
 };
 
@@ -180,7 +183,7 @@ const diffIfChanged: StorageControlsInputTypeHandler["diff"] = (
 const textLikeInputHandler: StorageControlsInputTypeHandler = {
   diff: diffIfChanged,
   write(element: HTMLInputElement, value) {
-    element.value = value ?? "";
+    element.value = value ?? element.defaultValue;
   },
 };
 
@@ -197,9 +200,12 @@ const checkableInputHandler: StorageControlsInputTypeHandler = {
       return oldValue === element.value ? UNSELECTED : NOCHANGE;
     }
   },
-
   write(element: HTMLInputElement, value) {
-    element.checked = element.value === value;
+    if (value === undefined) {
+      element.checked = element.defaultChecked;
+    } else {
+      element.checked = element.value === value;
+    }
   },
 };
 
@@ -210,7 +216,6 @@ const ignoreInputHandler: StorageControlsInputTypeHandler = {
   diff() {
     return NOCHANGE;
   },
-
   write() {
     // Do nothing
   },
@@ -219,11 +224,11 @@ const ignoreInputHandler: StorageControlsInputTypeHandler = {
 for (const t of ["button", "reset", "submit", "image", "hidden"] as const)
   registerInputTypeHandler(t, ignoreInputHandler);
 
-/** 
+/**
  * A helper function to create a diff function for input types
  * that reject empty value treated as nochange.
  */
-const diffIfNonEmpty: StorageControlsInputTypeHandler["diff"] = (
+const diffIfNoInput: StorageControlsInputTypeHandler["diff"] = (
   element,
   oldValue,
 ) => {
@@ -233,7 +238,7 @@ const diffIfNonEmpty: StorageControlsInputTypeHandler["diff"] = (
 };
 
 registerInputTypeHandler("file", {
-  diff: diffIfNonEmpty,
+  diff: diffIfNoInput,
   write(element: HTMLInputElement, value) {
     // For security reasons, the value of a file input cannot be set except empty.
     if (element.value !== value) {
@@ -243,47 +248,49 @@ registerInputTypeHandler("file", {
 });
 
 /**
- * A helper function to create a write function for input types 
- * that accept a value that matches the given regexp, 
+ * A helper function to create a write function for input types
+ * that accept a value that matches the given regexp,
  * otherwise the value is set to fallbackValue.
- * 
+ *
  * TODO RegExp is not enough to validate the value.
  */
 const writeIfRegexpMatch =
   (
     regexp: RegExp,
-    fallbackValue = "",
+    options: { fallbackValue?: string } = { fallbackValue: "" },
   ): StorageControlsInputTypeHandler["write"] =>
   (element, value) => {
-    if (value?.match(regexp)) {
+    if (value === undefined) {
+      element.value = element.defaultValue;
+    } else if (value.match(regexp)) {
       element.value = value;
     } else {
-      element.value = fallbackValue;
+      element.value = options.fallbackValue ?? "";
     }
   };
 
 registerInputTypeHandler("date", {
-  diff: diffIfNonEmpty,
+  diff: diffIfNoInput,
   write: writeIfRegexpMatch(/^\d{4}-\d{2}-\d{2}$/),
 });
 
 registerInputTypeHandler("datetime-local", {
-  diff: diffIfNonEmpty,
+  diff: diffIfNoInput,
   write: writeIfRegexpMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
 });
 
 registerInputTypeHandler("month", {
-  diff: diffIfNonEmpty,
+  diff: diffIfNoInput,
   write: writeIfRegexpMatch(/^\d{4}-\d{2}$/),
 });
 
 registerInputTypeHandler("time", {
-  diff: diffIfNonEmpty,
+  diff: diffIfNoInput,
   write: writeIfRegexpMatch(/^\d{2}:\d{2}$/),
 });
 
 registerInputTypeHandler("week", {
-  diff: diffIfNonEmpty,
+  diff: diffIfNoInput,
   write: writeIfRegexpMatch(/^\d{4}-W\d{2}$/),
 });
 
@@ -298,7 +305,7 @@ registerInputTypeHandler("color", {
   // TODO Should not read the value when the value is not set by the user.
   // But there might be no way to detect it.
   diff: diffIfChanged,
-  write: writeIfRegexpMatch(/^#[0-9a-f]{6}$/i, "#000000"),
+  write: writeIfRegexpMatch(/^#[0-9a-f]{6}$/i, { fallbackValue: "#000000" }),
 });
 
 registerInputTypeHandler("number", {

@@ -28,6 +28,7 @@
       background-color: transparent;
       border: none;
       padding: 0;
+      line-height: 120%;
     }
   }
   div.result::before {
@@ -335,6 +336,38 @@
   type=date.
 </p>
 
+<h2>Switch the storage area programmatically</h2>
+
+<p>
+  You can switch the storage area with with javascript using
+  <code>storage-form#storage-area</code> property.
+</p>
+
+<script type="code">
+  <storage-form id="exampleareaswitch">
+    <label>foo: <input name="foo" /></label>
+  </storage-form><br />
+  <button onclick="exampleareaswitch.storageArea = 'session-storage'">
+    Switch to sessionStorage
+  </button>
+  <button onclick="exampleareaswitch.storageArea = 'local-storage'">
+    Switch to localStorage
+  </button>
+</script>
+
+<div class="result">
+  <storage-form id="exampleareaswitch">
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+  <br />
+  <button onclick="exampleareaswitch.storageArea = 'session-storage'">
+    Switch to sessionStorage
+  </button>
+  <button onclick="exampleareaswitch.storageArea = 'local-storage'">
+    Switch to localStorage
+  </button>
+</div>
+
 <h2>Support custom elements</h2>
 
 <p>You can use support custom elements for some utilities.</p>
@@ -351,8 +384,7 @@
 
 <script type="code">
   <label>
-    foo:
-    <input is="storage-input" name="foo" storage-area="local-storage" />
+    foo: <input is="storage-input" name="foo" storage-area="local-storage" />
   </label>
 </script>
 
@@ -368,8 +400,7 @@
 <script type="code">
   <storage-form storage-area="local-storage">
     <label>
-      foo:
-      <input name="foo" />
+      foo: <input name="foo" />
     </label>
   </storage-form>
 </script>

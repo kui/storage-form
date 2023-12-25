@@ -122,6 +122,10 @@ class MonoStorageControlIO implements DOMBinderIO {
       },
     };
   }
+
+  clear(): void {
+    storageControlsHandler.write(this.baseElement, undefined);
+  }
 }
 
 type Constructor<E extends ValueContainerElement = ValueContainerElement> =

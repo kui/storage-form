@@ -27,6 +27,7 @@ export interface AreaBinderIO extends BinderIO {
 export interface DOMBinderIO extends BinderIO {
   getArea(): string | null;
   onAreaChange(callback: (changes: ValueChange) => void): { stop: () => void };
+  clear(): void;
 }
 
 export class StorageBinder {
@@ -80,6 +81,7 @@ export class StorageBinder {
   private async updateArea(area: string | null) {
     await this.executor.enqueue(async () => {
       this.areaIO.updateArea(area);
+      this.domIO.clear();
       await this.domIO.write(await this.areaIO.readAll());
     });
   }
