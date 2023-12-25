@@ -1,0 +1,312 @@
+interface StorageControlsHandler {
+  diff(
+    element: HTMLElement,
+    oldValue: string | undefined,
+  ):
+    | { type: "unselected" }
+    | { type: "value"; value: string }
+    | { type: "nochange" };
+  write(element: HTMLElement, value: string | undefined): void;
+}
+
+const NOCHANGE = { type: "nochange" } as const;
+const UNSELECTED = { type: "unselected" } as const;
+
+/**
+ * The key is the tag name of the element.
+ */
+const handlers = new Map<string, StorageControlsHandler>();
+
+const INPUT_TYPES = [
+  "button",
+  "checkbox",
+  "color",
+  "date",
+  "datetime-local",
+  "email",
+  "file",
+  "hidden",
+  "image",
+  "month",
+  "number",
+  "password",
+  "radio",
+  "range",
+  "reset",
+  "search",
+  "submit",
+  "tel",
+  "text",
+  "time",
+  "url",
+  "week",
+] as const;
+
+type InputType = (typeof INPUT_TYPES)[number];
+const inputHandlers = new Map<InputType, StorageControlsInputTypeHandler>();
+
+export function findStorageControlsHandler(
+  element: HTMLElement,
+): StorageControlsHandler | undefined {
+  return handlers.get(element.tagName);
+}
+
+export function diff(
+  element: HTMLElement,
+  oldValue: string | undefined,
+):
+  | { type: "unselected" }
+  | { type: "value"; value: string }
+  | { type: "nochange" } {
+  const h = findStorageControlsHandler(element);
+  if (!h) {
+    console.warn("No handler for %o", element);
+    return NOCHANGE;
+  }
+  return h.diff(element, oldValue);
+}
+
+export function write(element: HTMLElement, value: string | undefined): void {
+  const h = findStorageControlsHandler(element);
+  if (!h) {
+    console.warn("No handler for %o", element);
+    return;
+  }
+  h.write(element, value);
+}
+
+function registerHandler(
+  tagName: string,
+  handler: StorageControlsHandler,
+): void {
+  if (handlers.has(tagName))
+    throw new Error(`Handler for ${tagName} already exists`);
+  handlers.set(tagName, handler);
+}
+
+registerHandler("INPUT", {
+  diff(element: HTMLInputElement, oldValue) {
+    const h = inputHandlers.get(element.type as InputType);
+    if (h) {
+      return h.diff(element, oldValue);
+    } else {
+      console.warn(`Unknown input type: ${element.type}`);
+      return textLikeInputHandler.diff(element, oldValue);
+    }
+  },
+
+  write(element: HTMLInputElement, value) {
+    const h = inputHandlers.get(element.type as InputType);
+    if (h) {
+      h.write(element, value);
+    } else {
+      console.warn(`Unknown input type: ${element.type}`);
+      textLikeInputHandler.write(element, value);
+    }
+  },
+});
+
+registerHandler("SELECT", {
+  diff(element: HTMLSelectElement, oldValue) {
+    if (element.selectedIndex < 0) {
+      for (const options of element.options) {
+        if (options.value === oldValue) return UNSELECTED;
+      }
+      return NOCHANGE;
+    } else {
+      return oldValue === element.value
+        ? NOCHANGE
+        : { type: "value", value: element.value };
+    }
+  },
+  write(element: HTMLSelectElement, value) {
+    element.value = value ?? "";
+  },
+});
+
+const plainValueHandler: StorageControlsHandler = {
+  diff(element: HTMLTextAreaElement | HTMLOutputElement, oldValue) {
+    return oldValue === element.value
+      ? NOCHANGE
+      : { type: "value", value: element.value };
+  },
+
+  write(element: HTMLTextAreaElement | HTMLOutputElement, value) {
+    element.value = value ?? "";
+  },
+};
+
+registerHandler("TEXTAREA", plainValueHandler);
+registerHandler("OUTPUT", plainValueHandler);
+
+///////////////////////////////////////////////////////////////////////
+// Input type handlers
+
+interface StorageControlsInputTypeHandler {
+  diff(
+    element: HTMLInputElement,
+    oldValue: string | undefined,
+  ):
+    | { type: "unselected" }
+    | { type: "value"; value: string }
+    | { type: "nochange" };
+  write(element: HTMLInputElement, value: string | undefined): void;
+}
+
+function registerInputTypeHandler(
+  type: InputType,
+  handler: StorageControlsInputTypeHandler,
+) {
+  if (inputHandlers.has(type))
+    throw new Error(`Input type handler for ${type} already exists`);
+
+  inputHandlers.set(type, handler);
+}
+
+/**
+ * Basic diff function for input types.
+ * If the value is changed, return { type: "value", value: newValue }.
+ * Otherwise, return NOCHANGE.
+ */
+const diffIfChanged: StorageControlsInputTypeHandler["diff"] = (
+  element,
+  oldValue,
+) => {
+  return oldValue === element.value
+    ? NOCHANGE
+    : { type: "value", value: element.value };
+};
+
+const textLikeInputHandler: StorageControlsInputTypeHandler = {
+  diff: diffIfChanged,
+  write(element: HTMLInputElement, value) {
+    element.value = value ?? "";
+  },
+};
+
+for (const t of ["text", "email", "password", "search", "tel", "url"] as const)
+  registerInputTypeHandler(t, textLikeInputHandler);
+
+const checkableInputHandler: StorageControlsInputTypeHandler = {
+  diff(element: HTMLInputElement, oldValue) {
+    if (element.checked) {
+      return oldValue === element.value
+        ? NOCHANGE
+        : { type: "value", value: element.value };
+    } else {
+      return oldValue === element.value ? UNSELECTED : NOCHANGE;
+    }
+  },
+
+  write(element: HTMLInputElement, value) {
+    element.checked = element.value === value;
+  },
+};
+
+for (const t of ["checkbox", "radio"] as const)
+  registerInputTypeHandler(t, checkableInputHandler);
+
+const ignoreInputHandler: StorageControlsInputTypeHandler = {
+  diff() {
+    return NOCHANGE;
+  },
+
+  write() {
+    // Do nothing
+  },
+};
+
+for (const t of ["button", "reset", "submit", "image", "hidden"] as const)
+  registerInputTypeHandler(t, ignoreInputHandler);
+
+/** 
+ * A helper function to create a diff function for input types
+ * that reject empty value treated as nochange.
+ */
+const diffIfNonEmpty: StorageControlsInputTypeHandler["diff"] = (
+  element,
+  oldValue,
+) => {
+  if (element.value === "") return NOCHANGE;
+  if (element.value === oldValue) return NOCHANGE;
+  return { type: "value" as const, value: element.value };
+};
+
+registerInputTypeHandler("file", {
+  diff: diffIfNonEmpty,
+  write(element: HTMLInputElement, value) {
+    // For security reasons, the value of a file input cannot be set except empty.
+    if (element.value !== value) {
+      element.value = "";
+    }
+  },
+});
+
+/**
+ * A helper function to create a write function for input types 
+ * that accept a value that matches the given regexp, 
+ * otherwise the value is set to fallbackValue.
+ * 
+ * TODO RegExp is not enough to validate the value.
+ */
+const writeIfRegexpMatch =
+  (
+    regexp: RegExp,
+    fallbackValue = "",
+  ): StorageControlsInputTypeHandler["write"] =>
+  (element, value) => {
+    if (value?.match(regexp)) {
+      element.value = value;
+    } else {
+      element.value = fallbackValue;
+    }
+  };
+
+registerInputTypeHandler("date", {
+  diff: diffIfNonEmpty,
+  write: writeIfRegexpMatch(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+registerInputTypeHandler("datetime-local", {
+  diff: diffIfNonEmpty,
+  write: writeIfRegexpMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
+});
+
+registerInputTypeHandler("month", {
+  diff: diffIfNonEmpty,
+  write: writeIfRegexpMatch(/^\d{4}-\d{2}$/),
+});
+
+registerInputTypeHandler("time", {
+  diff: diffIfNonEmpty,
+  write: writeIfRegexpMatch(/^\d{2}:\d{2}$/),
+});
+
+registerInputTypeHandler("week", {
+  diff: diffIfNonEmpty,
+  write: writeIfRegexpMatch(/^\d{4}-W\d{2}$/),
+});
+
+registerInputTypeHandler("range", {
+  // TODO Should not read the value when the value is not set by the user.
+  // But there might be no way to detect it.
+  diff: diffIfChanged,
+  write: writeIfRegexpMatch(/^[-+]?\d+(\.\d+)?$/),
+});
+
+registerInputTypeHandler("color", {
+  // TODO Should not read the value when the value is not set by the user.
+  // But there might be no way to detect it.
+  diff: diffIfChanged,
+  write: writeIfRegexpMatch(/^#[0-9a-f]{6}$/i, "#000000"),
+});
+
+registerInputTypeHandler("number", {
+  diff: diffIfChanged,
+  write: writeIfRegexpMatch(/^[-+]?\d+(\.\d+)?$/),
+});
+
+// Check all input types are registered
+for (const t of INPUT_TYPES)
+  if (!inputHandlers.has(t))
+    throw new Error(`Input type handler for ${t} is not registered`);

@@ -5,21 +5,48 @@
 
 <style>
   code {
-    color: #fff;
-    background-color: #333;
+    background-color: #eee;
     padding: 4px;
   }
-  pre {
-    display: inline-block;
-    color: #fff;
-    background-color: #333;
+  pre.code,
+  div.result {
+    display: table;
+    background-color: #eee;
     padding: 8px;
-    margin: 0 8px;
+    margin: 32px 8px 8px 8px;
+    position: relative;
+    &::before {
+      position: absolute;
+      top: calc(-8px - 1em);
+      left: 0;
+      display: inline-block;
+      font-weight: bold;
+      font-size: 12px;
+    }
     & > code {
+      display: block;
       background-color: transparent;
       border: none;
       padding: 0;
     }
+  }
+  div.result::before {
+    content: "Result:";
+  }
+  pre.code::before {
+    content: "Source:";
+  }
+  h1::before {
+    content: "#";
+    color: #666;
+  }
+  h2::before {
+    content: "## ";
+    color: #666;
+  }
+  h3::before {
+    content: "### ";
+    color: #666;
   }
 </style>
 
@@ -33,6 +60,7 @@
   addEventListener("DOMContentLoaded", () => {
     for (const e of document.querySelectorAll("script[type=code]")) {
       const pre = document.createElement("pre");
+      pre.classList.add("code");
       const content = e.textContent
         .replace(/^\n*/, "")
         .replace(/(\n\s*)*$/, "")
@@ -79,8 +107,6 @@
   storage-elements.
 </p>
 
-<p>Source:</p>
-
 <script type="code">
   <script type="module">
     import { register } from "./js/storage-elements-registerer.js";
@@ -93,19 +119,17 @@
   <code>localStorage</code>.
 </p>
 
-<p>Source:</p>
-
 <script type="code">
   <storage-form storage-area="local-storage">
     <label>foo: <input name="foo" /></label>
   </storage-form>
 </script>
 
-<p>Result:</p>
-
-<storage-form storage-area="local-storage">
-  <label>foo: <input name="foo" /></label>
-</storage-form>
+<div class="result">
+  <storage-form storage-area="local-storage">
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</div>
 
 <h2>Supported storages</h2>
 
@@ -135,17 +159,15 @@
 <storage-form storage-area="local-storage">
   <h3>input type="text"</h3>
 
-  <p>Source:</p>
-
   <script type="code">
     <label>foo: <input name="foo" /></label>
   </script>
 
   <p>Result:</p>
 
-  <p>
+  <div class="result">
     <label>foo input: <input name="foo" /></label>
-  </p>
+  </div>
 
   <h3>input type="checkbox"</h3>
 
@@ -154,29 +176,23 @@
     otherwise the value is deleted.
   </p>
 
-  <p>Source:</p>
-
   <script type="code">
     <label>
       checkbox-sample1:
       <input type="checkbox" name="checkbox-sample1" />
     </label>
   </script>
-
-  <p>Result:</p>
-
-  <p>
+  <div class="result">
     <label>
       checkbox-sample1:
       <input type="checkbox" name="checkbox-sample1" />
     </label>
-  </p>
+  </div>
 
   <h3>input type="radio"</h3>
 
   <p>If checked, the value of <code>radio-sample</code> is the value.</p>
 
-  <p>Source:</p>
   <script type="code">
     radio-sample:
     <label>
@@ -192,9 +208,7 @@
       value-3
     </label>
   </script>
-
-  <p>Result:</p>
-  <p>
+  <div class="result">
     radio-sample:
     <label>
       <input type="radio" name="radio-sample" value="value-1" />
@@ -208,7 +222,7 @@
       <input type="radio" name="radio-sample" value="value-3" checked />
       value-3
     </label>
-  </p>
+  </div>
 
   <h3>And more...</h3>
   <p>
@@ -332,8 +346,6 @@
   single select element in the <code>storage-form</code>.
 </p>
 
-<p>Source:</p>
-
 <script type="code">
   <label>
     foo:
@@ -345,16 +357,16 @@
   </label>
 </script>
 
-<p>Result:</p>
-
-<label>
-  foo:
-  <select is="storage-select" name="foo" storage-area="local-storage">
-    <option>select-value1</option>
-    <option>select-value2</option>
-    <option>select-value3</option>
-  </select>
-</label>
+<div class="result">
+  <label>
+    foo:
+    <select is="storage-select" name="foo" storage-area="local-storage">
+      <option>select-value1</option>
+      <option>select-value2</option>
+      <option>select-value3</option>
+    </select>
+  </label>
+</div>
 
 <p>The following example is the same as the above example:</p>
 
