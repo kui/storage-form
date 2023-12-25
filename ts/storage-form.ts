@@ -98,7 +98,7 @@ class StorageFormIO implements DOMBinderIO {
           for (const e of r.addedNodes) {
             if (!matchesStorageControl(e)) continue;
             isValueChanged = true;
-            if (e.name) this.elements.add(e);
+            this.elements.add(e);
           }
           for (const e of r.removedNodes) {
             if (!matchesStorageControl(e)) continue;
