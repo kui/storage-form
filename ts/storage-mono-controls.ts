@@ -1,9 +1,9 @@
 import { remove } from "./arrays.js";
 import { SerialTaskExecutor, repeatAsPolling } from "./promises.js";
 import {
+  ComponentChangeCallback,
   DOMBinderIO,
   StorageBinder,
-  ValueChange,
   ValueChanges,
   WroteValues,
 } from "./storage-binder.js";
@@ -19,7 +19,7 @@ type MonoStorageControlMixin = ValueContainerElement & StorageElementMixin;
 class MonoStorageControlIO implements DOMBinderIO {
   private value: string | undefined;
   private observer: MutationObserver | null = null;
-  private readonly areaChangeListeners: ((change: ValueChange) => void)[];
+  private readonly componentChangeListeners: ComponentChangeCallback[] = [];
   private readonly valueChangeListeners: ((
     change: ValueChanges,
   ) => void | Promise<void>)[] = [];
@@ -27,11 +27,6 @@ class MonoStorageControlIO implements DOMBinderIO {
 
   constructor(private readonly baseElement: MonoStorageControlMixin) {
     this.value = baseElement.value;
-    this.areaChangeListeners = [
-      (change) => {
-        this.baseElement.value = change.newValue ?? "";
-      },
-    ];
   }
 
   private isDOMBinding() {
@@ -56,13 +51,14 @@ class MonoStorageControlIO implements DOMBinderIO {
     this.observer = new MutationObserver((records) => {
       for (const r of records) {
         if (r.attributeName === "storage-area") {
-          this.dispatchAreaChange(
-            r.oldValue ?? undefined,
-            this.baseElement.storageArea,
-          );
+          this.dispatchComponentChange({
+            area: {
+              newValue: this.baseElement.storageArea,
+              oldValue: r.oldValue ?? undefined,
+            },
+          });
         } else if (r.attributeName === "name") {
-          storageControlsHandler.reset(this.baseElement);
-          this.value = undefined;
+          this.dispatchComponentChange({});
         }
       }
     });
@@ -87,22 +83,21 @@ class MonoStorageControlIO implements DOMBinderIO {
     });
   }
 
-  private dispatchAreaChange(
-    oldValue: string | undefined,
-    newValue: string | undefined,
+  private dispatchComponentChange(
+    changes: Parameters<ComponentChangeCallback>[0],
   ) {
-    for (const l of this.areaChangeListeners) l({ oldValue, newValue });
+    for (const l of this.componentChangeListeners) l(changes);
   }
 
   getArea(): string | null {
     return this.baseElement.storageArea;
   }
 
-  onAreaChange(callback: (change: ValueChange) => void): { stop: () => void } {
-    this.areaChangeListeners.push(callback);
+  onComponentChange(callback: ComponentChangeCallback): { stop: () => void } {
+    this.componentChangeListeners.push(callback);
     return {
       stop: () => {
-        remove(this.areaChangeListeners, callback);
+        remove(this.componentChangeListeners, callback);
       },
     };
   }
@@ -127,7 +122,9 @@ class MonoStorageControlIO implements DOMBinderIO {
   }
 
   clear(): void {
-    storageControlsHandler.reset(this.baseElement);
+    this.value = undefined;
+    if (this.isDOMBinding())
+      storageControlsHandler.reset(this.baseElement);
   }
 }
 

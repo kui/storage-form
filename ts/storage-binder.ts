@@ -5,11 +5,8 @@ export interface ValueChange {
   oldValue?: string;
   newValue?: string;
 }
-
 export type ValueChanges = Map<string, ValueChange>;
-
 export type StoredValues = Map<string, string>;
-
 export type WroteValues = Map<string, string | undefined>;
 
 interface BinderIO {
@@ -24,23 +21,26 @@ export interface AreaBinderIO extends BinderIO {
   readAll(): Promise<StoredValues> | StoredValues;
 }
 
+export type ComponentChangeCallback = (changes: { area?: ValueChange }) => void;
 export interface DOMBinderIO extends BinderIO {
   getArea(): string | null;
-  onAreaChange(callback: (changes: ValueChange) => void): { stop: () => void };
+  onComponentChange(callback: ComponentChangeCallback): {
+    stop: () => void;
+  };
   clear(): void;
 }
 
 export class StorageBinder {
   private readonly executor = new SerialTaskExecutor();
   private readonly areaIO = new FacadeAreaBinderIO();
-  private isInitialized = false;
+  private isStarted = false;
   private stopListening: (() => void) | null = null;
 
   constructor(private readonly domIO: DOMBinderIO) {}
 
   async start() {
-    if (this.isInitialized) throw Error("Already initialized");
-    this.isInitialized = true;
+    if (this.isStarted) throw Error("Already started");
+    this.isStarted = true;
 
     const domListening = this.domIO.onChange((c) =>
       this.writeChanges(this.areaIO, c),
@@ -48,8 +48,8 @@ export class StorageBinder {
     const storageListening = this.areaIO.onChange((c) =>
       this.writeChanges(this.domIO, c),
     );
-    const domAreaListening = this.domIO.onAreaChange((c) => {
-      this.updateArea(c.newValue ?? null).catch(console.error);
+    const domAreaListening = this.domIO.onComponentChange((c) => {
+      this.updateComponents(c.area?.newValue ?? null).catch(console.error);
     });
     this.stopListening = () => {
       domListening.stop();
@@ -57,12 +57,12 @@ export class StorageBinder {
       domAreaListening.stop();
     };
 
-    await this.updateArea(this.domIO.getArea());
+    await this.updateComponents(this.domIO.getArea());
   }
 
   stop() {
-    if (!this.isInitialized) throw Error("Not initialized");
-    this.isInitialized = false;
+    if (!this.isStarted) throw Error("Not started");
+    this.isStarted = false;
 
     this.stopListening?.();
     this.stopListening = null;
@@ -78,7 +78,7 @@ export class StorageBinder {
     }
   }
 
-  private async updateArea(area: string | null) {
+  private async updateComponents(area: string | null) {
     await this.executor.enqueue(async () => {
       this.areaIO.updateArea(area);
       this.domIO.clear();

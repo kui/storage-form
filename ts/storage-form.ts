@@ -3,6 +3,7 @@ import { NamedSetMap } from "./maps.js";
 import { SerialTaskExecutor, repeatAsPolling } from "./promises.js";
 import { StorageBinder } from "./storage-binder.js";
 import type {
+  ComponentChangeCallback,
   DOMBinderIO,
   ValueChange,
   ValueChanges,
@@ -41,7 +42,7 @@ class StorageFormIO implements DOMBinderIO {
   ) => void | Promise<void>)[] = [];
   private observer: MutationObserver | null = null;
   private polling: { stop(): Promise<void> } | null = null;
-  private readonly areaChangeListeners: ((change: ValueChange) => void)[] = [];
+  private readonly componentChangeListener: ComponentChangeCallback[] = [];
 
   constructor(private readonly baseElement: StorageElementMixin) {}
 
@@ -49,11 +50,13 @@ class StorageFormIO implements DOMBinderIO {
     return this.baseElement.storageArea;
   }
 
-  onAreaChange(callback: (changes: ValueChange) => void): { stop: () => void } {
-    this.areaChangeListeners.push(callback);
+  onComponentChange(callback: ComponentChangeCallback): {
+    stop: () => void;
+  } {
+    this.componentChangeListener.push(callback);
     return {
       stop: () => {
-        remove(this.areaChangeListeners, callback);
+        remove(this.componentChangeListener, callback);
       },
     };
   }
@@ -109,7 +112,7 @@ class StorageFormIO implements DOMBinderIO {
           if (oldName) this.elements.deleteByValue(r.target);
           const newName = r.target.name;
           if (newName) this.elements.add(r.target);
-          storageControlsHandler.reset(r.target);
+          this.dispatchComponentChangeListeners({});
         } else if (
           r.type === "attributes" &&
           r.attributeName === "storage-area"
@@ -117,7 +120,9 @@ class StorageFormIO implements DOMBinderIO {
           const oldValue = r.oldValue ?? undefined;
           const newValue = this.baseElement.storageArea;
           if (oldValue !== newValue)
-            for (const l of this.areaChangeListeners) l({ oldValue, newValue });
+            this.dispatchComponentChangeListeners({
+              area: { oldValue, newValue },
+            });
         }
       }
       if (isValueChanged) this.writeToDOM(this.values);
@@ -142,6 +147,11 @@ class StorageFormIO implements DOMBinderIO {
 
   private async dispatchChangeListeners(changes: ValueChanges) {
     for (const l of this.changeListeners) await l(changes);
+  }
+  private dispatchComponentChangeListeners(
+    changes: Parameters<ComponentChangeCallback>[0],
+  ) {
+    for (const l of this.componentChangeListener) l(changes);
   }
 
   private updateValues(): ValueChanges {
