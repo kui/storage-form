@@ -19,7 +19,15 @@ const STORAGE_CONTROL_SELECTOR = STORAGE_CONTROL_TAGS.join(",");
 function matchesStorageControl(
   e: unknown,
 ): e is HTMLStorageFormControllElements {
-  return e instanceof Element && e.matches(STORAGE_CONTROL_SELECTOR);
+  return (
+    e instanceof Element &&
+    // Child storage custom elements should be ignored
+    !("storageArea" in e) &&
+    "name" in e &&
+    // Reject if the name is empty
+    Boolean(e.name) &&
+    e.matches(STORAGE_CONTROL_SELECTOR)
+  );
 }
 
 class StorageFormIO implements DOMBinderIO {
@@ -74,12 +82,8 @@ class StorageFormIO implements DOMBinderIO {
       this.baseElement.querySelectorAll<HTMLStorageFormControllElements>(
         STORAGE_CONTROL_SELECTOR,
       );
-    for (const e of elements) {
-      if (!e.name) continue;
-      // Child storage custom elements should be ignored
-      if ("storageArea" in e) continue;
-      this.elements.add(e);
-    }
+    for (const e of elements)
+      if (matchesStorageControl(e)) this.elements.add(e);
     this.writeToDOM(this.values);
   }
 
@@ -105,6 +109,7 @@ class StorageFormIO implements DOMBinderIO {
           if (oldName) this.elements.deleteByValue(r.target);
           const newName = r.target.name;
           if (newName) this.elements.add(r.target);
+          storageControlsHandler.reset(r.target);
         } else if (
           r.type === "attributes" &&
           r.attributeName === "storage-area"
@@ -115,9 +120,7 @@ class StorageFormIO implements DOMBinderIO {
             for (const l of this.areaChangeListeners) l({ oldValue, newValue });
         }
       }
-      if (isValueChanged) {
-        this.writeToDOM(this.values);
-      }
+      if (isValueChanged) this.writeToDOM(this.values);
     });
     this.observer.observe(this.baseElement, {
       childList: true,

@@ -157,6 +157,16 @@
   <code>select</code>, <code>textarea</code> and <code>output</code> elements.
 </p>
 
+<p>
+  The <code>name</code> attribute of the element is used as a key of the
+  storage.
+</p>
+
+<p>
+  The below example shows the supported elements. These sources are in the
+  <code>storage-form</code> element.
+</p>
+
 <storage-form storage-area="local-storage">
   <h3>input type="text"</h3>
 
@@ -167,7 +177,7 @@
   <p>Result:</p>
 
   <div class="result">
-    <label>foo input: <input name="foo" /></label>
+    <label>foo: <input name="foo" /></label>
   </div>
 
   <h3>input type="checkbox"</h3>

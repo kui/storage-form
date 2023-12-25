@@ -66,6 +66,11 @@ export function diff(
   return h.diff(element, oldValue);
 }
 
+/**
+ *
+ * @param element Target element
+ * @param value if `undefined`, the element is set to the default value.
+ */
 export function write(element: HTMLElement, value: string | undefined): void {
   const h = findStorageControlsHandler(element);
   if (!h) {
@@ -73,6 +78,10 @@ export function write(element: HTMLElement, value: string | undefined): void {
     return;
   }
   h.write(element, value);
+}
+
+export function reset(element: HTMLElement): void {
+  write(element, undefined);
 }
 
 function registerHandler(

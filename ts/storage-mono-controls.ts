@@ -60,12 +60,15 @@ class MonoStorageControlIO implements DOMBinderIO {
             r.oldValue ?? undefined,
             this.baseElement.storageArea,
           );
+        } else if (r.attributeName === "name") {
+          storageControlsHandler.reset(this.baseElement);
+          this.value = undefined;
         }
       }
     });
     this.observer.observe(this.baseElement, {
       attributes: true,
-      attributeFilter: ["storage-area"],
+      attributeFilter: ["storage-area", "name"],
     });
   }
 
@@ -124,7 +127,7 @@ class MonoStorageControlIO implements DOMBinderIO {
   }
 
   clear(): void {
-    storageControlsHandler.write(this.baseElement, undefined);
+    storageControlsHandler.reset(this.baseElement);
   }
 }
 
@@ -169,7 +172,6 @@ export function mixinMonoStorageControl<T extends Constructor>(
     }
   };
 }
-
 
 export class HTMLStorageInputElement extends mixinMonoStorageControl(
   HTMLInputElement,
