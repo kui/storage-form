@@ -107,7 +107,6 @@ class StorageFormIO implements DOMBinderIO {
           }
         } else if (r.attributeName === "name") {
           if (!matchesStorageControl(r.target)) continue;
-          isValueChanged = true;
           const oldName = r.oldValue;
           if (oldName) this.elements.deleteByKeyValue(oldName, r.target);
           const newName = r.target.name;
