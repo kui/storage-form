@@ -339,32 +339,27 @@
 
 <p>You can use support custom elements for some utilities.</p>
 
-<h3>Support custom element: <code>storage-select</code></h3>
+<h3>
+  Mono storage inputs: <code>storage-input</code>, <code>storage-select</code>,
+  <code>storage-textarea</code>, <code>storage-output</code>
+</h3>
 
 <p>
-  <code>storage-select</code> is a custom element that is shorthand for the
-  single select element in the <code>storage-form</code>.
+  <code>storage-input</code> is a custom element that is shorthand for the
+  single &lt;input&gt; element in the <code>storage-form</code>.
 </p>
 
 <script type="code">
   <label>
     foo:
-    <select is="storage-select" name="foo" storage-area="local-storage">
-      <option>select-value1</option>
-      <option>select-value2</option>
-      <option>select-value3</option>
-    </select>
+    <input is="storage-input" name="foo" storage-area="local-storage" />
   </label>
 </script>
 
 <div class="result">
   <label>
     foo:
-    <select is="storage-select" name="foo" storage-area="local-storage">
-      <option>select-value1</option>
-      <option>select-value2</option>
-      <option>select-value3</option>
-    </select>
+    <input is="storage-input" name="foo" storage-area="local-storage" />
   </label>
 </div>
 
@@ -374,14 +369,15 @@
   <storage-form storage-area="local-storage">
     <label>
       foo:
-      <select name="foo">
-        <option>value-1</option>
-        <option>value-2</option>
-        <option>value-3</option>
-      </select>
+      <input name="foo" />
     </label>
   </storage-form>
 </script>
+
+<p>
+  <code>storage-select</code>, <code>storage-textarea</code> and
+  <code>storage-output</code> are the same as <code>storage-input</code>.
+</p>
 
 <h3>Support custom element: <code>area-select</code></h3>
 

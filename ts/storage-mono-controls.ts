@@ -8,11 +8,16 @@ import {
   WroteValues,
 } from "./storage-binder.js";
 import { StorageElementMixin } from "./storage-element.js";
+import * as storageControlsHandler from "./storage-controls-handler.js";
 
-type StorageSelectMixin = HTMLSelectElement & StorageElementMixin;
+interface ValueContainerElement extends HTMLElement {
+  name: string;
+  value: string;
+}
+type MonoStorageControlMixin = ValueContainerElement & StorageElementMixin;
 
-class StorageSelectIO implements DOMBinderIO {
-  private value: string;
+class MonoStorageControlIO implements DOMBinderIO {
+  private value: string | undefined;
   private observer: MutationObserver | null = null;
   private readonly areaChangeListeners: ((change: ValueChange) => void)[];
   private readonly valueChangeListeners: ((
@@ -20,7 +25,7 @@ class StorageSelectIO implements DOMBinderIO {
   ) => void | Promise<void>)[] = [];
   private polling: { stop(): Promise<void> } | null = null;
 
-  constructor(private readonly baseElement: StorageSelectMixin) {
+  constructor(private readonly baseElement: MonoStorageControlMixin) {
     this.value = baseElement.value;
     this.areaChangeListeners = [
       (change) => {
@@ -35,7 +40,7 @@ class StorageSelectIO implements DOMBinderIO {
 
   startBinding() {
     if (this.isDOMBinding()) return;
-    this.baseElement.value = this.value;
+    this.baseElement.value = this.value ?? "";
     this.buildObserver();
     this.startValuePolling();
   }
@@ -66,10 +71,10 @@ class StorageSelectIO implements DOMBinderIO {
 
   private startValuePolling() {
     this.polling = repeatAsPolling(async () => {
-      if (this.baseElement.selectedIndex < 0) return;
-      const newValue = this.baseElement.value;
+      const diff = storageControlsHandler.diff(this.baseElement, this.value);
+      if (diff.type === "nochange") return;
+      const newValue = diff.type === "value" ? diff.value : undefined;
       const oldValue = this.value;
-      if (oldValue === newValue) return;
       this.value = newValue;
       const changes = new Map([
         [this.baseElement.name, { oldValue, newValue }],
@@ -103,7 +108,8 @@ class StorageSelectIO implements DOMBinderIO {
     const value = items.get(this.baseElement.name);
     if (value === undefined) return;
     this.value = value;
-    if (this.isDOMBinding()) this.baseElement.value = value;
+    if (this.isDOMBinding())
+      storageControlsHandler.write(this.baseElement, value);
   }
 
   onChange(callback: (changes: ValueChanges) => void | Promise<void>): {
@@ -118,18 +124,19 @@ class StorageSelectIO implements DOMBinderIO {
   }
 }
 
-type HTMLSelectElementConstructor<
-  T extends HTMLSelectElement = HTMLSelectElement,
-> =
+type Constructor<E extends ValueContainerElement = ValueContainerElement> =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  new (...args: any[]) => T;
+  new (...args: any[]) => E;
 
-export function mixinAreaSelect<T extends HTMLSelectElementConstructor>(
+export function mixinMonoStorageControl<T extends Constructor>(
   base: T,
-): T & HTMLSelectElementConstructor<StorageSelectMixin> {
-  return class extends base {
+): T & Constructor<MonoStorageControlMixin> {
+  return class
+    extends base
+    implements MonoStorageControlMixin, ValueContainerElement
+  {
     private binder: StorageBinder | null = null;
-    private io: StorageSelectIO | null = null;
+    private io: MonoStorageControlIO | null = null;
     private readonly taskExecutor = new SerialTaskExecutor();
 
     get storageArea(): string {
@@ -141,7 +148,7 @@ export function mixinAreaSelect<T extends HTMLSelectElementConstructor>(
 
     connectedCallback() {
       this.taskExecutor.enqueueNoWait(async () => {
-        this.io = new StorageSelectIO(this);
+        this.io = new MonoStorageControlIO(this);
         this.binder = new StorageBinder(this.io);
         await this.binder.start();
         this.io.startBinding();
@@ -159,14 +166,43 @@ export function mixinAreaSelect<T extends HTMLSelectElementConstructor>(
   };
 }
 
-export class HTMLStorageSelectElement extends mixinAreaSelect(HTMLSelectElement) {
+
+export class HTMLStorageInputElement extends mixinMonoStorageControl(
+  HTMLInputElement,
+) {
   static register() {
-    register();
+    customElements.define("storage-input", HTMLStorageInputElement, {
+      extends: "input",
+    });
   }
 }
 
-export function register() {
-  customElements.define("storage-select", HTMLStorageSelectElement, {
-    extends: "select",
-  });
+export class HTMLStorageSelectElement extends mixinMonoStorageControl(
+  HTMLSelectElement,
+) {
+  static register() {
+    customElements.define("storage-select", HTMLStorageSelectElement, {
+      extends: "select",
+    });
+  }
+}
+
+export class HTMLStorageTextAreaElement extends mixinMonoStorageControl(
+  HTMLTextAreaElement,
+) {
+  static register() {
+    customElements.define("storage-textarea", HTMLStorageTextAreaElement, {
+      extends: "textarea",
+    });
+  }
+}
+
+export class HTMLStorageOutputElement extends mixinMonoStorageControl(
+  HTMLOutputElement,
+) {
+  static register() {
+    customElements.define("storage-output", HTMLStorageOutputElement, {
+      extends: "output",
+    });
+  }
 }
