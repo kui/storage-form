@@ -346,36 +346,48 @@
   type=date.
 </p>
 
-<h2>Switch the storage area programmatically</h2>
+<h2>Switch attributes programmatically</h2>
 
 <p>
   You can switch the storage area with with javascript using
-  <code>storage-form#storage-area</code> property.
+  <code>storage-form#storageArea</code> property.
+</p>
+
+<p>
+  And you can also switch the name of binding target of the storage entry
+  <code>storage-form#name</code> property.
 </p>
 
 <script type="code">
-  <storage-form id="exampleareaswitch">
-    <label>foo: <input name="foo" /></label>
-  </storage-form><br />
-  <button onclick="exampleareaswitch.storageArea = 'session-storage'">
-    Switch to sessionStorage
+  <storage-form id="areaswitchexample">
+    <label><input id="nameswitchexample" /></label>
+  </storage-form>
+  <br />
+  <button onclick="areaswitchexample.storageArea = 'session-storage'">
+    storageArea=sessionStorage
   </button>
-  <button onclick="exampleareaswitch.storageArea = 'local-storage'">
-    Switch to localStorage
+  <button onclick="areaswitchexample.storageArea = 'local-storage'">
+    storageArea=localStorage
   </button>
+  <br />
+  <button onclick="nameswitchexample.name = 'foo'">name=foo</button>
+  <button onclick="nameswitchexample.name = 'bar'">name=bar</button>
 </script>
 
 <div class="result">
-  <storage-form id="exampleareaswitch">
-    <label>foo: <input name="foo" /></label>
+  <storage-form id="areaswitchexample">
+    <label><input id="nameswitchexample" /></label>
   </storage-form>
   <br />
-  <button onclick="exampleareaswitch.storageArea = 'session-storage'">
-    Switch to sessionStorage
+  <button onclick="areaswitchexample.storageArea = 'session-storage'">
+    storageArea=sessionStorage
   </button>
-  <button onclick="exampleareaswitch.storageArea = 'local-storage'">
-    Switch to localStorage
+  <button onclick="areaswitchexample.storageArea = 'local-storage'">
+    storageArea=localStorage
   </button>
+  <br />
+  <button onclick="nameswitchexample.name = 'foo'">name=foo</button>
+  <button onclick="nameswitchexample.name = 'bar'">name=bar</button>
 </div>
 
 <h2>Support custom elements</h2>

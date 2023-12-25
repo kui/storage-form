@@ -26,6 +26,11 @@ export class NamedSetMap<
     return this;
   }
 
+  deleteByKeyValue(k: string, v: V): boolean {
+    const s = this.get(k);
+    return s && s.delete(v) && s.size === 0 ? this.delete(k) : false;
+  }
+
   deleteByValue(v: V): boolean {
     const s = this.get(v.name);
     return s && s.delete(v) && s.size === 0 ? this.delete(v.name) : false;

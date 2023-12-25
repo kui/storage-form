@@ -49,7 +49,10 @@ export class StorageBinder {
       this.writeChanges(this.domIO, c),
     );
     const domAreaListening = this.domIO.onComponentChange((c) => {
-      this.updateComponents(c.area?.newValue ?? null).catch(console.error);
+      let area;
+      if (c.area === undefined) area = null;
+      else area = c.area.newValue ?? "";
+      this.updateComponents(area).catch(console.error);
     });
     this.stopListening = () => {
       domListening.stop();
@@ -57,7 +60,7 @@ export class StorageBinder {
       domAreaListening.stop();
     };
 
-    await this.updateComponents(this.domIO.getArea());
+    await this.updateComponents(this.domIO.getArea() ?? "");
   }
 
   stop() {
@@ -80,7 +83,7 @@ export class StorageBinder {
 
   private async updateComponents(area: string | null) {
     await this.executor.enqueue(async () => {
-      this.areaIO.updateArea(area);
+      if (area !== null) this.areaIO.updateArea(area);
       this.domIO.clear();
       await this.domIO.write(await this.areaIO.readAll());
     });

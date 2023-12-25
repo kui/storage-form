@@ -105,18 +105,15 @@ class StorageFormIO implements DOMBinderIO {
             isValueChanged = true;
             this.elements.deleteByValue(e);
           }
-        } else if (r.type === "attributes" && r.attributeName === "name") {
+        } else if (r.attributeName === "name") {
           if (!matchesStorageControl(r.target)) continue;
           isValueChanged = true;
           const oldName = r.oldValue;
-          if (oldName) this.elements.deleteByValue(r.target);
+          if (oldName) this.elements.deleteByKeyValue(oldName, r.target);
           const newName = r.target.name;
           if (newName) this.elements.add(r.target);
           this.dispatchComponentChangeListeners({});
-        } else if (
-          r.type === "attributes" &&
-          r.attributeName === "storage-area"
-        ) {
+        } else if (r.attributeName === "storage-area") {
           const oldValue = r.oldValue ?? undefined;
           const newValue = this.baseElement.storageArea;
           if (oldValue !== newValue)
