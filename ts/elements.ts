@@ -49,10 +49,11 @@ export function addChangeListeners(
       element.removeEventListener("input", listener);
     },
   };
-} /**
+}
+
+/**
  * To prevent the element from being treated as a storage control.
  */
-
 export interface StorageFormLikeElement extends HTMLElement {
   isNotStorageControl: boolean;
 }
