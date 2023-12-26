@@ -19,11 +19,13 @@ export function registerHandler(area: string, handler: AreaBinderIO) {
 }
 
 export function findHandler(area: string): AreaBinderIO | null {
-  return handlers.get(area) ?? null;
+  const h = handlers.get(area) ?? null;
+  if (!h) console.warn(`No handler for "%s"`, area);
+  return h;
 }
 
-export function listHandlers(): IterableIterator<[string, AreaBinderIO]> {
-  return handlers.entries();
+export function listAreas(): string[] {
+  return [...handlers.keys()];
 }
 
 export class FacadeAreaBinderIO implements AreaBinderIO {

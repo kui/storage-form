@@ -25,12 +25,19 @@ export function sleep(msec: number): CancellablePromise<void> {
 }
 
 export class SerialTaskExecutor {
-  private readonly queue: (() => Promise<void>)[] = [];
+  private readonly queue: (() => void | Promise<void>)[] = [];
   private isRunning = false;
 
-  async enqueue(task: () => Promise<void>): Promise<void> {
+  async enqueue(task: () => void | Promise<void>): Promise<void> {
     const { promise, resolve, reject } = withResolves();
-    this.queue.push(() => task().then(resolve).catch(reject));
+    this.queue.push(async () => {
+      try {
+        await task();
+        resolve();
+      } catch (e) {
+        reject(e);
+      }
+    });
 
     if (this.isRunning) return promise;
 
@@ -49,12 +56,12 @@ export class SerialTaskExecutor {
     return promise;
   }
 
-  enqueueNoWait(task: () => Promise<void>): void {
+  enqueueNoWait(task: () => void | Promise<void>): void {
     this.enqueue(task).catch(console.error);
   }
 }
 
-export function repeatAsPolling(task: () => Promise<void>): {
+export function repeatAsPolling(task: () => Promise<void> | void): {
   stop(): Promise<void>;
 } {
   let isRunning = true;

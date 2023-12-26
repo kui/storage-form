@@ -5,7 +5,7 @@ import {
   HTMLStorageTextAreaElement,
   HTMLStorageOutputElement,
 } from "./storage-mono-controls.js";
-//import { HTMLAreaSelectElement } from "./area-select.js";
+import { HTMLAreaSelectElement, HTMLStorageAreaSelectElement } from "./storage-area-select.js";
 
 /**
  * Registers all custom elements defined in this package.
@@ -16,5 +16,6 @@ export function register(): void {
   HTMLStorageSelectElement.register();
   HTMLStorageTextAreaElement.register();
   HTMLStorageOutputElement.register();
-  //HTMLAreaSelectElement.register();
+  HTMLAreaSelectElement.register();
+  HTMLStorageAreaSelectElement.register();
 }

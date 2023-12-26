@@ -10,7 +10,7 @@ import type {
   WroteValues,
 } from "./storage-binder.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";
-import type { StorageElementMixin } from "./storage-element.js";
+import type { StorageElementMixin, StorageFormLikeElement } from "./storage-element.js";
 
 const STORAGE_CONTROL_TAGS = ["input", "select", "textarea", "output"] as const;
 type HTMLStorageFormControllElements =
@@ -23,10 +23,9 @@ function matchesStorageControl(
   return (
     e instanceof Element &&
     // Child storage custom elements should be ignored
-    !("storageArea" in e) &&
-    "name" in e &&
-    // Reject if the name is empty
-    Boolean(e.name) &&
+    !(e as StorageFormLikeElement).isNotStorageControl &&
+    // Reject if the name is undefined or empty
+    Boolean((e as HTMLStorageFormControllElements).name) &&
     e.matches(STORAGE_CONTROL_SELECTOR)
   );
 }
@@ -113,6 +112,7 @@ class StorageFormIO implements DOMBinderIO {
           if (newName) this.elements.add(r.target);
           this.dispatchComponentChangeListeners({});
         } else if (r.attributeName === "storage-area") {
+          if (r.target !== this.baseElement) continue;
           const oldValue = r.oldValue ?? undefined;
           const newValue = this.baseElement.storageArea;
           if (oldValue !== newValue)
@@ -272,6 +272,7 @@ export function mixinStorage<T extends HTMLElementConstructor>(
     private binder: StorageBinder | null = null;
     private io: StorageFormIO | null = null;
     private readonly taskExecutor = new SerialTaskExecutor();
+    readonly isNotStorageControl = true;
 
     get storageArea(): string {
       return this.getAttribute("storage-area") ?? "";

@@ -10,11 +10,12 @@ import {
 import { StorageElementMixin } from "./storage-element.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";
 
-interface ValueContainerElement extends HTMLElement {
+interface MonoStorageControlParent extends HTMLElement {
   name: string;
   value: string;
 }
-type MonoStorageControlMixin = ValueContainerElement & StorageElementMixin;
+export type MonoStorageControlMixin = MonoStorageControlParent &
+  StorageElementMixin;
 
 class MonoStorageControlIO implements DOMBinderIO {
   private value: string | undefined;
@@ -123,12 +124,13 @@ class MonoStorageControlIO implements DOMBinderIO {
 
   clear(): void {
     this.value = undefined;
-    if (this.isDOMBinding())
-      storageControlsHandler.reset(this.baseElement);
+    if (this.isDOMBinding()) storageControlsHandler.reset(this.baseElement);
   }
 }
 
-type Constructor<E extends ValueContainerElement = ValueContainerElement> =
+type Constructor<
+  E extends MonoStorageControlParent = MonoStorageControlParent,
+> =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new (...args: any[]) => E;
 
@@ -137,11 +139,12 @@ export function mixinMonoStorageControl<T extends Constructor>(
 ): T & Constructor<MonoStorageControlMixin> {
   return class
     extends base
-    implements MonoStorageControlMixin, ValueContainerElement
+    implements MonoStorageControlMixin, MonoStorageControlParent
   {
     private binder: StorageBinder | null = null;
     private io: MonoStorageControlIO | null = null;
     private readonly taskExecutor = new SerialTaskExecutor();
+    readonly isNotStorageControl = true;
 
     get storageArea(): string {
       return this.getAttribute("storage-area") ?? "";
@@ -151,6 +154,7 @@ export function mixinMonoStorageControl<T extends Constructor>(
     }
 
     connectedCallback() {
+      super.connectedCallback?.();
       this.taskExecutor.enqueueNoWait(async () => {
         this.io = new MonoStorageControlIO(this);
         this.binder = new StorageBinder(this.io);
@@ -160,6 +164,7 @@ export function mixinMonoStorageControl<T extends Constructor>(
     }
 
     disconnectedCallback() {
+      super.disconnectedCallback?.();
       this.taskExecutor.enqueueNoWait(async () => {
         await this.io?.stopBinding();
         this.io = null;

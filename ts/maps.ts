@@ -43,3 +43,31 @@ export function setAll<K, V>(
 ): void {
   for (const [k, v] of newEntries) map.set(k, v);
 }
+
+export class SetMap<K, V> extends Map<K, Set<V>> {
+  constructor(private readonly setConstructor: new () => Set<V> = Set) {
+    super();
+  }
+
+  add(k: K, v: V): void {
+    let s = this.get(k);
+    if (!s) {
+      s = new this.setConstructor();
+      this.set(k, s);
+    }
+    s.add(v);
+  }
+
+  deleteByKeyValue(k: K, v: V): boolean {
+    const s = this.get(k);
+    return s && s.delete(v) && s.size === 0 ? this.delete(k) : false;
+  }
+
+  deleteByValue(v: V): boolean {
+    let deleted = false;
+    for (const s of this.values()) {
+      if (s.delete(v) && s.size === 0) deleted = true;
+    }
+    return deleted;
+  }
+}

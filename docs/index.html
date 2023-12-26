@@ -174,8 +174,6 @@
     <label>foo: <input name="foo" /></label>
   </script>
 
-  <p>Result:</p>
-
   <div class="result">
     <label>foo: <input name="foo" /></label>
   </div>
@@ -432,18 +430,74 @@
   <code>storage-output</code> are the same as <code>storage-input</code>.
 </p>
 
-<h3>Support custom element: <code>area-select</code></h3>
+<h3>
+  Configurer for Storage Area: <code>area-select</code>,
+  <code>storage-area-select</code>
+</h3>
 
 <p>
-  You can change the stored area for the <code>ex4</code>'s value using an
+  You can change the stored area for the <code>foo</code>'s value using an
   <code>area-select</code> element.
 </p>
 
-<storage-form id="example5">
-  <label>
-    Storage Area:
-    <select is="area-select" name="example5-area" area="local-storage"></select>
-  </label>
-  <br />
-  <label>example5: <input name="example5" /></label>
-</storage-form>
+<script type="code">
+  <storage-form>
+    <label>
+      Select storage-area:
+      <select is="area-select" name="_area"></select>
+    </label>
+    <br />
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</script>
+
+<div class="result">
+  <storage-form>
+    <label>
+      Select storage-area:
+      <select is="area-select" name="_area"></select>
+    </label>
+    <br />
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</div>
+
+<p>
+  <code>storage-area-select</code> is not only the same as
+  <code>area-select</code>, but also it is like a mono storage select element.
+  So that it remembers the value in the storage.
+</p>
+
+<script type="code">
+  <storage-form>
+    <label>
+      Select storage-area:
+      <select is="storage-area-select" name="_area" storage-area="local-storage">
+        <option>local-storage</option>
+        <option>session-storage</option>
+        <option>invalid-area-name</option>
+      </select>
+    </label>
+    <br />
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</script>
+
+<div class="result">
+  <storage-form>
+    <label>
+      Select storage-area:
+      <select
+        is="storage-area-select"
+        name="_area"
+        storage-area="local-storage"
+      >
+        <option>local-storage</option>
+        <option>session-storage</option>
+        <option>invalid-area-name</option>
+      </select>
+    </label>
+    <br />
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</div>

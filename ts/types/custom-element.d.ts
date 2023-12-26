@@ -1,0 +1,9 @@
+interface HTMLElement {
+  connectedCallback?(): void;
+  disconnectedCallback?(): void;
+  attributeChangedCallback?(
+    name: string,
+    oldValue: string | null,
+    newValue: string | null,
+  ): void;
+}
