@@ -61,39 +61,6 @@ export class SerialTaskExecutor {
   }
 }
 
-export function repeatAsPolling(task: () => Promise<void> | void): {
-  stop(): Promise<void>;
-} {
-  let isRunning = true;
-  const promise = (async () => {
-    // Update isRunning by stop()
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    while (isRunning) {
-      await task();
-      await waitAnimationFrame();
-    }
-  })().catch(console.error);
-  return {
-    stop: () => {
-      isRunning = false;
-      return promise;
-    },
-  };
-}
-
-const waitAnimationFrame: () => Promise<DOMHighResTimeStamp> = (() => {
-  if (typeof requestAnimationFrame === "undefined") {
-    const offset = Date.now();
-    return () =>
-      new Promise((r) =>
-        setTimeout(() => {
-          r(Date.now() - offset);
-        }, 100),
-      );
-  }
-  return () => new Promise((r) => requestAnimationFrame(r));
-})();
-
 /**
  * Ponyfill for `Promise.withResolvers()`.
  *

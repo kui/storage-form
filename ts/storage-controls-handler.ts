@@ -1,4 +1,4 @@
-import { dispatchChangeEvent } from "./elements.js";
+import type { MaybeValueCheckableElement } from "./elements.js";
 
 interface StorageControlsHandler {
   diff(
@@ -59,10 +59,7 @@ export function diff(
     console.warn("No handler for %o", element);
     return NOCHANGE;
   }
-  const d = h.diff(element, oldValue);
-  if (d.type !== "nochange")
-    dispatchChangeEvent(element);
-  return d;
+  return h.diff(element, oldValue);
 }
 
 /**
@@ -70,17 +67,25 @@ export function diff(
  * @param element Target element
  * @param value if `undefined`, the element is set to the default value.
  */
-export function write(element: HTMLElement, value: string | undefined): void {
+export function write(
+  element: HTMLElement,
+  value: string | undefined,
+): boolean {
   const h = handlers.get(element.tagName);
   if (!h) {
     console.warn("No handler for %o", element);
-    return;
+    return false;
   }
+  const { value: oldValue, checked: oldChecked } =
+    element as MaybeValueCheckableElement;
   h.write(element, value);
+  const { value: newValue, checked: newChecked } =
+    element as MaybeValueCheckableElement;
+  return oldValue !== newValue || oldChecked !== newChecked;
 }
 
-export function reset(element: HTMLElement): void {
-  write(element, undefined);
+export function reset(element: HTMLElement): boolean {
+  return write(element, undefined);
 }
 
 function registerHandler(

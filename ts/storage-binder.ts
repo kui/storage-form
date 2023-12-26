@@ -27,7 +27,7 @@ export interface DOMBinderIO extends BinderIO {
   onComponentChange(callback: ComponentChangeCallback): {
     stop: () => void;
   };
-  clear(): void;
+  clearWrite(items: WroteValues): Promise<void> | void;
 }
 
 export class StorageBinder {
@@ -84,8 +84,7 @@ export class StorageBinder {
   private async updateComponents(area: string | null) {
     await this.executor.enqueue(async () => {
       if (area !== null) this.areaIO.updateArea(area);
-      this.domIO.clear();
-      await this.domIO.write(await this.areaIO.readAll());
+      await this.domIO.clearWrite(await this.areaIO.readAll());
     });
   }
 }

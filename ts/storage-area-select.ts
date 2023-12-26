@@ -1,14 +1,15 @@
 import { listAreas } from "./area-handler.js";
 import { updateValue } from "./elements.js";
-import { StorageElementMixin } from "./storage-element.js";
 import { mixinMonoStorageControl } from "./storage-mono-controls.js";
 
-interface AreaSelectTargetParent extends HTMLElement {
+import type { StorageElementMixin } from "./elements.js";
+
+interface ValueContainerElement extends HTMLElement {
   value: string;
 }
 
 type ValueContainerElementConstructor<
-  T extends HTMLElement = AreaSelectTargetParent,
+  T extends HTMLElement = ValueContainerElement,
 > =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new (...args: any[]) => T;

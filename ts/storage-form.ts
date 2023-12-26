@@ -1,6 +1,8 @@
+import * as storageControlsHandler from "./storage-controls-handler.js";
 import { remove } from "./arrays.js";
-import { NamedSetMap } from "./maps.js";
-import { SerialTaskExecutor, repeatAsPolling } from "./promises.js";
+import { addChangeListeners, dispatchChangeEvent } from "./elements.js";
+import { NamedSetMap, setAll } from "./maps.js";
+import { SerialTaskExecutor } from "./promises.js";
 import { StorageBinder } from "./storage-binder.js";
 import type {
   ComponentChangeCallback,
@@ -9,23 +11,25 @@ import type {
   ValueChanges,
   WroteValues,
 } from "./storage-binder.js";
-import * as storageControlsHandler from "./storage-controls-handler.js";
-import type { StorageElementMixin, StorageFormLikeElement } from "./storage-element.js";
+import type {
+  StorageElementMixin,
+  StorageFormLikeElement,
+} from "./elements.js";
 
 const STORAGE_CONTROL_TAGS = ["input", "select", "textarea", "output"] as const;
-type HTMLStorageFormControllElements =
+type HTMLStorageFormControllElement =
   HTMLElementTagNameMap[(typeof STORAGE_CONTROL_TAGS)[number]];
 const STORAGE_CONTROL_SELECTOR = STORAGE_CONTROL_TAGS.join(",");
 
 function matchesStorageControl(
   e: unknown,
-): e is HTMLStorageFormControllElements {
+): e is HTMLStorageFormControllElement {
   return (
     e instanceof Element &&
     // Child storage custom elements should be ignored
     !(e as StorageFormLikeElement).isNotStorageControl &&
     // Reject if the name is undefined or empty
-    Boolean((e as HTMLStorageFormControllElements).name) &&
+    Boolean((e as HTMLStorageFormControllElement).name) &&
     e.matches(STORAGE_CONTROL_SELECTOR)
   );
 }
@@ -34,16 +38,18 @@ class StorageFormIO implements DOMBinderIO {
   private values = new Map<string, string>();
   private readonly elements = new NamedSetMap<
     SameNameElementSet,
-    HTMLStorageFormControllElements
+    HTMLStorageFormControllElement
   >(SameNameElementSet);
   private readonly changeListeners: ((
     changes: ValueChanges,
   ) => void | Promise<void>)[] = [];
-  private observer: MutationObserver | null = null;
-  private polling: { stop(): Promise<void> } | null = null;
+  private observer: MutationObserver;
+  private listening: { stop(): void } | null = null;
   private readonly componentChangeListener: ComponentChangeCallback[] = [];
 
-  constructor(private readonly baseElement: StorageElementMixin) {}
+  constructor(private readonly baseElement: StorageElementMixin) {
+    this.observer = new MutationObserver(this.handleMutaions.bind(this));
+  }
 
   getArea(): string {
     return this.baseElement.storageArea;
@@ -61,27 +67,29 @@ class StorageFormIO implements DOMBinderIO {
   }
 
   private isDOMBinding() {
-    return this.observer !== null;
+    return this.listening !== null;
   }
 
   startBinding() {
     if (this.isDOMBinding()) throw Error("Already started");
     this.initElements();
     this.buildObserver();
-    this.startValuePolling();
+    this.listening = addChangeListeners(
+      this.baseElement,
+      this.handleChangeEvent.bind(this),
+    );
   }
 
-  async stopBinding() {
+  stopBinding() {
     if (!this.isDOMBinding()) return;
-    this.observer?.disconnect();
-    this.observer = null;
-    await this.polling?.stop();
+    this.observer.disconnect();
+    this.listening?.stop();
   }
 
   private initElements() {
     this.elements.clear();
     const elements =
-      this.baseElement.querySelectorAll<HTMLStorageFormControllElements>(
+      this.baseElement.querySelectorAll<HTMLStorageFormControllElement>(
         STORAGE_CONTROL_SELECTOR,
       );
     for (const e of elements)
@@ -90,39 +98,6 @@ class StorageFormIO implements DOMBinderIO {
   }
 
   private buildObserver() {
-    this.observer = new MutationObserver((records) => {
-      let isValueChanged = false;
-      for (const r of records) {
-        if (r.type === "childList") {
-          for (const e of r.addedNodes) {
-            if (!matchesStorageControl(e)) continue;
-            isValueChanged = true;
-            this.elements.add(e);
-          }
-          for (const e of r.removedNodes) {
-            if (!matchesStorageControl(e)) continue;
-            isValueChanged = true;
-            this.elements.deleteByValue(e);
-          }
-        } else if (r.attributeName === "name") {
-          if (!matchesStorageControl(r.target)) continue;
-          const oldName = r.oldValue;
-          if (oldName) this.elements.deleteByKeyValue(oldName, r.target);
-          const newName = r.target.name;
-          if (newName) this.elements.add(r.target);
-          this.dispatchComponentChangeListeners({});
-        } else if (r.attributeName === "storage-area") {
-          if (r.target !== this.baseElement) continue;
-          const oldValue = r.oldValue ?? undefined;
-          const newValue = this.baseElement.storageArea;
-          if (oldValue !== newValue)
-            this.dispatchComponentChangeListeners({
-              area: { oldValue, newValue },
-            });
-        }
-      }
-      if (isValueChanged) this.writeToDOM(this.values);
-    });
     this.observer.observe(this.baseElement, {
       childList: true,
       subtree: true,
@@ -132,13 +107,43 @@ class StorageFormIO implements DOMBinderIO {
     });
   }
 
-  // We should not use EventListener of "input"/"change" or MutationObserver of the "value" attribute,
-  // because they are not fired when the value is changed programmatically.
-  private startValuePolling() {
-    this.polling = repeatAsPolling(async () => {
-      const changes = this.updateValues();
-      if (changes.size > 0) await this.dispatchChangeListeners(changes);
-    });
+  private handleMutaions(mutations: MutationRecord[]) {
+    let isValueChanged = false;
+    for (const mutation of mutations) {
+      if (mutation.type === "childList") {
+        for (const e of mutation.addedNodes) {
+          if (!matchesStorageControl(e)) continue;
+          isValueChanged = true;
+          this.elements.add(e);
+        }
+        for (const e of mutation.removedNodes) {
+          if (!matchesStorageControl(e)) continue;
+          isValueChanged = true;
+          this.elements.deleteByValue(e);
+        }
+      } else if (mutation.attributeName === "name") {
+        if (!matchesStorageControl(mutation.target)) continue;
+        const oldName = mutation.oldValue;
+        if (oldName) this.elements.deleteByKeyValue(oldName, mutation.target);
+        const newName = mutation.target.name;
+        if (newName) this.elements.add(mutation.target);
+        this.dispatchComponentChangeListeners({});
+      } else if (mutation.attributeName === "storage-area") {
+        if (mutation.target !== this.baseElement) continue;
+        const oldValue = mutation.oldValue ?? undefined;
+        const newValue = this.baseElement.storageArea;
+        if (oldValue !== newValue)
+          this.dispatchComponentChangeListeners({
+            area: { oldValue, newValue },
+          });
+      }
+    }
+    if (isValueChanged) this.writeToDOM(this.values);
+  }
+
+  private async handleChangeEvent() {
+    const changes = this.updateValues();
+    if (changes.size > 0) await this.dispatchChangeListeners(changes);
   }
 
   private async dispatchChangeListeners(changes: ValueChanges) {
@@ -167,7 +172,28 @@ class StorageFormIO implements DOMBinderIO {
       if (value === undefined) this.values.delete(name);
       else this.values.set(name, value);
     }
-    if (this.isDOMBinding()) this.writeToDOM(items);
+    if (this.isDOMBinding()) {
+      const oldValues = this.captureElementsValues();
+      this.writeToDOM(items);
+      const diffValues = this.diffElementsValues(oldValues);
+      if (diffValues.size > 0) dispatchChangeEvent(...diffValues.keys());
+    }
+  }
+
+  private captureElementsValues() {
+    const values = new Map<HTMLStorageFormControllElement, string>();
+    for (const element of this.elements.flattenValues())
+      values.set(element, element.value);
+    return values;
+  }
+
+  private diffElementsValues(
+    oldValues: Map<HTMLStorageFormControllElement, string>,
+  ) {
+    const diff = new Map<HTMLStorageFormControllElement, string>();
+    for (const [element, oldValue] of oldValues)
+      if (oldValue !== element.value) diff.set(element, element.value);
+    return diff;
   }
 
   private writeToDOM(items: WroteValues) {
@@ -175,6 +201,16 @@ class StorageFormIO implements DOMBinderIO {
       const elementSet = this.elements.get(name);
       if (elementSet) elementSet.value = value;
     }
+  }
+
+  clearWrite(items: WroteValues) {
+    const clearedMap = new Map<string, string | undefined>();
+    setAll(
+      clearedMap,
+      [...this.elements.keys()].map((n) => [n, undefined]),
+    );
+    setAll(clearedMap, items);
+    this.write(clearedMap);
   }
 
   onChange(callback: (changes: ValueChanges) => void | Promise<void>): {
@@ -187,26 +223,20 @@ class StorageFormIO implements DOMBinderIO {
       },
     };
   }
-
-  clear(): void {
-    this.values.clear();
-    if (this.isDOMBinding())
-      for (const elementSet of this.elements.values()) elementSet.clear();
-  }
 }
 
 class SameNameElementSet {
-  private readonly elements = new Set<HTMLStorageFormControllElements>();
+  private readonly elements = new Set<HTMLStorageFormControllElement>();
 
   #name: string | undefined = undefined;
   #value: string | undefined = undefined;
 
-  add(e: HTMLStorageFormControllElements) {
+  add(e: HTMLStorageFormControllElement) {
     this.elements.add(e);
     return this;
   }
 
-  delete(e: HTMLStorageFormControllElements) {
+  delete(e: HTMLStorageFormControllElement) {
     return this.elements.delete(e);
   }
 
@@ -226,7 +256,9 @@ class SameNameElementSet {
   set value(newValue: string | undefined) {
     if (this.#value === newValue) return;
     this.#value = newValue;
-    for (const e of this.elements) storageControlsHandler.write(e, newValue);
+    for (const e of this.elements) {
+      storageControlsHandler.write(e, newValue);
+    }
   }
 
   /**
@@ -258,6 +290,10 @@ class SameNameElementSet {
 
   clear() {
     this.value = undefined;
+  }
+
+  [Symbol.iterator]() {
+    return this.elements[Symbol.iterator]();
   }
 }
 
@@ -291,8 +327,8 @@ export function mixinStorage<T extends HTMLElementConstructor>(
     }
 
     disconnectedCallback() {
-      this.taskExecutor.enqueueNoWait(async () => {
-        await this.io?.stopBinding();
+      this.taskExecutor.enqueueNoWait(() => {
+        this.io?.stopBinding();
         this.io = null;
         this.binder?.stop();
         this.binder = null;
