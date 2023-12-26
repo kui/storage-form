@@ -9,6 +9,7 @@ import {
 } from "./storage-binder.js";
 import { StorageElementMixin } from "./storage-element.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";
+import { dispatchChangeEvent } from "./elements.js";
 
 interface MonoStorageControlParent extends HTMLElement {
   name: string;
@@ -37,6 +38,7 @@ class MonoStorageControlIO implements DOMBinderIO {
   startBinding() {
     if (this.isDOMBinding()) return;
     this.baseElement.value = this.value ?? "";
+    dispatchChangeEvent(this.baseElement);
     this.buildObserver();
     this.startValuePolling();
   }

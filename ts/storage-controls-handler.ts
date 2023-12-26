@@ -1,3 +1,5 @@
+import { dispatchChangeEvent } from "./elements.js";
+
 interface StorageControlsHandler {
   diff(
     element: HTMLElement,
@@ -45,12 +47,6 @@ const INPUT_TYPES = [
 type InputType = (typeof INPUT_TYPES)[number];
 const inputHandlers = new Map<InputType, StorageControlsInputTypeHandler>();
 
-export function findStorageControlsHandler(
-  element: HTMLElement,
-): StorageControlsHandler | undefined {
-  return handlers.get(element.tagName);
-}
-
 export function diff(
   element: HTMLElement,
   oldValue: string | undefined,
@@ -58,12 +54,15 @@ export function diff(
   | { type: "unselected" }
   | { type: "value"; value: string }
   | { type: "nochange" } {
-  const h = findStorageControlsHandler(element);
+  const h = handlers.get(element.tagName);
   if (!h) {
     console.warn("No handler for %o", element);
     return NOCHANGE;
   }
-  return h.diff(element, oldValue);
+  const d = h.diff(element, oldValue);
+  if (d.type !== "nochange")
+    dispatchChangeEvent(element);
+  return d;
 }
 
 /**
@@ -72,7 +71,7 @@ export function diff(
  * @param value if `undefined`, the element is set to the default value.
  */
 export function write(element: HTMLElement, value: string | undefined): void {
-  const h = findStorageControlsHandler(element);
+  const h = handlers.get(element.tagName);
   if (!h) {
     console.warn("No handler for %o", element);
     return;

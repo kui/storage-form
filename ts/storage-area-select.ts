@@ -1,12 +1,7 @@
 import { listAreas } from "./area-handler.js";
-import { SerialTaskExecutor } from "./promises.js";
+import { updateValue } from "./elements.js";
 import { StorageElementMixin } from "./storage-element.js";
 import { mixinMonoStorageControl } from "./storage-mono-controls.js";
-import {
-  ValueChangeDetail,
-  ValueObserver,
-  ValueObserverContainer,
-} from "./value-observer.js";
 
 interface AreaSelectTargetParent extends HTMLElement {
   value: string;
@@ -23,30 +18,38 @@ export function mixinAreaSelect<T extends ValueContainerElementConstructor>(
 ): T {
   return class extends base {
     #target: StorageElementMixin | null = null;
-    private valueObserverContainer: ValueObserverContainer | null = null;
-    private readonly taskExecutor = new SerialTaskExecutor();
     readonly isNotStorageControl = true;
+    private readonly onChangeListener = this.onChange.bind(this);
 
     // Workaround for ts2545 error.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-    constructor(...args: any[]) {
+    constructor(..._: any[]) {
       super();
-      this.addEventListener("valuechange", ((
-        event: CustomEvent<ValueChangeDetail>,
-      ) => {
-        if (this.#target) this.#target.storageArea = event.detail.newValue;
-      }) as EventListener);
+      this.addEventListener("change", this.onChangeListener);
+      this.addEventListener("input", this.onChangeListener);
     }
 
     get target(): StorageElementMixin | null {
       return this.#target;
     }
     set target(newTarget: StorageElementMixin | null) {
+      const oldTarget = this.#target;
       this.#target = newTarget;
-      if (newTarget) {
-        this.value = newTarget.storageArea;
-        this.valueObserverContainer?.instance.sync();
-      }
+      if (oldTarget !== newTarget)
+        updateValue(this, newTarget?.storageArea ?? "");
+    }
+    get targetSelector(): string | null {
+      return this.getAttribute("target-selector");
+    }
+    set targetSelector(v: string | null) {
+      if (v === null) this.removeAttribute("target-selector");
+      else this.setAttribute("target-selector", v);
+    }
+
+    private onChange(event: Event) {
+      if (event.target !== this) return;
+      if (this.#target === null) return;
+      this.#target.storageArea = this.value;
     }
 
     connectedCallback() {
@@ -59,27 +62,20 @@ export function mixinAreaSelect<T extends ValueContainerElementConstructor>(
           this.appendChild(option);
         }
       }
-      this.taskExecutor.enqueueNoWait(async () => {
-        this.target =
-          this.target ??
-          this.getTargetByAttribute() ??
-          this.getTargetByParent();
-        this.valueObserverContainer = await ValueObserver.observe(this, {
-          enablePolling: true,
-        });
-      });
+      this.updateTarget();
     }
 
     disconnectedCallback() {
       super.disconnectedCallback?.();
-      this.taskExecutor.enqueueNoWait(async () => {
-        await this.valueObserverContainer?.release();
-        this.valueObserverContainer = null;
-      });
+    }
+
+    private updateTarget() {
+      this.target =
+        this.target ?? this.getTargetByAttribute() ?? this.getTargetByParent();
     }
 
     private getTargetByAttribute(): StorageElementMixin | null {
-      const selector = this.getAttribute("target-selector");
+      const selector = this.targetSelector;
       return selector === null ? null : document.querySelector(selector);
     }
 
