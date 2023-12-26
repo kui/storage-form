@@ -39,7 +39,7 @@ class StorageFormIO implements DOMBinderIO {
   private readonly elements = new NamedSetMap<
     SameNameElementSet,
     HTMLStorageFormControllElement
-  >(SameNameElementSet);
+  >((n) => new SameNameElementSet(n));
   private readonly changeListeners: ((
     changes: ValueChanges,
   ) => void | Promise<void>)[] = [];
@@ -228,10 +228,12 @@ class StorageFormIO implements DOMBinderIO {
 class SameNameElementSet {
   private readonly elements = new Set<HTMLStorageFormControllElement>();
 
-  #name: string | undefined = undefined;
   #value: string | undefined = undefined;
 
+  constructor(readonly name: string) {}
+
   add(e: HTMLStorageFormControllElement) {
+    if (e.name !== this.name) throw Error("Invalid name");
     this.elements.add(e);
     return this;
   }
@@ -242,15 +244,6 @@ class SameNameElementSet {
 
   get size(): number {
     return this.elements.size;
-  }
-
-  get name(): string {
-    if (this.#name !== undefined) return this.#name;
-    for (const e of this.elements) {
-      const name = e.name;
-      if (name) return (this.#name = name);
-    }
-    throw Error("No element has name");
   }
 
   set value(newValue: string | undefined) {
