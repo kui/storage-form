@@ -18,12 +18,16 @@ interface BinderIO {
 
 export interface AreaBinderIO extends BinderIO {
   read(names: string[]): Promise<StoredValues> | StoredValues;
-  readAll(): Promise<StoredValues> | StoredValues;
 }
 
-export type ComponentChangeCallback = (changes: { area?: ValueChange }) => void;
+export interface ComponentChangeEvent {
+  area?: string;
+  names: string[];
+}
+export type ComponentChangeCallback = (event: ComponentChangeEvent) => void;
 export interface DOMBinderIO extends BinderIO {
   getArea(): string | null;
+  getNames(): string[];
   onComponentChange(callback: ComponentChangeCallback): {
     stop: () => void;
   };
@@ -48,11 +52,9 @@ export class StorageBinder {
     const storageListening = this.areaIO.onChange((c) =>
       this.writeChanges(this.domIO, c),
     );
-    const domAreaListening = this.domIO.onComponentChange((c) => {
-      let area;
-      if (c.area === undefined) area = null;
-      else area = c.area.newValue ?? "";
-      this.updateComponents(area).catch(console.error);
+    const domAreaListening = this.domIO.onComponentChange((event) => {
+      const { area, names } = event;
+      this.updateComponents(area, names).catch(console.error);
     });
     this.stopListening = () => {
       domListening.stop();
@@ -60,7 +62,10 @@ export class StorageBinder {
       domAreaListening.stop();
     };
 
-    await this.updateComponents(this.domIO.getArea() ?? "");
+    await this.updateComponents(
+      this.domIO.getArea() ?? "",
+      this.domIO.getNames(),
+    );
   }
 
   stop() {
@@ -81,10 +86,13 @@ export class StorageBinder {
     }
   }
 
-  private async updateComponents(area: string | null) {
+  private async updateComponents(
+    area: string | undefined,
+    names: string[],
+  ) {
     await this.executor.enqueue(async () => {
-      if (area !== null) this.areaIO.updateArea(area);
-      await this.domIO.clearWrite(await this.areaIO.readAll());
+      if (area !== undefined) this.areaIO.updateArea(area);
+      await this.domIO.clearWrite(await this.areaIO.read(names));
     });
   }
 }

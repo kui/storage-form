@@ -76,28 +76,32 @@ class MonoStorageControlIO implements DOMBinderIO {
   }
 
   private handleMutaions(mutations: MutationRecord[]) {
+    let area: string | undefined = undefined;
+    let shouldDispatch = false;
     for (const r of mutations) {
       if (r.attributeName === "storage-area") {
-        this.dispatchComponentChange({
-          area: {
-            newValue: this.baseElement.storageArea,
-            oldValue: r.oldValue ?? undefined,
-          },
-        });
+        area = this.getArea() ?? undefined;
+        shouldDispatch = true;
       } else if (r.attributeName === "name") {
-        this.dispatchComponentChange({});
+        shouldDispatch = true;
       }
+    }
+    if (shouldDispatch) {
+      this.dispatchComponentChange(area);
     }
   }
 
-  private dispatchComponentChange(
-    changes: Parameters<ComponentChangeCallback>[0],
-  ) {
-    for (const l of this.componentChangeListeners) l(changes);
+  private dispatchComponentChange(area?: string | undefined) {
+    const e = { area, names: this.getNames() };
+    for (const l of this.componentChangeListeners) l(e);
   }
 
   getArea(): string | null {
     return this.baseElement.storageArea;
+  }
+
+  getNames(): string[] {
+    return [this.baseElement.name];
   }
 
   onComponentChange(callback: ComponentChangeCallback): { stop: () => void } {

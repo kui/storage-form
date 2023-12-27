@@ -43,10 +43,6 @@ export class FacadeAreaBinderIO implements AreaBinderIO {
     return this.handler?.read(names) ?? new Map();
   }
 
-  readAll(): Promise<StoredValues> | StoredValues {
-    return this.handler?.readAll() ?? new Map();
-  }
-
   async write(items: WroteValues): Promise<void> {
     await this.handler?.write(items);
   }
@@ -250,10 +246,6 @@ export class BufferedWriteBinderIO implements AreaBinderIO {
 
   read(names: string[]): Promise<StoredValues> | StoredValues {
     return this.delegate.read(names);
-  }
-
-  readAll(): Promise<StoredValues> | StoredValues {
-    return this.delegate.readAll();
   }
 
   write(items: WroteValues): Promise<void> {
