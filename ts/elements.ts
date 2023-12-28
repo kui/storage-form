@@ -6,15 +6,14 @@ export interface StorageUsageContainer {
 
 export type StorageUsageMixin = HTMLElement & StorageUsageContainer;
 
-export interface StringValueContainer {
-  value: string;
+export interface ValueContainer<V> {
+  name: string;
+  value: V;
 }
-export interface NumberValueContainer {
-  value: number;
-}
-export type ValueContainer = StringValueContainer | NumberValueContainer;
-export type ValueContainerElement<C extends ValueContainer = ValueContainer> =
-  HTMLElement & C;
+export type ValueContainerElement<
+  V = string,
+  C extends ValueContainer<V> = ValueContainer<V>,
+> = HTMLElement & C;
 
 export interface Checkable {
   checked: boolean;
@@ -33,7 +32,7 @@ export function dispatchChangeEvent(...elements: EventTarget[]) {
     element.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-export function updateValue<C extends ValueContainer>(
+export function updateValue<C extends ValueContainer<V>, V = string>(
   element: EventTarget & C,
   newValue: C["value"],
 ) {

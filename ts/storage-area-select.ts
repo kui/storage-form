@@ -2,11 +2,7 @@ import { listAreas } from "./area-handler.js";
 import { updateValue } from "./elements.js";
 import { mixinMonoStorageControl } from "./storage-mono-controls.js";
 
-import type { StorageElementMixin } from "./elements.js";
-
-interface ValueContainerElement extends HTMLElement {
-  value: string;
-}
+import type { StorageElementMixin, ValueContainerElement } from "./elements.js";
 
 type ValueContainerElementConstructor<
   T extends HTMLElement = ValueContainerElement,

@@ -13,14 +13,9 @@ import {
   ValueChanges,
   WroteValues,
 } from "./storage-binder.js";
-import type { StorageElementMixin } from "./elements.js";
+import type { StorageElementMixin, ValueContainerElement } from "./elements.js";
 
-interface MonoStorageControlParent extends HTMLElement {
-  name: string;
-  value: string;
-}
-export type MonoStorageControlMixin = MonoStorageControlParent &
-  StorageElementMixin;
+export type MonoStorageControlMixin = StorageElementMixin & ValueContainerElement;
 
 class MonoStorageControlIO implements DOMBinderIO {
   private value: string | undefined;
@@ -149,7 +144,7 @@ class MonoStorageControlIO implements DOMBinderIO {
 }
 
 type Constructor<
-  E extends MonoStorageControlParent = MonoStorageControlParent,
+  E extends ValueContainerElement = ValueContainerElement,
 > =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new (...args: any[]) => E;
@@ -159,7 +154,7 @@ export function mixinMonoStorageControl<T extends Constructor>(
 ): T & Constructor<MonoStorageControlMixin> {
   return class
     extends base
-    implements MonoStorageControlMixin, MonoStorageControlParent
+    implements MonoStorageControlMixin
   {
     private binder: StorageBinder | null = null;
     private io: MonoStorageControlIO | null = null;
