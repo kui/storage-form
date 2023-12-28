@@ -1,12 +1,11 @@
-import { BufferedWriteBinderIO } from "../ts/area-handler.js";
-import { AreaBinderIO } from "../ts/storage-binder.js";
+import { AreaHandler, BufferedWriteHandler } from "../ts/area-handler.js";
 
 describe("BufferedWriteChromeStorageAreaHandler", () => {
   describe("#write", () => {
     it("should delay the second writing", async () => {
       const mockedWrite = jest.fn();
-      const handler = new BufferedWriteBinderIO(
-        { write: mockedWrite } as unknown as AreaBinderIO,
+      const handler = new BufferedWriteHandler(
+        { write: mockedWrite } as unknown as AreaHandler,
         14400,
       );
 

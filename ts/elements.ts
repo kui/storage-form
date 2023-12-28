@@ -1,3 +1,11 @@
+export interface StorageUsageContainer {
+  name: string;
+  storageUsage: true;
+  type: string;
+}
+
+export type StorageUsageMixin = HTMLElement & StorageUsageContainer;
+
 export interface StringValueContainer {
   value: string;
 }

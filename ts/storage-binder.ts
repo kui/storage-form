@@ -1,4 +1,4 @@
-import { FacadeAreaBinderIO } from "./area-handler.js";
+import { FacadeAreaHandler } from "./area-handler.js";
 import { SerialTaskExecutor } from "./promises.js";
 
 export interface ValueChange {
@@ -36,7 +36,7 @@ export interface DOMBinderIO extends BinderIO {
 
 export class StorageBinder {
   private readonly executor = new SerialTaskExecutor();
-  private readonly areaIO = new FacadeAreaBinderIO();
+  private readonly areaIO = new FacadeAreaHandler();
   private isStarted = false;
   private stopListening: (() => void) | null = null;
 
@@ -86,10 +86,7 @@ export class StorageBinder {
     }
   }
 
-  private async updateComponents(
-    area: string | undefined,
-    names: string[],
-  ) {
+  private async updateComponents(area: string | undefined, names: string[]) {
     await this.executor.enqueue(async () => {
       if (area !== undefined) this.areaIO.updateArea(area);
       await this.domIO.clearWrite(await this.areaIO.read(names));

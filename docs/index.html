@@ -8,6 +8,7 @@
     background-color: #eee;
     padding: 4px;
   }
+
   pre.code,
   div.result {
     display: table;
@@ -15,6 +16,7 @@
     padding: 8px;
     margin: 32px 8px 8px 8px;
     position: relative;
+
     &::before {
       position: absolute;
       top: calc(-8px - 1em);
@@ -23,6 +25,7 @@
       font-weight: bold;
       font-size: 12px;
     }
+
     & > code {
       display: block;
       background-color: transparent;
@@ -31,20 +34,25 @@
       line-height: 120%;
     }
   }
+
   div.result::before {
     content: "Result:";
   }
+
   pre.code::before {
     content: "Source:";
   }
+
   h1::before {
     content: "#";
     color: #666;
   }
+
   h2::before {
     content: "## ";
     color: #666;
   }
+
   h3::before {
     content: "### ";
     color: #666;
@@ -500,4 +508,63 @@
     <br />
     <label>foo: <input name="foo" /></label>
   </storage-form>
+</div>
+
+<h3>Show the storage usage: <code>storage-usage</code></h3>
+
+<p>You can show the storage usage using <code>storage-usage</code> element.</p>
+
+<script type="code">
+  <ul>
+    <li>Total usage in localStorage:
+      <storage-usage storage-area="local-storage"></storage-usage>
+    <li>Usage of "foo" in localStorage:
+      <storage-usage storage-area="local-storage" name="foo"></storage-usage>
+    <li>Quota of localStorage:
+      <storage-usage storage-area="local-storage" type="quota"></storage-usage>
+    <li>Total quota of localStorage:
+      <storage-usage storage-area="local-storage" type="total-quota"></storage-usage>
+    <li>Usage percentage of "foo" in localStorage:
+      <storage-usage storage-area="local-storage" name="foo" type="byte-percent"></storage-usage>
+    <li>Total usage percentage of localStorage:
+      <storage-usage storage-area="local-storage" type="total-byte-percent"></storage-usage>
+  </ul>
+</script>
+<div class="result">
+  <ul>
+    <li>
+      Total usage in localStorage:
+      <storage-usage storage-area="local-storage"></storage-usage>
+    </li>
+    <li>
+      Usage of "foo" in localStorage:
+      <storage-usage storage-area="local-storage" name="foo"></storage-usage>
+    </li>
+    <li>
+      Quota of localStorage:
+      <storage-usage storage-area="local-storage" type="quota"></storage-usage>
+    </li>
+    <li>
+      Total quota of localStorage:
+      <storage-usage
+        storage-area="local-storage"
+        type="total-quota"
+      ></storage-usage>
+    </li>
+    <li>
+      Usage percentage of "foo" in localStorage:
+      <storage-usage
+        storage-area="local-storage"
+        name="foo"
+        type="byte-percent"
+      ></storage-usage>
+    </li>
+    <li>
+      Total usage percentage of localStorage:
+      <storage-usage
+        storage-area="local-storage"
+        type="total-byte-percent"
+      ></storage-usage>
+    </li>
+  </ul>
 </div>

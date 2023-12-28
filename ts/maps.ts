@@ -47,3 +47,20 @@ export function setAll<K, V>(
 ): void {
   for (const [k, v] of newEntries) map.set(k, v);
 }
+
+export function mapKeyValues<K1, K2, V1, V2>(
+  map: Map<K1, V1>,
+  keyMapper: (k: K1, v: V1) => K2,
+  valueMapper: (k: K1, v: V1) => V2,
+): Map<K2, V2> {
+  const result = new Map<K2, V2>();
+  for (const [k, v] of map) result.set(keyMapper(k, v), valueMapper(k, v));
+  return result;
+}
+
+export function mapValues<K, V1, V2>(
+  map: Map<K, V1>,
+  mapper: (k: K, v: V1) => V2,
+): Map<K, V2> {
+  return mapKeyValues(map, (k) => k, mapper);
+}

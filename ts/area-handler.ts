@@ -1,5 +1,5 @@
 import { buildWithIndex, remove } from "./arrays.js";
-import { setAll } from "./maps.js";
+import { mapValues, setAll } from "./maps.js";
 import { sleep } from "./promises.js";
 import type {
   AreaBinderIO,
@@ -8,17 +8,30 @@ import type {
   StoredValues,
   WroteValues,
 } from "./storage-binder.js";
+import { byteLength } from "./strings.js";
 
-const handlers = new Map<string, AreaBinderIO>();
+type Sizes = Map<string, number>;
 
-export function registerHandler(area: string, handler: AreaBinderIO) {
+export interface AreaHandler extends AreaBinderIO {
+  readBytes(names: string[]): Sizes | Promise<Sizes>;
+  readTotalBytes(): number | Promise<number>;
+  get quotaBytes(): number | undefined;
+  get totalQuotaBytes(): number | undefined;
+}
+
+const KIBI = 1024;
+const MEBI = KIBI * KIBI;
+
+const handlers = new Map<string, AreaHandler>();
+
+export function registerHandler(area: string, handler: AreaHandler) {
   if (handlers.get(area)) {
     throw Error(`Already registered handler for "${area}"`);
   }
   handlers.set(area, handler);
 }
 
-export function findHandler(area: string): AreaBinderIO | null {
+export function findHandler(area: string): AreaHandler | null {
   const h = handlers.get(area) ?? null;
   if (!h) console.warn(`No handler for "%s"`, area);
   return h;
@@ -28,11 +41,27 @@ export function listAreas(): string[] {
   return [...handlers.keys()];
 }
 
-export class FacadeAreaBinderIO implements AreaBinderIO {
-  private handler: AreaBinderIO | null = null;
+export class FacadeAreaHandler implements AreaHandler {
+  private handler: AreaHandler | null = null;
   private readonly areaChangeListeners: ((
     newHandler: AreaBinderIO | null,
   ) => void)[] = [];
+
+  readBytes(names: string[]): Sizes | Promise<Sizes> {
+    return this.handler?.readBytes(names) ?? new Map();
+  }
+
+  readTotalBytes(): number | Promise<number> {
+    return this.handler?.readTotalBytes() ?? 0;
+  }
+
+  get quotaBytes(): number | undefined {
+    return this.handler?.quotaBytes;
+  }
+
+  get totalQuotaBytes(): number | undefined {
+    return this.handler?.totalQuotaBytes;
+  }
 
   updateArea(area: string | null) {
     this.handler = area ? findHandler(area) : null;
@@ -72,8 +101,23 @@ interface StorageChange {
   storageArea: Storage | null;
 }
 
-export class WebStorageBinderIO implements AreaBinderIO {
-  constructor(private readonly storage: Storage) {}
+export class WebStorageHandler implements AreaHandler {
+  constructor(
+    private readonly storage: Storage,
+    readonly quotaBytes: number | undefined = undefined,
+    readonly totalQuotaBytes: number | undefined = undefined,
+  ) {}
+
+  readBytes(names: string[]): Sizes {
+    return mapValues(this.read(names), (k, v) => byteLength(v));
+  }
+
+  readTotalBytes(): number {
+    return this.allKeys().reduce(
+      (acc, k) => acc + byteLength(this.storage.getItem(k) ?? ""),
+      0,
+    );
+  }
 
   read(names: string[]): StoredValues {
     return names.reduce<StoredValues>((map, name) => {
@@ -81,10 +125,6 @@ export class WebStorageBinderIO implements AreaBinderIO {
       if (v != null) map.set(name, v);
       return map;
     }, new Map());
-  }
-
-  readAll(): StoredValues {
-    return this.read(this.allKeys());
   }
 
   private allKeys(): string[] {
@@ -104,7 +144,7 @@ export class WebStorageBinderIO implements AreaBinderIO {
       } else {
         this.storage.setItem(key, newValue);
       }
-      WebStorageBinderIO.dispatchStorageEvent({
+      WebStorageHandler.dispatchStorageEvent({
         key,
         oldValue,
         newValue: newValue ?? null,
@@ -135,11 +175,11 @@ export class WebStorageBinderIO implements AreaBinderIO {
 
     // We need to implement the listener because
     // "storage" event is not fired in the same window.
-    WebStorageBinderIO.storageEventListeners.push(listener);
+    WebStorageHandler.storageEventListeners.push(listener);
     addEventListener("storage", listener);
     return {
       stop: () => {
-        remove(WebStorageBinderIO.storageEventListeners, listener);
+        remove(WebStorageHandler.storageEventListeners, listener);
         removeEventListener("storage", listener);
       },
     };
@@ -148,40 +188,55 @@ export class WebStorageBinderIO implements AreaBinderIO {
   static readonly storageEventListeners: ((change: StorageChange) => void)[] =
     [];
   static dispatchStorageEvent(change: StorageChange) {
-    for (const l of WebStorageBinderIO.storageEventListeners) l(change);
+    for (const l of WebStorageHandler.storageEventListeners) l(change);
   }
 }
 
 if ("localStorage" in globalThis)
-  registerHandler("local-storage", new WebStorageBinderIO(localStorage));
+  registerHandler(
+    "local-storage",
+    new WebStorageHandler(localStorage, 10 * MEBI, 10 * MEBI),
+  );
 if ("sessionStorage" in globalThis)
-  registerHandler("session-storage", new WebStorageBinderIO(sessionStorage));
+  registerHandler(
+    "session-storage",
+    new WebStorageHandler(sessionStorage, 5 * MEBI, 5 * MEBI),
+  );
 
-export class ChromeStorageBinderIO implements AreaBinderIO {
-  constructor(protected readonly storage: chrome.storage.StorageArea) {}
+export class ChromeStorageHandler implements AreaHandler {
+  constructor(
+    private readonly storage: chrome.storage.StorageArea,
+    readonly quotaBytes: number | undefined = undefined,
+    readonly totalQuotaBytes: number | undefined = undefined,
+  ) {}
 
-  read(names: string[] | null): Promise<StoredValues> {
-    return new Promise((resolve) => {
-      this.storage.get(names, (items) => {
-        const m = new Map<string, string>();
-        for (const [key, value] of Object.entries(items)) {
-          if (typeof value === "string") {
-            m.set(key, value);
-          } else {
-            console.warn(
-              "Unexpected type of stored value: type=%s, value=%o",
-              typeof value,
-              value,
-            );
-          }
-        }
-        resolve(m);
-      });
+  async readBytes(names: string[]): Promise<Sizes> {
+    const entries = names.map(async (name) => {
+      return [name, await this.storage.getBytesInUse(name)] as const;
     });
+    return new Map(await Promise.all(entries));
   }
 
-  readAll(): Promise<StoredValues> {
-    return this.read(null);
+  readTotalBytes(): Promise<number> {
+    return this.storage.getBytesInUse(null);
+  }
+
+  async read(names: string[] | null): Promise<StoredValues> {
+    return Object.entries(await this.storage.get(names)).reduce<StoredValues>(
+      (map, [k, v]) => {
+        if (typeof v === "string") {
+          map.set(k, v);
+        } else {
+          console.warn(
+            "Unexpected type of stored value: type=%s, value=%o",
+            typeof v,
+            v,
+          );
+        }
+        return map;
+      },
+      new Map(),
+    );
   }
 
   async write(items: WroteValues): Promise<void> {
@@ -226,7 +281,7 @@ export class ChromeStorageBinderIO implements AreaBinderIO {
   }
 }
 
-export class BufferedWriteBinderIO implements AreaBinderIO {
+export class BufferedWriteHandler implements AreaHandler {
   private readonly delayMillis: number;
   private updatedEntries: WroteValues | null = null;
   private writePromise: Promise<void> = Promise.resolve();
@@ -235,13 +290,28 @@ export class BufferedWriteBinderIO implements AreaBinderIO {
   private static WRITE_INTERVAL_MERGIN_MILLIS = 300;
 
   constructor(
-    private readonly delegate: AreaBinderIO,
+    private readonly delegate: AreaHandler,
     maxWritePerHour: number,
   ) {
     // how interval we should keep for a write operation.
     this.delayMillis =
       (60 * 60 * 1000) / maxWritePerHour +
-      BufferedWriteBinderIO.WRITE_INTERVAL_MERGIN_MILLIS;
+      BufferedWriteHandler.WRITE_INTERVAL_MERGIN_MILLIS;
+  }
+
+  get quotaBytes(): number | undefined {
+    return this.delegate.quotaBytes;
+  }
+  get totalQuotaBytes(): number | undefined {
+    return this.delegate.totalQuotaBytes;
+  }
+
+  readBytes(names: string[]): Promise<Sizes> | Sizes {
+    return this.delegate.readBytes(names);
+  }
+
+  readTotalBytes(): Promise<number> | number {
+    return this.delegate.readTotalBytes();
   }
 
   read(names: string[]): Promise<StoredValues> | StoredValues {
@@ -281,13 +351,21 @@ if ("chrome" in globalThis && chrome.storage) {
   if (chrome.storage.local)
     registerHandler(
       "chrome-local",
-      new ChromeStorageBinderIO(chrome.storage.local),
+      new ChromeStorageHandler(
+        chrome.storage.local,
+        chrome.storage.local.QUOTA_BYTES,
+        chrome.storage.local.QUOTA_BYTES,
+      ),
     );
   if (chrome.storage.sync)
     registerHandler(
       "chrome-sync",
-      new BufferedWriteBinderIO(
-        new ChromeStorageBinderIO(chrome.storage.sync),
+      new BufferedWriteHandler(
+        new ChromeStorageHandler(
+          chrome.storage.sync,
+          chrome.storage.sync.QUOTA_BYTES_PER_ITEM,
+          chrome.storage.sync.QUOTA_BYTES,
+        ),
         chrome.storage.sync.MAX_WRITE_OPERATIONS_PER_HOUR,
       ),
     );
