@@ -1,5 +1,5 @@
 import { AreaHandler, FacadeAreaHandler } from "./area-handler.js";
-import type { StorageUsageMixin } from "./elements.js";
+import type { StorageElementMixin, StorageUsageMixin } from "./elements.js";
 
 type HTMLElementConstructor<T extends HTMLElement> =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -11,11 +11,15 @@ export function mixinStorageUsageElement<
   return class extends base {
     readonly storageUsage = true;
     private readonly areaHandler = new FacadeAreaHandler();
+    #storageForm: StorageElementMixin | null = null;
+    private readonly storageFormObserver = new MutationObserver(
+      this.onStorageFormChange.bind(this),
+    );
+    private areaListening: { stop(): void } | null = null;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
     constructor(..._args: any[]) {
       super();
-      this.areaHandler.onChange(() => this.update());
     }
 
     get type() {
@@ -33,10 +37,51 @@ export function mixinStorageUsageElement<
     }
 
     get storageArea() {
-      return this.getAttribute("storage-area") ?? "";
+      return (
+        this.getAttribute("storage-area") ??
+        this.#storageForm?.storageArea ??
+        ""
+      );
     }
     set storageArea(v: string) {
       this.setAttribute("storage-area", v);
+    }
+
+    get storageForm() {
+      return this.#storageForm;
+    }
+
+    private onStorageFormChange(mutaions: MutationRecord[]) {
+      for (const mutaion of mutaions) {
+        if (mutaion.type === "attributes") {
+          if (mutaion.attributeName === "storage-area") {
+            this.areaHandler.updateArea(this.storageArea);
+          }
+        }
+      }
+    }
+
+    private updateStorageForm() {
+      const form = this.getStorageForm();
+      if (form === this.#storageForm) return;
+
+      if (form === null) {
+        this.storageFormObserver.disconnect();
+      } else {
+        this.storageFormObserver.disconnect();
+        this.storageFormObserver.observe(form, {
+          attributes: true,
+          attributeFilter: ["storage-area"],
+        });
+      }
+      this.#storageForm = form;
+    }
+
+    private getStorageForm(): StorageElementMixin | null {
+      let parent = this.parentElement;
+      while (parent !== null && !(parent as StorageElementMixin).storageArea)
+        parent = parent.parentElement;
+      return parent === null ? null : (parent as StorageElementMixin);
     }
 
     private async update() {
@@ -56,13 +101,24 @@ export function mixinStorageUsageElement<
 
     connectedCallback() {
       super.connectedCallback?.();
+      this.areaListening = this.areaHandler.onChange(() => this.update());
+      this.updateStorageForm();
       this.areaHandler.updateArea(this.storageArea);
       this.update().catch(console.error);
     }
 
     adoptedCallback() {
       super.adoptedCallback?.();
+      this.updateStorageForm();
+      this.areaHandler.updateArea(this.storageArea);
       this.update().catch(console.error);
+    }
+
+    disconnectedCallback() {
+      super.disconnectedCallback?.();
+      this.storageFormObserver.disconnect();
+      this.areaListening?.stop();
+      this.areaListening = null;
     }
 
     static readonly observedAttributes = ["type", "name", "storage-area"];
@@ -92,9 +148,12 @@ const sizeFormats = new Map<string, Format>();
 const KIBI = 1024;
 const UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
 function bytesUnitFormat(b: number) {
-  if (b === 0) return "0 B";
+  if (b === 0) return "0B";
   const unitIndex = Math.floor(Math.log(b) / Math.log(KIBI));
-  return `${(b / KIBI ** unitIndex).toPrecision(4)} ${UNITS[unitIndex]}`;
+  const optionalDecimalPrecition = (b / KIBI ** unitIndex)
+    .toPrecision(4)
+    .replace(/\.0+$/, "");
+  return `${optionalDecimalPrecition}${UNITS[unitIndex]}`;
 }
 
 const NAMED_DEFAULT_TYPE = "bytes";

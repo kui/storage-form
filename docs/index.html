@@ -568,3 +568,31 @@
     </li>
   </ul>
 </div>
+
+<p>
+  The <code>storage-area</code> attribute can be omitted, if
+  <code>storage-usage</code> element was put in the
+  <code>storage-form</code> element,
+</p>
+
+<script type="code">
+  <storage-form storage-area="local-storage">
+    Storage: <select is="storage-area-select" name="_area" storage-area="local-storage"></select>
+    <br />
+    <label>foo: <input name="foo" /></label>
+    <storage-usage name="foo"></storage-usage>
+  </storage-form>
+</script>
+<div class="result">
+  <storage-form storage-area="local-storage">
+    Storage:
+    <select
+      is="storage-area-select"
+      name="_area"
+      storage-area="local-storage"
+    ></select>
+    <br />
+    <label>foo: <input name="foo" /></label>
+    <storage-usage name="foo"></storage-usage>
+  </storage-form>
+</div>
