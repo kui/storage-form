@@ -33,7 +33,7 @@ describe("SerialTaskExecutor", () => {
       expect(results).toEqual([1, 2, 3]);
     });
 
-    it("should execute tasks serially even if the task is rejected", async () => {
+    it("should execute tasks serially even if a task is rejected", async () => {
       const executor = new SerialTaskExecutor();
       const results: number[] = [];
       const task = (n: number) => () => {
@@ -52,9 +52,9 @@ describe("SerialTaskExecutor", () => {
     it("should await enqueued tasks", async () => {
       const executor = new SerialTaskExecutor();
       const results: number[] = [];
-      const task = (n: number) => () => {
+      const task = (n: number) => async () => {
+        await sleep(200);
         results.push(n);
-        return sleep(100);
       };
       void executor.enqueue(task(1));
       await executor.enqueue(task(2));
