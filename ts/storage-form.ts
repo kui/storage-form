@@ -263,11 +263,10 @@ class SameNameElementSet {
       }
     }
 
-    // There are 4 cases by the combination of unchecked and newvalue:
-    // 1) unselected=true,  newvalue=string:    If an element was made unselected and the value was changed, It indicates to have a change.
+    // There are 3 cases by the combination of unchecked and newvalue:
+    // 1) unselected=any,   newvalue=string:    If the value was changed, It indicates to have a change.
     // 2) unselected=true,  newvalue=undefined: If an element was made unselected and the value was not changed, It indicates that the value was deleted.
-    // 3) unselected=false, newvalue=string:    If an element was not made unselected and the value was changed, It indicates to have a change.
-    // 4) unselected=false, newvalue=undefined: If an element was not made unselected and the value was not changed, It indicates to have no changes.
+    // 3) unselected=false, newvalue=undefined: If an element was not made unselected and the value was not changed, It indicates to have no changes.
     if (newValue === undefined && !unselected) return undefined;
     this.value = newValue;
     return { oldValue, newValue };
