@@ -1,7 +1,6 @@
 import type {
   FormatedNumericValueElement,
   StorageElementMixin,
-  ValueContainerElement,
 } from "./elements.js";
 
 import { AreaHandler, FacadeAreaHandler } from "./area-handler.js";
@@ -113,6 +112,7 @@ numberFormats.set("bytes", { format: bytesUnitFormat });
 const KIBI = 1024;
 const UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
 function bytesUnitFormat(bytes: number) {
+  if (isNaN(bytes)) return String(NaN);
   if (bytes === 0) return "0B";
   const unitIndex = Math.floor(Math.log(bytes) / Math.log(KIBI));
   const format = new Intl.NumberFormat(undefined, {
@@ -125,11 +125,11 @@ interface AreaHandlerElement extends HTMLElement {
   readonly storageUsage: true;
   readonly storageForm: StorageElementMixin | null;
   storageArea: string;
-  readonly areaHandler: AreaHandler | null;
+  readonly areaHandler: AreaHandler;
 }
 
 export function mixinAreaHandlerElement<
-  T extends HTMLElementConstructor<ValueContainerElement<number>>,
+  T extends HTMLElementConstructor<HTMLElement>,
 >(base: T): T & HTMLElementConstructor<AreaHandlerElement> {
   return class extends base {
     readonly storageUsage = true;
@@ -169,22 +169,6 @@ export function mixinAreaHandlerElement<
       }
     }
 
-    private updateStorageForm() {
-      const form = this.getStorageForm();
-      if (form === this.#storageForm) return;
-
-      if (form === null) {
-        this.storageFormObserver.disconnect();
-      } else {
-        this.storageFormObserver.disconnect();
-        this.storageFormObserver.observe(form, {
-          attributes: true,
-          attributeFilter: ["storage-area"],
-        });
-      }
-      this.#storageForm = form;
-    }
-
     private getStorageForm(): StorageElementMixin | null {
       let parent = this.parentElement;
       while (parent !== null && !(parent as StorageElementMixin).storageArea)
@@ -194,11 +178,12 @@ export function mixinAreaHandlerElement<
 
     connectedCallback() {
       super.connectedCallback?.();
-      this.areaListening = this.#areaHandler.onChange(() => {
-        dispatchChangeEvent(this);
-      });
+      this.areaListening = this.#areaHandler.onChange(
+        this.handleChange.bind(this),
+      );
       this.updateStorageForm();
       this.#areaHandler.updateArea(this.storageArea);
+      this.handleChange()?.catch(console.error);
     }
 
     adoptedCallback() {
@@ -226,40 +211,27 @@ export function mixinAreaHandlerElement<
         this.#areaHandler.updateArea(newValue);
       }
     }
-  };
-}
 
-export function mixinAreaValueBindingElement<
-  T extends HTMLElementConstructor<ValueContainerElement<number>>,
->(base: T): T {
-  return class extends mixinAreaHandlerElement(base) {
-    private readonly changeHandler = this.handleChange.bind(this);
+    //
 
-    private handleChange() {
-      (async () => {
-        if (this.areaHandler === null) {
-          console.warn("no area handler", this);
-          this.value = NaN;
-          return;
-        }
-        this.value = await this.fetchValue(this.areaHandler);
-      })().catch(console.error);
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    protected fetchValue(_areaHandler: AreaHandler): number | Promise<number> {
+    protected handleChange(): void | Promise<void> {
       throw new Error("Method not implemented.");
     }
 
-    connectedCallback() {
-      super.connectedCallback?.();
-      this.handleChange();
-      this.addEventListener("change", this.changeHandler);
-    }
+    private updateStorageForm() {
+      const form = this.getStorageForm();
+      if (form === this.#storageForm) return;
 
-    disconnectedCallback() {
-      super.disconnectedCallback?.();
-      this.removeEventListener("change", this.changeHandler);
+      if (form === null) {
+        this.storageFormObserver.disconnect();
+      } else {
+        this.storageFormObserver.disconnect();
+        this.storageFormObserver.observe(form, {
+          attributes: true,
+          attributeFilter: ["storage-area"],
+        });
+      }
+      this.#storageForm = form;
     }
   };
 }
@@ -288,7 +260,7 @@ export function mixinStorageUsageMeterElement<
       }
     }
   };
-  return class extends mixinAreaValueBindingElement(namedMeter) {
+  return class extends mixinAreaHandlerElement(namedMeter) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
     constructor(..._args: any[]) {
       super();
@@ -296,11 +268,11 @@ export function mixinStorageUsageMeterElement<
       if (!this.hasAttribute("low")) this.low = 0.7;
     }
 
-    protected async fetchValue(areaHandler: AreaHandler) {
+    protected async handleChange() {
       if (this.hasAttribute("name")) {
-        return usagePercentage(areaHandler, this.name);
+        this.value = await usagePercentage(this.areaHandler, this.name);
       } else {
-        return usageTotalPercentage(areaHandler);
+        this.value = await usageTotalPercentage(this.areaHandler);
       }
     }
   };
@@ -332,20 +304,20 @@ export class HTMLStorageUsageMeterElement extends mixinStorageUsageMeterElement(
 export function mixinStorageUsageElement<
   T extends HTMLElementConstructor<FormatedNumericValueElement>,
 >(base: T): T {
-  return class extends mixinAreaValueBindingElement(base) {
-    protected async fetchValue(areaHandler: AreaHandler) {
+  return class extends mixinAreaHandlerElement(base) {
+    protected async handleChange() {
       if (this.hasAttribute("name")) {
         if (this.format === "percent") {
-          return usagePercentage(areaHandler, this.name);
+          this.value = await usagePercentage(this.areaHandler, this.name);
         } else {
-          const sizes = await areaHandler.readBytes([self.name]);
-          return sizes.get(self.name) ?? 0;
+          const sizes = await this.areaHandler.readBytes([this.name]);
+          this.value = sizes.get(this.name) ?? 0;
         }
       } else {
         if (this.format === "percent") {
-          return usageTotalPercentage(areaHandler);
+          this.value = await usageTotalPercentage(this.areaHandler);
         } else {
-          return areaHandler.readTotalBytes();
+          this.value = await this.areaHandler.readTotalBytes();
         }
       }
     }
@@ -363,12 +335,12 @@ export class HTMLStorageUsageElement extends mixinStorageUsageElement(
 export function mixinStorageQuotaElement<
   T extends HTMLElementConstructor<FormatedNumericValueElement>,
 >(base: T): T {
-  return class extends mixinAreaValueBindingElement(base) {
-    protected fetchValue(areaHandler: AreaHandler) {
+  return class extends mixinAreaHandlerElement(base) {
+    protected handleChange() {
       if (this.hasAttribute("name")) {
-        return areaHandler.quotaBytes ?? NaN;
+        this.value = this.areaHandler.quotaBytes ?? NaN;
       } else {
-        return areaHandler.totalQuotaBytes ?? NaN;
+        this.value = this.areaHandler.totalQuotaBytes ?? NaN;
       }
     }
   };
