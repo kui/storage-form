@@ -1,11 +1,3 @@
-export interface StorageUsageContainer {
-  name: string;
-  storageUsage: true;
-  type: string;
-}
-
-export type StorageUsageMixin = HTMLElement & StorageUsageContainer;
-
 export interface ValueContainer<V> {
   name: string;
   value: V;
@@ -14,6 +6,11 @@ export type ValueContainerElement<
   V = string,
   C extends ValueContainer<V> = ValueContainer<V>,
 > = HTMLElement & C;
+
+export interface FormatedNumericValueElement
+  extends ValueContainerElement<number> {
+  format: string;
+}
 
 export interface Checkable {
   checked: boolean;

@@ -542,29 +542,38 @@
     </li>
     <li>
       Quota of localStorage:
-      <storage-usage storage-area="local-storage" type="quota"></storage-usage>
+      <storage-quota storage-area="local-storage" name></storage-quota>
     </li>
     <li>
       Total quota of localStorage:
-      <storage-usage
-        storage-area="local-storage"
-        type="total-quota"
-      ></storage-usage>
+      <storage-quota storage-area="local-storage"></storage-quota>
     </li>
     <li>
       Usage percentage of "foo" in localStorage:
       <storage-usage
         storage-area="local-storage"
         name="foo"
-        type="byte-percent"
+        format="percent"
       ></storage-usage>
     </li>
     <li>
       Total usage percentage of localStorage:
       <storage-usage
         storage-area="local-storage"
-        type="total-byte-percent"
+        format="percent"
       ></storage-usage>
+    </li>
+    <li>
+      Usage percentage meter of "foo" in localStorage:
+      <meter
+        is="storage-usage-meter"
+        storage-area="local-storage"
+        name="foo"
+      ></meter>
+    </li>
+    <li>
+      Total usage percentage meter of localStorage:
+      <meter is="storage-usage-meter" storage-area="local-storage"></meter>
     </li>
   </ul>
 </div>

@@ -9,7 +9,11 @@ import {
   HTMLAreaSelectElement,
   HTMLStorageAreaSelectElement,
 } from "./storage-area-select.js";
-import { HTMLStorageUsageElement } from "./storage-usage.js";
+import {
+  HTMLStorageQuotaElement,
+  HTMLStorageUsageElement,
+  HTMLStorageUsageMeterElement,
+} from "./storage-usage.js";
 
 /**
  * Registers all custom elements defined in this package.
@@ -23,4 +27,6 @@ export function register(): void {
   HTMLAreaSelectElement.register();
   HTMLStorageAreaSelectElement.register();
   HTMLStorageUsageElement.register();
+  HTMLStorageUsageMeterElement.register();
+  HTMLStorageQuotaElement.register();
 }
