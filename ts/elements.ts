@@ -24,6 +24,10 @@ export interface MaybeValueCheckableContainer {
 export type MaybeValueCheckableElement = HTMLElement &
   MaybeValueCheckableContainer;
 
+export type HTMLElementConstructor<T extends HTMLElement> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  new (...args: any[]) => T;
+
 export function dispatchChangeEvent(...elements: EventTarget[]) {
   for (const element of elements)
     element.dispatchEvent(new Event("change", { bubbles: true }));

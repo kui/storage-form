@@ -1,9 +1,8 @@
-import * as storageControlsHandler from "./storage-controls-handler.js";
-import { remove } from "./arrays.js";
-import { addChangeListeners, dispatchChangeEvent } from "./elements.js";
-import { NamedSetMap, setAll } from "./maps.js";
-import { SerialTaskExecutor } from "./promises.js";
-import { StorageBinder } from "./storage-binder.js";
+import type {
+  HTMLElementConstructor,
+  StorageElementMixin,
+  StorageFormLikeElement,
+} from "./elements.js";
 import type {
   ComponentChangeCallback,
   DOMBinderIO,
@@ -11,10 +10,13 @@ import type {
   ValueChanges,
   WroteValues,
 } from "./storage-binder.js";
-import type {
-  StorageElementMixin,
-  StorageFormLikeElement,
-} from "./elements.js";
+
+import { remove } from "./arrays.js";
+import { addChangeListeners, dispatchChangeEvent } from "./elements.js";
+import { NamedSetMap, setAll } from "./maps.js";
+import { SerialTaskExecutor } from "./promises.js";
+import { StorageBinder } from "./storage-binder.js";
+import * as storageControlsHandler from "./storage-controls-handler.js";
 
 const STORAGE_CONTROL_TAGS = ["input", "select", "textarea", "output"] as const;
 type HTMLStorageFormControllElement =
@@ -281,11 +283,7 @@ class SameNameElementSet {
   }
 }
 
-type HTMLElementConstructor<T extends HTMLElement = HTMLElement> =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  new (...args: any[]) => T;
-
-export function mixinStorage<T extends HTMLElementConstructor>(
+export function mixinStorage<T extends HTMLElementConstructor<HTMLElement>>(
   base: T,
 ): T & HTMLElementConstructor<StorageElementMixin> {
   return class extends base {

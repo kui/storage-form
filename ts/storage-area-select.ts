@@ -1,18 +1,16 @@
+import type {
+  HTMLElementConstructor,
+  StorageElementMixin,
+  ValueContainerElement,
+} from "./elements.js";
+
 import { listAreas } from "./area-handler.js";
 import { updateValue } from "./elements.js";
 import { mixinMonoStorageControl } from "./storage-mono-controls.js";
 
-import type { StorageElementMixin, ValueContainerElement } from "./elements.js";
-
-type ValueContainerElementConstructor<
-  T extends HTMLElement = ValueContainerElement,
-> =
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  new (...args: any[]) => T;
-
-export function mixinAreaSelect<T extends ValueContainerElementConstructor>(
-  base: T,
-): T {
+export function mixinAreaSelect<
+  T extends HTMLElementConstructor<ValueContainerElement>,
+>(base: T): T {
   return class extends base {
     #target: StorageElementMixin | null = null;
     readonly isNotStorageControl = true;
