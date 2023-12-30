@@ -1,6 +1,6 @@
-import type {
-  HTMLElementConstructor,
-  StorageElementMixin,
+import {
+  type HTMLElementConstructor,
+  type StorageElementMixin,
 } from "./elements.js";
 import { AreaHandler, FacadeAreaHandler } from "./area-handler.js";
 
@@ -53,9 +53,9 @@ export function mixinAreaHandlerElement<
     }
 
     private getStorageForm(): StorageElementMixin | null {
-      let parent = this.parentElement;
+      let parent = parentOrShadowRootHost(this);
       while (parent !== null && !(parent as StorageElementMixin).storageArea)
-        parent = parent.parentElement;
+        parent = parentOrShadowRootHost(parent);
       return parent === null ? null : (parent as StorageElementMixin);
     }
 
@@ -116,4 +116,14 @@ export function mixinAreaHandlerElement<
       this.#storageForm = form;
     }
   };
+}
+
+function parentOrShadowRootHost(element: HTMLElement): HTMLElement | null {
+  const parent = element.parentElement;
+  if (parent !== null) return parent;
+  const shadowRoot = element.getRootNode();
+  if (!(shadowRoot instanceof ShadowRoot)) return null;
+  const host = shadowRoot.host;
+  if (!(host instanceof HTMLElement)) return null;
+  return host;
 }
