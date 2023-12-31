@@ -1,134 +1,607 @@
 <!doctype html>
-<head>
-  <meta charset="utf-8">
+<meta charset="utf-8" />
 
-  <title>storage-form Examples</title>
+<title>storage-form Examples</title>
 
-  <style>
-    code {
-      background-color: #eee;
-      padding: 1px 3px;
+<style>
+  code {
+    background-color: #eee;
+    padding: 4px;
+  }
+
+  pre.code,
+  div.result {
+    display: table;
+    background-color: #eee;
+    padding: 8px;
+    margin: 32px 8px 8px 8px;
+    position: relative;
+
+    &::before {
+      position: absolute;
+      top: calc(-8px - 1em);
+      left: 0;
+      display: inline-block;
+      font-weight: bold;
+      font-size: 12px;
     }
-    h2 {
-      border-bottom: 1px solid #999;
+
+    & > code {
+      display: block;
+      background-color: transparent;
+      border: none;
+      padding: 0;
+      line-height: 120%;
     }
-  </style>
+  }
 
-  <!-- Custom Elements v0 polyfill -->
-  <script src="CustomElements.min.js"></script>
+  div.result::before {
+    content: "Result:";
+  }
 
-  <script src="storage-elements-debug.js" async></script>
-  <!-- Use no -debug suffix one f you use in production environment -->
-  <!-- <script src="storage-elements.js"></script> -->
-</head>
+  pre.code::before {
+    content: "Source:";
+  }
 
-<h1><a href="https://github.com/kui/storage-elements"><code>storage-form</code></a> Examples</h1>
+  h1::before {
+    content: "#";
+    color: #666;
+  }
 
-<p>See <a href="https://github.com/kui/storage-elements/blob/master/docs/index.html">HTML souce</a>.</p>
+  h2::before {
+    content: "## ";
+    color: #666;
+  }
 
-<h2>Manually save/load example</h2>
+  h3::before {
+    content: "### ";
+    color: #666;
+  }
+</style>
 
-<p>Using all supported form components. You need to click [Save] to store values. These value are stored into <code>localStorage</code></p>
-
-<form is="storage-form"
-      id="example1"
-      area="local-storage">
-  <p><label>foo: <input name="foo"></label></p>
-  <p><label>checkbox-sample1:
-    <input type="checkbox" name="checkbox-sample1">
-  </label>: checked-value="on", unchecked-value=""(empty)</p>
-  <p><label>checkbox-sample2:
-    <input type="checkbox" name="checkbox-sample2" value="nyan" data-unchecked-value="wan" checked>
-  </label>: checked-value="nyan", unchecked-value="wan", and default checked</p>
-  <p>radio-sample:
-    <label><input type="radio" name="radio-sample" value="value-1">value-1</label>,
-    <label><input type="radio" name="radio-sample" value="value-2">value-2</label>,
-    <label><input type="radio" name="radio-sample" value="value-3" checked>value-3</label></p>
-  <p><textarea name="sometextarea">this is a default textarea value.</textarea></p>
-  <p><label>select-sample:
-    <select name="select-sample">
-      <option>value-1</option>
-      <option selected>value-2</option>
-      <option>value-3</option>
-    </select>
-  </label></p>
-  <p><button>Save</button> <button is="load-button">Load</button></p>
- </form>
+<script type="module">
+  import { register } from "./js/storage-elements-registerer.js";
+  register();
+</script>
 
 <script>
-  // You can hook some events
-  const ex1 = document.getElementById("example1");
-  for (const type of ["storage-form-load", "storage-form-submit", "storage-form-sync"]) {
-    ex1.addEventListener(type, (event) => {
-      console.log("example1 event", type, event);
-    });
+  // Implement <script type="code"> element which shows the code as a code block.
+  addEventListener("DOMContentLoaded", () => {
+    for (const e of document.querySelectorAll("script[type=code]")) {
+      const pre = document.createElement("pre");
+      pre.classList.add("code");
+      const content = e.textContent
+        .replace(/^\n*/, "")
+        .replace(/(\n\s*)*$/, "")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      pre.innerHTML = `<code>${trimIndent(content)}</code>`;
+      e.parentNode.insertBefore(pre, e);
+    }
+  });
+
+  function trimIndent(text) {
+    const lines = text.split("\n");
+    const indent = lines
+      .filter((line) => line.trim() !== "")
+      .map((line) => line.match(/^\s*/)[0].length)
+      .reduce((a, b) => Math.min(a, b));
+    return lines.map((line) => line.slice(indent)).join("\n");
   }
 </script>
 
+<h1>
+  <a href="https://github.com/kui/storage-elements"
+    ><code>storage-form</code></a
+  >
+  Examples
+</h1>
 
-<h2>Auto load example</h2>
+<p>
+  <code>storage-form</code> is a custom element that can edit and store the
+  values in some storages.
+</p>
 
-<p>An <code>autoload</code> attribute are a function that </p>
+<p>
+  See
+  <a href="https://github.com/kui/storage-elements/blob/master/docs/index.html"
+    >HTML souce</a
+  >.
+</p>
 
-<form is="storage-form"
-      id="example2"
-      area="session-storage"
-      autoload>
-  <label>bar: <input name="bar"></label>
-  <input type="submit" value="Save">
-</form>
+<h2>Basic usage</h2>
 
-<h2>Auto sync example</h2>
+<p>
+  To enable <code>storage-form</code>, you need to register the custom
+  storage-elements.
+</p>
 
-<p>An <code>autosync</code> attribute are a function that store the <code>bar</code>'s value automatically, and load it's value when it is changed by another javascript. You can confirm that the <code>bar</code> form value is changed when you change it from a developer console of your browser.</p>
-
-<form is="storage-form"
-      id="example3"
-      area="session-storage"
-      autosync>
-  <label>bar: <input name="bar"></label>
-</form>
-
-
-<h2>Dynamic building using javascript</h2>
-
-<div id="example4-anchor"></div>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    // For the third example
-    const base = document.getElementById("example4-anchor");
-    const form = base.appendChild(document.createElement("form", "storage-form"));
-    form.area = "local-storage";
-
-    // Append <input>s on next tick.
-    setTimeout(() => {
-      const input1 = form.appendChild(document.createElement("input"));
-      input1.name = "ex4-1";
-      const input2 = form.appendChild(document.createElement("input"));
-      input2.type = "checkbox";
-      input2.name = "ex4-2";
-      const submit = form.appendChild(document.createElement("input"));
-      submit.type = "submit";
-    }, 1);
-  });
+<script type="code">
+  <script type="module">
+    import { register } from "./js/storage-elements-registerer.js";
+    register();
+  &lt;/script>
 </script>
 
+<p>
+  Then, you can edit and store the <code>foo</code> value in the
+  <code>localStorage</code>.
+</p>
 
-<h2><code>&lt;area-select&gt;</code> example</h2>
+<script type="code">
+  <storage-form storage-area="local-storage">
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</script>
 
-<p>You can change the stored area for the <code>ex4</code>'s value using an <code>area-select</code> element.</p>
+<div class="result">
+  <storage-form storage-area="local-storage">
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</div>
 
-<form is="storage-form"
-      id="example5"
-      autosync>
-  <label>Storage Area:
-    <select is="area-select" name="example5-area" area="local-storage">
-      <option value="local-storage">localStorage
-      <option value="session-storage">sessionStorage
-    </select>
-  </label><br>
-  <label>ex5: <input name="ex5"></label>
-</form>
+<h2>Supported storages</h2>
 
-<!-- github ribbons -->
-<a href="https://github.com/kui/storage-elements"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_red_aa0000.png" alt="Fork me on GitHub"></a>
+<p>
+  the storage is selected by <code>area</code> attribute. The
+  <code>area</code> attribute can be one of the following values:
+</p>
+
+<dl>
+  <dt><code>local-storage</code></dt>
+  <dd>Use <code>localStorage</code> as a storage.</dd>
+  <dt><code>session-storage</code></dt>
+  <dd>Use <code>sessionStorage</code> as a storage.</dd>
+  <dt><code>chrome-local</code></dt>
+  <dd>Use <code>chrome.storage.local</code> as a storage.</dd>
+  <dt><code>chrome-sync</code></dt>
+  <dd>Use <code>chrome.storage.sync</code> as a storage.</dd>
+</dl>
+
+<h2>Supported elements</h2>
+
+<p>
+  Some elements are supported. You can use <code>input</code>,
+  <code>select</code>, <code>textarea</code> and <code>output</code> elements.
+</p>
+
+<p>
+  The <code>name</code> attribute of the element is used as a key of the
+  storage.
+</p>
+
+<p>
+  The below example shows the supported elements. These sources are in the
+  <code>storage-form</code> element.
+</p>
+
+<storage-form storage-area="local-storage">
+  <h3>input type="text"</h3>
+
+  <script type="code">
+    <label>foo: <input name="foo" /></label>
+  </script>
+
+  <div class="result">
+    <label>foo: <input name="foo" /></label>
+  </div>
+
+  <h3>input type="checkbox"</h3>
+
+  <p>
+    if checked, the value of <code>checkbox-sample1</code> is <code>on</code>,
+    otherwise the value is deleted.
+  </p>
+
+  <script type="code">
+    <label>
+      checkbox-sample1:
+      <input type="checkbox" name="checkbox-sample1" />
+    </label>
+  </script>
+  <div class="result">
+    <label>
+      checkbox-sample1:
+      <input type="checkbox" name="checkbox-sample1" />
+    </label>
+  </div>
+
+  <h3>input type="radio"</h3>
+
+  <p>If checked, the value of <code>radio-sample</code> is the value.</p>
+
+  <script type="code">
+    radio-sample:
+    <label>
+      <input type="radio" name="radio-sample" value="value-1" />
+      value-1
+    </label>
+    <label>
+      <input type="radio" name="radio-sample" value="value-2" />
+      value-2
+    </label>
+    <label>
+      <input type="radio" name="radio-sample" value="value-3" checked />
+      value-3
+    </label>
+  </script>
+  <div class="result">
+    radio-sample:
+    <label>
+      <input type="radio" name="radio-sample" value="value-1" />
+      value-1
+    </label>
+    <label>
+      <input type="radio" name="radio-sample" value="value-2" />
+      value-2
+    </label>
+    <label>
+      <input type="radio" name="radio-sample" value="value-3" checked />
+      value-3
+    </label>
+  </div>
+
+  <h3>And more...</h3>
+  <p>
+    type=color:
+    <input type="color" name="color-sample" />
+  </p>
+  <p>
+    type=date:
+    <input type="date" name="date-sample" />
+  </p>
+  <p>
+    textarea:
+    <textarea name="sometextarea">this is a default textarea value.</textarea>
+  </p>
+  <p>
+    <label>
+      select-sample:
+      <select name="select-sample">
+        <option>value-1</option>
+        <option selected>value-2</option>
+        <option>value-3</option>
+      </select>
+    </label>
+  </p>
+  <p>
+    Note:
+    type=<code>button</code>/<code>submit</code>/<code>reset</code>/<code>image</code>/<code
+      >hidden</code
+    >
+    are ignored.
+  </p>
+</storage-form>
+
+<h2>The value of elements are synchronized with the same "name"</h2>
+
+<p>
+  If you have multiple elements with the same <code>name</code>, the value of
+  the elements are synchronized.
+</p>
+
+<p>The following example named <code>foo</code> elements are synchronized.</p>
+
+<storage-form storage-area="local-storage">
+  <ul>
+    <li>
+      <label>
+        text input: <input name="foo" list="textinput-datalist" />
+        <button onclick="this.previousElementSibling.value = ''">✕</button>
+      </label>
+      <datalist id="textinput-datalist">
+        <option value="c1">
+          Same value with a checkbox. This value checks the checkbox.
+        </option>
+        <option value="r3">
+          Same value with a radio. This value checks the radio.
+        </option>
+        <option value="1985-06-18">Accept a format for type=date</option>
+        <option value="select-value2">
+          Same value with a select option. This value selects the option.
+        </option>
+      </datalist>
+    </li>
+    <li>
+      <label>output: <output name="foo"></output></label>
+    </li>
+    <li>
+      <label
+        >checkbox(value=c1): <input type="checkbox" name="foo" value="c1"
+      /></label>
+    </li>
+    <li>
+      radio:
+      <label><input type="radio" name="foo" value="r1" />r1</label>,
+      <label><input type="radio" name="foo" value="r2" />r2</label>,
+      <label><input type="radio" name="foo" value="r3" />r3</label>
+    </li>
+    <li>
+      <label>date input: <input type="date" name="foo" /></label>
+    </li>
+    <li>
+      <label
+        >checkbox(value=1985-06-18):
+        <input type="checkbox" name="foo" value="1985-06-18"
+      /></label>
+    </li>
+    <li>
+      <label>url input: <input type="url" name="foo" /></label>
+    </li>
+    <li>
+      <label>file input: <input type="file" name="foo" /></label>
+    </li>
+    <li>
+      select:
+      <select name="foo">
+        <option>select-value1</option>
+        <option>select-value2</option>
+        <option>select-value3</option>
+      </select>
+    </li>
+    <li>
+      <label>textarea: <textarea name="foo"></textarea></label>
+    </li>
+  </ul>
+</storage-form>
+
+<p>
+  Note: <code>input type=color</code> and <code>input type=range</code> does not
+  work right in the synchronization. They always force to set the default value,
+  because these types can not set the unset value like empty string in
+  type=date.
+</p>
+
+<h2>Switch attributes programmatically</h2>
+
+<p>
+  You can switch the storage area with with javascript using
+  <code>storage-form#storageArea</code> property.
+</p>
+
+<p>
+  And you can also switch the name of binding target of the storage entry
+  <code>storage-form#name</code> property.
+</p>
+
+<script type="code">
+  <storage-form id="areaswitchexample">
+    <label><input id="nameswitchexample" /></label>
+  </storage-form>
+  <br />
+  <button onclick="areaswitchexample.storageArea = 'session-storage'">
+    storageArea=sessionStorage
+  </button>
+  <button onclick="areaswitchexample.storageArea = 'local-storage'">
+    storageArea=localStorage
+  </button>
+  <br />
+  <button onclick="nameswitchexample.name = 'foo'">name=foo</button>
+  <button onclick="nameswitchexample.name = 'bar'">name=bar</button>
+</script>
+
+<div class="result">
+  <storage-form id="areaswitchexample">
+    <label><input id="nameswitchexample" /></label>
+  </storage-form>
+  <br />
+  <button onclick="areaswitchexample.storageArea = 'session-storage'">
+    storageArea=sessionStorage
+  </button>
+  <button onclick="areaswitchexample.storageArea = 'local-storage'">
+    storageArea=localStorage
+  </button>
+  <br />
+  <button onclick="nameswitchexample.name = 'foo'">name=foo</button>
+  <button onclick="nameswitchexample.name = 'bar'">name=bar</button>
+</div>
+
+<h2>Support custom elements</h2>
+
+<p>You can use support custom elements for some utilities.</p>
+
+<h3>
+  Mono storage inputs: <code>storage-input</code>, <code>storage-select</code>,
+  <code>storage-textarea</code>, <code>storage-output</code>
+</h3>
+
+<p>
+  <code>storage-input</code> is a custom element that is shorthand for the
+  single &lt;input&gt; element in the <code>storage-form</code>.
+</p>
+
+<script type="code">
+  <label>
+    foo: <input is="storage-input" name="foo" storage-area="local-storage" />
+  </label>
+</script>
+
+<div class="result">
+  <label>
+    foo:
+    <input is="storage-input" name="foo" storage-area="local-storage" />
+  </label>
+</div>
+
+<p>The following example is the same as the above example:</p>
+
+<script type="code">
+  <storage-form storage-area="local-storage">
+    <label>
+      foo: <input name="foo" />
+    </label>
+  </storage-form>
+</script>
+
+<p>
+  <code>storage-select</code>, <code>storage-textarea</code> and
+  <code>storage-output</code> are the same as <code>storage-input</code>.
+</p>
+
+<h3>
+  Configurer for Storage Area: <code>area-select</code>,
+  <code>storage-area-select</code>
+</h3>
+
+<p>
+  You can change the stored area for the <code>foo</code>'s value using an
+  <code>area-select</code> element.
+</p>
+
+<script type="code">
+  <storage-form>
+    <label>
+      Select storage-area:
+      <select is="area-select" name="_area"></select>
+    </label>
+    <br />
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</script>
+
+<div class="result">
+  <storage-form>
+    <label>
+      Select storage-area:
+      <select is="area-select" name="_area"></select>
+    </label>
+    <br />
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</div>
+
+<p>
+  <code>storage-area-select</code> is not only the same as
+  <code>area-select</code>, but also it is like a mono storage select element.
+  So that it remembers the value in the storage.
+</p>
+
+<script type="code">
+  <storage-form>
+    <label>
+      Select storage-area:
+      <select is="storage-area-select" name="_area" storage-area="local-storage">
+        <option>local-storage</option>
+        <option>session-storage</option>
+        <option>invalid-area-name</option>
+      </select>
+    </label>
+    <br />
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</script>
+
+<div class="result">
+  <storage-form>
+    <label>
+      Select storage-area:
+      <select
+        is="storage-area-select"
+        name="_area"
+        storage-area="local-storage"
+      >
+        <option>local-storage</option>
+        <option>session-storage</option>
+        <option>invalid-area-name</option>
+      </select>
+    </label>
+    <br />
+    <label>foo: <input name="foo" /></label>
+  </storage-form>
+</div>
+
+<h3>Show the storage usage: <code>storage-usage</code></h3>
+
+<p>You can show the storage usage using <code>storage-usage</code> element.</p>
+
+<script type="code">
+  <ul>
+    <li>Total usage in localStorage:
+      <storage-usage storage-area="local-storage"></storage-usage>
+    <li>Usage of "foo" in localStorage:
+      <storage-usage storage-area="local-storage" name="foo"></storage-usage>
+    <li>Quota of localStorage:
+      <storage-usage storage-area="local-storage" type="quota"></storage-usage>
+    <li>Total quota of localStorage:
+      <storage-usage storage-area="local-storage" type="total-quota"></storage-usage>
+    <li>Usage percentage of "foo" in localStorage:
+      <storage-usage storage-area="local-storage" name="foo" type="byte-percent"></storage-usage>
+    <li>Total usage percentage of localStorage:
+      <storage-usage storage-area="local-storage" type="total-byte-percent"></storage-usage>
+  </ul>
+</script>
+<div class="result">
+  <ul>
+    <li>
+      Total usage in localStorage:
+      <storage-usage storage-area="local-storage"></storage-usage>
+    </li>
+    <li>
+      Usage of "foo" in localStorage:
+      <storage-usage storage-area="local-storage" name="foo"></storage-usage>
+    </li>
+    <li>
+      Quota of localStorage:
+      <storage-quota storage-area="local-storage" name></storage-quota>
+    </li>
+    <li>
+      Total quota of localStorage:
+      <storage-quota storage-area="local-storage"></storage-quota>
+    </li>
+    <li>
+      Usage percentage of "foo" in localStorage:
+      <storage-usage
+        storage-area="local-storage"
+        name="foo"
+        format="percent"
+      ></storage-usage>
+    </li>
+    <li>
+      Total usage percentage of localStorage:
+      <storage-usage
+        storage-area="local-storage"
+        format="percent"
+      ></storage-usage>
+    </li>
+    <li>
+      Usage percentage meter of "foo" in localStorage:
+      <meter
+        is="storage-usage-meter"
+        storage-area="local-storage"
+        name="foo"
+      ></meter>
+    </li>
+    <li>
+      Total usage percentage meter of localStorage:
+      <meter is="storage-usage-meter" storage-area="local-storage"></meter>
+    </li>
+  </ul>
+</div>
+
+<p>
+  The <code>storage-area</code> attribute can be omitted, if
+  <code>storage-usage</code> element was put in the
+  <code>storage-form</code> element,
+</p>
+
+<script type="code">
+  <storage-form storage-area="local-storage">
+    Storage: <select is="storage-area-select" name="_area" storage-area="local-storage"></select>
+    <br />
+    <label>foo: <input name="foo" /></label>
+    <storage-usage name="foo"></storage-usage>
+  </storage-form>
+</script>
+<div class="result">
+  <storage-form storage-area="local-storage">
+    Storage:
+    <select
+      is="storage-area-select"
+      name="_area"
+      storage-area="local-storage"
+    ></select>
+    <br />
+    <label>foo: <input name="foo" /></label>
+    <storage-usage name="foo"></storage-usage>
+  </storage-form>
+</div>
