@@ -3,6 +3,7 @@ import {
   type StorageElementMixin,
 } from "./elements.js";
 import { AreaHandler, FacadeAreaHandler } from "./area-handler.js";
+import { SerialTaskExecutor } from "./promises.js";
 
 interface AreaHandlerElement extends HTMLElement {
   readonly storageUsage: true;
@@ -22,6 +23,10 @@ export function mixinAreaHandlerElement<
       this.onStorageFormMutation.bind(this),
     );
     private areaListening: { stop(): void } | null = null;
+    private readonly taskExecutor = new SerialTaskExecutor();
+    private readonly invokeOnChange = () => {
+      this.taskExecutor.enqueueNoWait(() => this.handleChange());
+    };
 
     get storageForm() {
       return this.#storageForm;
@@ -61,12 +66,11 @@ export function mixinAreaHandlerElement<
 
     connectedCallback() {
       super.connectedCallback?.();
-      this.areaListening = this.#areaHandler.onChange(
-        this.handleChange.bind(this),
-      );
+      this.areaListening = this.#areaHandler.onChange(this.invokeOnChange);
       this.updateStorageForm();
       this.#areaHandler.updateArea(this.storageArea);
-      this.handleChange()?.catch(console.error);
+      this.addEventListener("change", this.invokeOnChange);
+      this.invokeOnChange();
     }
 
     adoptedCallback() {
@@ -77,6 +81,7 @@ export function mixinAreaHandlerElement<
 
     disconnectedCallback() {
       super.disconnectedCallback?.();
+      this.removeEventListener("change", this.invokeOnChange);
       this.storageFormObserver.disconnect();
       this.areaListening?.stop();
       this.areaListening = null;
@@ -96,6 +101,7 @@ export function mixinAreaHandlerElement<
     }
 
     //
+
     protected handleChange(): void | Promise<void> {
       throw new Error("Method not implemented.");
     }

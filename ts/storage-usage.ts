@@ -202,6 +202,16 @@ export function mixinStorageUsageElement<
         }
       }
     }
+
+    static readonly observedAttributes = ["name", "format", "value"];
+
+    attributeChangedCallback(
+      name: string,
+      oldValue: string | null,
+      newValue: string | null,
+    ) {
+      super.attributeChangedCallback?.(name, oldValue, newValue);
+    }
   };
 }
 
@@ -223,6 +233,16 @@ export function mixinStorageQuotaElement<
       } else {
         this.value = this.areaHandler.totalQuotaBytes ?? NaN;
       }
+    }
+
+    static readonly observedAttributes = ["name", "format", "value"];
+
+    attributeChangedCallback(
+      name: string,
+      oldValue: string | null,
+      newValue: string | null,
+    ) {
+      super.attributeChangedCallback?.(name, oldValue, newValue);
     }
   };
 }
