@@ -1,1 +1,5 @@
+/docs/
+/.github/
 
+!/types/
+!/js/

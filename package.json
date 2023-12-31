@@ -10,11 +10,11 @@
     }
   },
   "scripts": {
-    "prepare": "npm run build",
+    "prepare": "npm run build:ts",
     "test": "jest",
     "build:ts": "tsc --project ts",
     "build:docs": "cp -vur ts js docs",
-    "build": "run-s build:ts build:docs",
+    "docs": "run-s build:ts build:docs",
     "lint:eslint": "eslint .",
     "lint:prettier": "prettier --check .",
     "lint:ts": "tsc --noEmit --project ts",

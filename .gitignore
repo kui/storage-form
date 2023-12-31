@@ -3,6 +3,7 @@
 /node_modules/
 /docs/js/
 /docs/ts/
+*.tgz
 
 .lock-wscript
 .wafpickle-N
