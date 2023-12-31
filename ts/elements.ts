@@ -24,9 +24,22 @@ export interface MaybeValueCheckableContainer {
 export type MaybeValueCheckableElement = HTMLElement &
   MaybeValueCheckableContainer;
 
+export interface CustomElementInterface {
+  connectedCallback?(): void;
+  disconnectedCallback?(): void;
+  adoptedCallback?(): void;
+  attributeChangedCallback?(
+    name: string,
+    oldValue: string | null,
+    newValue: string | null,
+  ): void;
+}
+
 export type HTMLElementConstructor<T extends HTMLElement> =
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  new (...args: any[]) => T;
+  (new (...args: any[]) => T & CustomElementInterface) & {
+    observedAttributes?: string[];
+  };
 
 export function dispatchChangeEvent(...elements: EventTarget[]) {
   for (const element of elements)

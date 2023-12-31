@@ -7,6 +7,7 @@ import type {
 import { listAreas } from "./area-handler.js";
 import { updateValue } from "./elements.js";
 import { mixinMonoStorageControl } from "./storage-mono-controls.js";
+import { distinctConcat } from "./arrays.js";
 
 export function mixinAreaSelect<
   T extends HTMLElementConstructor<ValueContainerElement>,
@@ -84,7 +85,10 @@ export function mixinAreaSelect<
       return null;
     }
 
-    static readonly observedAttributes = ["target-selector"];
+    static readonly observedAttributes = distinctConcat(
+      super.observedAttributes ?? [],
+      ["target-selector"],
+    );
 
     attributeChangedCallback(
       name: string,

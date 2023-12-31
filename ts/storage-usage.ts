@@ -5,7 +5,8 @@ import type {
 
 import { AreaHandler } from "./area-handler.js";
 import { dispatchChangeEvent } from "./elements.js";
-import { mixinAreaHandlerElement } from "./area-handler-element.js";
+import { mixinStorageFormChildAreaHandlerElement } from "./area-handler-element.js";
+import { distinctConcat } from "./arrays.js";
 
 export function mixinFormattedNumberElement<
   T extends HTMLElementConstructor<HTMLElement>,
@@ -72,7 +73,10 @@ export function mixinFormattedNumberElement<
       this.textContent = this.formatter.format(this.value);
     }
 
-    static readonly observedAttributes = ["name", "value", "format"];
+    static readonly observedAttributes = distinctConcat(
+      super.observedAttributes ?? [],
+      ["name", "format", "value"],
+    );
 
     attributeChangedCallback(
       name: string,
@@ -121,7 +125,7 @@ function bytesUnitFormat(bytes: number) {
 export function mixinStorageUsageMeterElement<
   T extends HTMLElementConstructor<HTMLMeterElement>,
 >(base: T): T {
-  return class extends mixinAreaHandlerElement(base) {
+  return class extends mixinStorageFormChildAreaHandlerElement(base) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
     constructor(..._args: any[]) {
       super();
@@ -136,7 +140,7 @@ export function mixinStorageUsageMeterElement<
       this.setAttribute("name", v);
     }
 
-    protected async handleChange() {
+    override async storageChangeCallback() {
       if (this.hasAttribute("name")) {
         this.value = await usagePercentage(this.areaHandler, this.name);
       } else {
@@ -144,7 +148,10 @@ export function mixinStorageUsageMeterElement<
       }
     }
 
-    static readonly observedAttributes = ["name"];
+    static readonly observedAttributes = distinctConcat(
+      super.observedAttributes ?? [],
+      ["name"],
+    );
 
     attributeChangedCallback(
       name: string,
@@ -185,8 +192,8 @@ export class HTMLStorageUsageMeterElement extends mixinStorageUsageMeterElement(
 export function mixinStorageUsageElement<
   T extends HTMLElementConstructor<FormatedNumericValueElement>,
 >(base: T): T {
-  return class extends mixinAreaHandlerElement(base) {
-    protected async handleChange() {
+  return class extends mixinStorageFormChildAreaHandlerElement(base) {
+    override async storageChangeCallback() {
       if (this.hasAttribute("name")) {
         if (this.format === "percent") {
           this.value = await usagePercentage(this.areaHandler, this.name);
@@ -202,16 +209,6 @@ export function mixinStorageUsageElement<
         }
       }
     }
-
-    static readonly observedAttributes = ["name", "format", "value"];
-
-    attributeChangedCallback(
-      name: string,
-      oldValue: string | null,
-      newValue: string | null,
-    ) {
-      super.attributeChangedCallback?.(name, oldValue, newValue);
-    }
   };
 }
 
@@ -226,23 +223,13 @@ export class HTMLStorageUsageElement extends mixinStorageUsageElement(
 export function mixinStorageQuotaElement<
   T extends HTMLElementConstructor<FormatedNumericValueElement>,
 >(base: T): T {
-  return class extends mixinAreaHandlerElement(base) {
-    protected handleChange() {
+  return class extends mixinStorageFormChildAreaHandlerElement(base) {
+    override storageChangeCallback() {
       if (this.hasAttribute("name")) {
         this.value = this.areaHandler.quotaBytes ?? NaN;
       } else {
         this.value = this.areaHandler.totalQuotaBytes ?? NaN;
       }
-    }
-
-    static readonly observedAttributes = ["name", "format", "value"];
-
-    attributeChangedCallback(
-      name: string,
-      oldValue: string | null,
-      newValue: string | null,
-    ) {
-      super.attributeChangedCallback?.(name, oldValue, newValue);
     }
   };
 }
