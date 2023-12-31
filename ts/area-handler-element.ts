@@ -52,6 +52,7 @@ export function mixinAreaHandlerElement<
         if (mutaion.type === "attributes") {
           if (mutaion.attributeName === "storage-area") {
             this.#areaHandler.updateArea(this.storageArea);
+            this.invokeOnChange();
           }
         }
       }
