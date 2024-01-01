@@ -7,11 +7,6 @@ export type ValueContainerElement<
   C extends ValueContainer<V> = ValueContainer<V>,
 > = HTMLElement & C;
 
-export interface FormatedNumericValueElement
-  extends ValueContainerElement<number> {
-  format: string;
-}
-
 export interface Checkable {
   checked: boolean;
 }
@@ -76,7 +71,7 @@ export function addChangeListeners(
  * To prevent the element from being treated as a storage control.
  */
 export interface StorageFormLikeElement extends HTMLElement {
-  isNotStorageControl: boolean;
+  isNotStorageControl: true;
 }
 export interface StorageElementMixin extends HTMLElement {
   storageArea: string;

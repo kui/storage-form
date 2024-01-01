@@ -7,14 +7,15 @@ import {
 import { FacadeAreaHandler } from "./area-handler.js";
 import { SerialTaskExecutor } from "./promises.js";
 import { distinctConcat } from "./arrays.js";
+import { ValueChanges } from "./storage-binder.js";
 
-interface AreaHandlerElement extends HTMLElement {
+export interface AreaHandlerElement extends HTMLElement {
   storageArea: string;
   readonly areaHandler: FacadeAreaHandler;
-  storageChangeCallback(): void | Promise<void>;
-}
-interface StorageFormChildAreaHandlerElement extends AreaHandlerElement {
-  readonly storageForm: StorageElementMixin | null;
+  /**
+   * @param changes If no entries, it means to need to update all values.
+   */
+  storageChangeCallback(changes: ValueChanges): void | Promise<void>;
 }
 
 export function mixinAreaHandlerElement<
@@ -25,7 +26,9 @@ export function mixinAreaHandlerElement<
     private areaListening: { stop(): void } | null = null;
     private readonly taskExecutor = new SerialTaskExecutor();
     private readonly invokeOnChange = () => {
-      this.taskExecutor.enqueueNoWait(() => this.storageChangeCallback());
+      this.taskExecutor.enqueueNoWait(() =>
+        this.storageChangeCallback(new Map()),
+      );
     };
 
     get storageArea() {
@@ -41,7 +44,9 @@ export function mixinAreaHandlerElement<
 
     connectedCallback() {
       super.connectedCallback?.();
-      this.areaListening = this.areaHandler.onChange(this.invokeOnChange);
+      this.areaListening = this.areaHandler.onChange(
+        this.storageChangeCallback.bind(this),
+      );
       this.areaHandler.updateArea(this.storageArea);
       this.addEventListener("change", this.invokeOnChange);
       this.invokeOnChange();
@@ -77,12 +82,15 @@ export function mixinAreaHandlerElement<
       }
     }
 
-    //
-
-    storageChangeCallback(): void | Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    storageChangeCallback(_changes: ValueChanges): void | Promise<void> {
       throw new Error("Method not implemented.");
     }
   };
+}
+
+export interface StorageFormChildAreaHandlerElement extends AreaHandlerElement {
+  readonly storageForm: StorageElementMixin | null;
 }
 
 export function mixinStorageFormChildAreaHandlerElement<
