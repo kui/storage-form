@@ -1,20 +1,21 @@
-import {
-  dispatchChangeEvent,
-  type HTMLElementConstructor,
-  type StorageElementMixin,
+import type {
+  HTMLElementConstructor,
+  StorageElementMixin,
 } from "./elements.js";
+import type { ValueChanges } from "./storage-binder.js";
 
 import { FacadeAreaHandler } from "./area-handler.js";
 import { SerialTaskExecutor } from "./promises.js";
 import { distinctConcat } from "./arrays.js";
 
-interface AreaHandlerElement extends HTMLElement {
+export interface AreaHandlerElement extends HTMLElement {
   storageArea: string;
   readonly areaHandler: FacadeAreaHandler;
-  storageChangeCallback(): void | Promise<void>;
-}
-interface StorageFormChildAreaHandlerElement extends AreaHandlerElement {
-  readonly storageForm: StorageElementMixin | null;
+  invokeStorageChangeCallback(changes?: ValueChanges): void;
+  /**
+   * @param changes If no entries, it means to change storage area reference.
+   */
+  storageChangeCallback(changes: ValueChanges): void | Promise<void>;
 }
 
 export function mixinAreaHandlerElement<
@@ -24,9 +25,6 @@ export function mixinAreaHandlerElement<
     #areaHandler = new FacadeAreaHandler();
     private areaListening: { stop(): void } | null = null;
     private readonly taskExecutor = new SerialTaskExecutor();
-    private readonly invokeOnChange = () => {
-      this.taskExecutor.enqueueNoWait(() => this.storageChangeCallback());
-    };
 
     get storageArea() {
       return this.getAttribute("storage-area") ?? "";
@@ -41,21 +39,21 @@ export function mixinAreaHandlerElement<
 
     connectedCallback() {
       super.connectedCallback?.();
-      this.areaListening = this.areaHandler.onChange(this.invokeOnChange);
+      this.areaListening = this.areaHandler.onChange(
+        this.invokeStorageChangeCallback.bind(this),
+      );
       this.areaHandler.updateArea(this.storageArea);
-      this.addEventListener("change", this.invokeOnChange);
-      this.invokeOnChange();
+      this.invokeStorageChangeCallback();
     }
 
     adoptedCallback() {
       super.adoptedCallback?.();
       this.areaHandler.updateArea(this.storageArea);
-      this.invokeOnChange();
+      this.invokeStorageChangeCallback();
     }
 
     disconnectedCallback() {
       super.disconnectedCallback?.();
-      this.removeEventListener("change", this.invokeOnChange);
       this.areaListening?.stop();
       this.areaListening = null;
     }
@@ -73,16 +71,32 @@ export function mixinAreaHandlerElement<
       super.attributeChangedCallback?.(name, oldValue, newValue);
       if (name === "storage-area") {
         this.areaHandler.updateArea(newValue);
-        this.invokeOnChange();
+        this.invokeStorageChangeCallback();
       }
     }
 
-    //
+    invokeStorageChangeCallback(changes: ValueChanges = new Map()) {
+      this.taskExecutor.enqueueNoWait(() =>
+        this.storageChangeCallback(changes),
+      );
+    }
 
-    storageChangeCallback(): void | Promise<void> {
+    /**
+     * Implement this method to handle storage changes.
+     *
+     * Should not call this method directly. Call {@link invokeStorageChangeCallback} instead.
+     *
+     * @param _changes If no entries, it means to change storage area reference.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    storageChangeCallback(_changes: ValueChanges): void | Promise<void> {
       throw new Error("Method not implemented.");
     }
   };
+}
+
+export interface StorageFormChildAreaHandlerElement extends AreaHandlerElement {
+  readonly storageForm: StorageElementMixin | null;
 }
 
 export function mixinStorageFormChildAreaHandlerElement<
@@ -110,7 +124,7 @@ export function mixinStorageFormChildAreaHandlerElement<
         if (mutaion.type === "attributes") {
           if (mutaion.attributeName === "storage-area") {
             this.updateArea();
-            dispatchChangeEvent(this);
+            this.invokeStorageChangeCallback();
           }
         }
       }
@@ -148,7 +162,7 @@ export function mixinStorageFormChildAreaHandlerElement<
       }
       this.#storageForm = form;
       this.updateArea();
-      dispatchChangeEvent(this);
+      this.invokeStorageChangeCallback();
     }
 
     private getStorageForm(): StorageElementMixin | null {

@@ -29,7 +29,7 @@ function matchesStorageControl(
   return (
     e instanceof Element &&
     // Child storage custom elements should be ignored
-    !(e as StorageFormLikeElement).isNotStorageControl &&
+    !(e as Partial<StorageFormLikeElement>).isNotStorageControl &&
     // Reject if the name is undefined or empty
     Boolean((e as HTMLStorageFormControllElement).name) &&
     e.matches(STORAGE_CONTROL_SELECTOR)

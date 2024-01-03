@@ -5,7 +5,6 @@ import type {
 } from "./elements.js";
 
 import { listAreas } from "./area-handler.js";
-import { updateValue } from "./elements.js";
 import { mixinMonoStorageControl } from "./storage-mono-controls.js";
 import { distinctConcat } from "./arrays.js";
 
@@ -13,39 +12,20 @@ export function mixinAreaSelect<
   T extends HTMLElementConstructor<ValueContainerElement>,
 >(base: T): T {
   return class extends base {
-    #target: StorageElementMixin | null = null;
+    target: StorageElementMixin | null = null;
     readonly isNotStorageControl = true;
-    private readonly onChangeListener = this.onChange.bind(this);
+    private readonly onChangeListener = (event: Event) => {
+      if (event.target !== this) return;
+      if (this.target === null) return;
+      this.target.storageArea = this.value;
+    };
 
-    // Workaround for ts2545 error.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-    constructor(..._: any[]) {
-      super();
-      this.addEventListener("change", this.onChangeListener);
-      this.addEventListener("input", this.onChangeListener);
-    }
-
-    get target(): StorageElementMixin | null {
-      return this.#target;
-    }
-    set target(newTarget: StorageElementMixin | null) {
-      const oldTarget = this.#target;
-      this.#target = newTarget;
-      if (oldTarget !== newTarget)
-        updateValue(this, newTarget?.storageArea ?? "");
-    }
     get targetSelector(): string | null {
       return this.getAttribute("target-selector");
     }
     set targetSelector(v: string | null) {
       if (v === null) this.removeAttribute("target-selector");
       else this.setAttribute("target-selector", v);
-    }
-
-    private onChange(event: Event) {
-      if (event.target !== this) return;
-      if (this.#target === null) return;
-      this.#target.storageArea = this.value;
     }
 
     connectedCallback() {
@@ -58,16 +38,18 @@ export function mixinAreaSelect<
           this.appendChild(option);
         }
       }
-      this.updateTarget();
+      this.target =
+        this.target ?? this.getTargetByAttribute() ?? this.getTargetByParent();
+      if (this.target !== null) this.target.storageArea = this.value;
+
+      this.addEventListener("change", this.onChangeListener);
+      this.addEventListener("input", this.onChangeListener);
     }
 
     disconnectedCallback() {
       super.disconnectedCallback?.();
-    }
-
-    private updateTarget() {
-      this.target =
-        this.target ?? this.getTargetByAttribute() ?? this.getTargetByParent();
+      this.removeEventListener("change", this.onChangeListener);
+      this.removeEventListener("input", this.onChangeListener);
     }
 
     private getTargetByAttribute(): StorageElementMixin | null {
