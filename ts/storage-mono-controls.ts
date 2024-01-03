@@ -4,7 +4,7 @@ import type {
   ValueContainerElement,
 } from "./elements.js";
 import type { AreaHandlerElement } from "./area-handler-element.js";
-import type { ValueChanges, WroteValues } from "./storage-binder.js";
+import type { ValueChanges, WroteValues } from "./area-handler.js";
 
 import { mixinAreaHandlerElement } from "./area-handler-element.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";

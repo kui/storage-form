@@ -2,7 +2,8 @@ import type {
   HTMLElementConstructor,
   StorageElementMixin,
 } from "./elements.js";
-import type { ValueChanges } from "./storage-binder.js";
+
+import type { ValueChanges } from "./area-handler.js";
 
 import { FacadeAreaHandler } from "./area-handler.js";
 import { SerialTaskExecutor } from "./promises.js";

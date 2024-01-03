@@ -1,22 +1,29 @@
 import { buildWithIndex, remove } from "./arrays.js";
 import { mapValues, setAll } from "./maps.js";
 import { sleep } from "./promises.js";
-import type {
-  AreaBinderIO,
-  ValueChanges,
-  ValueChange,
-  StoredValues,
-  WroteValues,
-} from "./storage-binder.js";
 import { byteLength } from "./strings.js";
+
+export interface ValueChange {
+  oldValue?: string;
+  newValue?: string;
+}
+export type ValueChanges = Map<string, ValueChange>;
+
+export type StoredValues = Map<string, string>;
+export type WroteValues = Map<string, string | undefined>;
 
 type Sizes = Map<string, number>;
 
-export interface AreaHandler extends AreaBinderIO {
+export interface AreaHandler {
+  read(names: string[]): StoredValues | Promise<StoredValues>;
+  write(items: WroteValues): void | Promise<void>;
   readBytes(names: string[]): Sizes | Promise<Sizes>;
   readTotalBytes(): number | Promise<number>;
   get quotaBytes(): number | undefined;
   get totalQuotaBytes(): number | undefined;
+  onChange(callback: (changes: ValueChanges) => void | Promise<void>): {
+    stop: () => void;
+  };
 }
 
 const KIBI = 1024;
@@ -44,7 +51,7 @@ export function listAreas(): string[] {
 export class FacadeAreaHandler implements AreaHandler {
   private handler: AreaHandler | null = null;
   private readonly areaChangeListeners: ((
-    newHandler: AreaBinderIO | null,
+    newHandler: AreaHandler | null,
   ) => void)[] = [];
 
   readBytes(names: string[]): Sizes | Promise<Sizes> {
@@ -79,7 +86,7 @@ export class FacadeAreaHandler implements AreaHandler {
   onChange(callback: (changes: ValueChanges) => void | Promise<void>) {
     let listening = this.handler?.onChange(callback);
 
-    const listener = (newHandler: AreaBinderIO | null) => {
+    const listener = (newHandler: AreaHandler | null) => {
       listening?.stop();
       listening = newHandler?.onChange(callback);
     };
