@@ -1,12 +1,11 @@
+import { mixinAreaHandlerElement } from "./area-handler-element.js";
+import type { ValueChanges, WroteValues } from "./area-handler.js";
+import { distinctConcat } from "./arrays.js";
 import type {
   HTMLElementConstructor,
   StorageElementMixin,
   StorageFormLikeElement,
 } from "./elements.js";
-import type { ValueChanges, WroteValues } from "./area-handler.js";
-
-import { mixinAreaHandlerElement } from "./area-handler-element.js";
-import { distinctConcat } from "./arrays.js";
 import { dispatchChangeEvent } from "./elements.js";
 import { NamedSetMap, mapValues, setAll } from "./maps.js";
 import { SerialTaskExecutor } from "./promises.js";

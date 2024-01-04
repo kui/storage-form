@@ -1,15 +1,14 @@
+import type { AreaHandlerElement } from "./area-handler-element.js";
+import { mixinAreaHandlerElement } from "./area-handler-element.js";
+import type { ValueChanges, WroteValues } from "./area-handler.js";
+import { distinctConcat } from "./arrays.js";
 import type {
   HTMLElementConstructor,
   StorageFormLikeElement,
   ValueContainerElement,
 } from "./elements.js";
-import type { AreaHandlerElement } from "./area-handler-element.js";
-import type { ValueChanges, WroteValues } from "./area-handler.js";
-
-import { mixinAreaHandlerElement } from "./area-handler-element.js";
-import * as storageControlsHandler from "./storage-controls-handler.js";
 import { SerialTaskExecutor } from "./promises.js";
-import { distinctConcat } from "./arrays.js";
+import * as storageControlsHandler from "./storage-controls-handler.js";
 
 export interface FormControlLikeElement<V = string>
   extends ValueContainerElement<V> {

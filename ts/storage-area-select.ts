@@ -1,12 +1,11 @@
+import { listAreas } from "./area-handler.js";
 import type {
   HTMLElementConstructor,
   StorageElementMixin,
   ValueContainerElement,
 } from "./elements.js";
-
-import { listAreas } from "./area-handler.js";
-import { mixinMonoStorageControl } from "./storage-mono-controls.js";
 import { parentOrShadowRootHost } from "./elements.js";
+import { mixinMonoStorageControl } from "./storage-mono-controls.js";
 
 export function mixinAreaSelect<
   T extends HTMLElementConstructor<ValueContainerElement>,

@@ -1,3 +1,7 @@
+import {
+  HTMLAreaSelectElement,
+  HTMLStorageAreaSelectElement,
+} from "./storage-area-select.js";
 import { HTMLStorageFormElement } from "./storage-form.js";
 import {
   HTMLStorageInputElement,
@@ -5,10 +9,6 @@ import {
   HTMLStorageTextAreaElement,
   HTMLStorageOutputElement,
 } from "./storage-mono-controls.js";
-import {
-  HTMLAreaSelectElement,
-  HTMLStorageAreaSelectElement,
-} from "./storage-area-select.js";
 import {
   HTMLStorageQuotaElement,
   HTMLStorageUsageElement,

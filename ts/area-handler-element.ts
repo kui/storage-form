@@ -1,14 +1,12 @@
+import type { ValueChanges } from "./area-handler.js";
+import { FacadeAreaHandler } from "./area-handler.js";
+import { distinctConcat } from "./arrays.js";
 import type {
   HTMLElementConstructor,
   StorageElementMixin,
 } from "./elements.js";
-
-import type { ValueChanges } from "./area-handler.js";
-
-import { FacadeAreaHandler } from "./area-handler.js";
-import { SerialTaskExecutor } from "./promises.js";
-import { distinctConcat } from "./arrays.js";
 import { parentOrShadowRootHost } from "./elements.js";
+import { SerialTaskExecutor } from "./promises.js";
 
 export interface AreaHandlerElement extends HTMLElement {
   storageArea: string;
