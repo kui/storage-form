@@ -2,6 +2,8 @@ import { buildWithIndex, remove } from "./arrays.js";
 import { mapValues, setAll } from "./maps.js";
 import { sleep } from "./promises.js";
 import { byteLength } from "./strings.js";
+import "./globals.js";
+import type { StorageChange } from "./globals.js";
 
 export interface ValueChange {
   oldValue?: string;
@@ -100,31 +102,6 @@ export class FacadeAreaHandler implements AreaHandler {
     };
   }
 }
-
-interface StorageChange {
-  key: string | null;
-  oldValue: string | null;
-  newValue: string | null;
-  storageArea: Storage | null;
-}
-
-declare global {
-  // eslint-disable-next-line no-var
-  var storageForm: {
-    webStorage: {
-      storageEventListeners: ((change: StorageChange) => void)[];
-      dispatchEvent(change: StorageChange): void;
-    };
-  };
-}
-globalThis.storageForm = {
-  webStorage: {
-    storageEventListeners: [],
-    dispatchEvent(change: StorageChange) {
-      for (const l of storageForm.webStorage.storageEventListeners) l(change);
-    },
-  },
-};
 
 export class WebStorageHandler implements AreaHandler {
   constructor(

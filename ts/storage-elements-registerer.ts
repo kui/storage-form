@@ -1,3 +1,4 @@
+import { allCustomElementsDefinedEvent } from "./globals.js";
 import {
   HTMLAreaSelectElement,
   HTMLStorageAreaSelectElement,
@@ -29,4 +30,5 @@ export function register(): void {
   HTMLStorageUsageMeterElement.register();
   HTMLStorageQuotaElement.register();
   HTMLStorageFormElement.register();
+  allCustomElementsDefinedEvent.dispatchEvent();
 }
