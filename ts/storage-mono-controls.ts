@@ -1,4 +1,7 @@
-import { mixinAreaHandlerElement, type AreaHandlerElement } from "./area-handler-element.js";
+import {
+  mixinAreaHandlerElement,
+  type AreaHandlerElement,
+} from "./area-handler-element.js";
 import type { ValueChanges, WroteValues } from "./area-handler.js";
 import { distinctConcat } from "./arrays.js";
 import {

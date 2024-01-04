@@ -1,11 +1,11 @@
 import { mixinStorageFormChildAreaHandlerElement } from "./area-handler-element.js";
 import { AreaHandler } from "./area-handler.js";
 import { distinctConcat } from "./arrays.js";
-import type {
-  HTMLElementConstructor,
-  ValueContainerElement,
+import {
+  dispatchChangeEvent,
+  type HTMLElementConstructor,
+  type ValueContainerElement,
 } from "./elements.js";
-import { dispatchChangeEvent } from "./elements.js";
 
 export interface FormatedNumericValueElement
   extends ValueContainerElement<number> {

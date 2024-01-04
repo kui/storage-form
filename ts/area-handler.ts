@@ -1,9 +1,8 @@
 import { buildWithIndex, remove } from "./arrays.js";
+import { type StorageChange } from "./globals.js";
 import { mapValues, setAll } from "./maps.js";
 import { sleep } from "./promises.js";
 import { byteLength } from "./strings.js";
-import "./globals.js";
-import type { StorageChange } from "./globals.js";
 
 export interface ValueChange {
   oldValue?: string;

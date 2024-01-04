@@ -1,10 +1,10 @@
 import { listAreas } from "./area-handler.js";
-import type {
-  HTMLElementConstructor,
-  StorageElementMixin,
-  ValueContainerElement,
+import {
+  parentOrShadowRootHost,
+  type HTMLElementConstructor,
+  type StorageElementMixin,
+  type ValueContainerElement,
 } from "./elements.js";
-import { parentOrShadowRootHost } from "./elements.js";
 import { allCustomElementsDefinedEvent } from "./globals.js";
 import { mixinMonoStorageControl } from "./storage-mono-controls.js";
 
@@ -39,11 +39,9 @@ export function mixinAreaSelect<
       }
 
       this.updateTargetStorage();
-      allCustomElementsDefinedEvent.listeners.push(
-        () => {
-          this.updateTargetStorage();
-        }
-      );
+      allCustomElementsDefinedEvent.listeners.push(() => {
+        this.updateTargetStorage();
+      });
 
       this.addEventListener("change", this.onChangeListener);
       this.addEventListener("input", this.onChangeListener);

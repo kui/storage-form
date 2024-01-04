@@ -1,12 +1,12 @@
 import { mixinAreaHandlerElement } from "./area-handler-element.js";
 import type { ValueChanges, WroteValues } from "./area-handler.js";
 import { distinctConcat } from "./arrays.js";
-import type {
-  HTMLElementConstructor,
-  StorageElementMixin,
-  StorageFormLikeElement,
+import {
+  dispatchChangeEvent,
+  type HTMLElementConstructor,
+  type StorageElementMixin,
+  type StorageFormLikeElement,
 } from "./elements.js";
-import { dispatchChangeEvent } from "./elements.js";
 import { NamedSetMap, mapValues, setAll } from "./maps.js";
 import { SerialTaskExecutor } from "./promises.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";

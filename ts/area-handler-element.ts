@@ -1,5 +1,4 @@
-import type { ValueChanges } from "./area-handler.js";
-import { FacadeAreaHandler } from "./area-handler.js";
+import { FacadeAreaHandler, type ValueChanges } from "./area-handler.js";
 import { distinctConcat } from "./arrays.js";
 import type {
   HTMLElementConstructor,
