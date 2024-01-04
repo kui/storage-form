@@ -1,8 +1,8 @@
 import { FlatCompat } from "@eslint/eslintrc";
 import js from "@eslint/js";
-import eslintConfigPrettier from "eslint-config-prettier";
-import parserTs from "@typescript-eslint/parser";
 import pluginTs from "@typescript-eslint/eslint-plugin";
+import parserTs from "@typescript-eslint/parser";
+import eslintConfigPrettier from "eslint-config-prettier";
 import globals from "globals";
 
 const compat = new FlatCompat();
@@ -25,7 +25,6 @@ function ts(files, project) {
       plugins: { "@typescript-eslint": pluginTs },
       rules: {
         ...config.rules,
-        "@typescript-eslint/prefer-namespace-keyword": "off",
       },
     }));
 }

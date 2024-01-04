@@ -1,3 +1,8 @@
+import { allCustomElementsDefinedEvent } from "./globals.js";
+import {
+  HTMLAreaSelectElement,
+  HTMLStorageAreaSelectElement,
+} from "./storage-area-select.js";
 import { HTMLStorageFormElement } from "./storage-form.js";
 import {
   HTMLStorageInputElement,
@@ -5,10 +10,6 @@ import {
   HTMLStorageTextAreaElement,
   HTMLStorageOutputElement,
 } from "./storage-mono-controls.js";
-import {
-  HTMLAreaSelectElement,
-  HTMLStorageAreaSelectElement,
-} from "./storage-area-select.js";
 import {
   HTMLStorageQuotaElement,
   HTMLStorageUsageElement,
@@ -19,7 +20,6 @@ import {
  * Registers all custom elements defined in this package.
  */
 export function register(): void {
-  HTMLStorageFormElement.register();
   HTMLStorageInputElement.register();
   HTMLStorageSelectElement.register();
   HTMLStorageTextAreaElement.register();
@@ -29,4 +29,6 @@ export function register(): void {
   HTMLStorageUsageElement.register();
   HTMLStorageUsageMeterElement.register();
   HTMLStorageQuotaElement.register();
+  HTMLStorageFormElement.register();
+  allCustomElementsDefinedEvent.dispatchEvent();
 }

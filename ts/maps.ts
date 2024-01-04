@@ -13,14 +13,14 @@ export class NamedSetMap<S extends SetLike<V>, V extends Named> extends Map<
   string,
   S
 > {
-  constructor(private readonly setFactory: (name: string) => S) {
+  constructor(private readonly setFactory: (v: V) => S) {
     super();
   }
 
   add(v: V) {
     let s = this.get(v.name);
     if (!s) {
-      s = this.setFactory(v.name);
+      s = this.setFactory(v);
       this.set(v.name, s);
     }
     s.add(v);

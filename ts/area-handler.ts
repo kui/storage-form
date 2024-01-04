@@ -1,22 +1,30 @@
 import { buildWithIndex, remove } from "./arrays.js";
+import { type StorageChange } from "./globals.js";
 import { mapValues, setAll } from "./maps.js";
 import { sleep } from "./promises.js";
-import type {
-  AreaBinderIO,
-  ValueChanges,
-  ValueChange,
-  StoredValues,
-  WroteValues,
-} from "./storage-binder.js";
 import { byteLength } from "./strings.js";
+
+export interface ValueChange {
+  oldValue?: string;
+  newValue?: string;
+}
+export type ValueChanges = Map<string, ValueChange>;
+
+export type StoredValues = Map<string, string>;
+export type WroteValues = Map<string, string | undefined>;
 
 type Sizes = Map<string, number>;
 
-export interface AreaHandler extends AreaBinderIO {
+export interface AreaHandler {
+  read(names: string[]): StoredValues | Promise<StoredValues>;
+  write(items: WroteValues): void | Promise<void>;
   readBytes(names: string[]): Sizes | Promise<Sizes>;
   readTotalBytes(): number | Promise<number>;
   get quotaBytes(): number | undefined;
   get totalQuotaBytes(): number | undefined;
+  onChange(callback: (changes: ValueChanges) => void | Promise<void>): {
+    stop: () => void;
+  };
 }
 
 const KIBI = 1024;
@@ -44,7 +52,7 @@ export function listAreas(): string[] {
 export class FacadeAreaHandler implements AreaHandler {
   private handler: AreaHandler | null = null;
   private readonly areaChangeListeners: ((
-    newHandler: AreaBinderIO | null,
+    newHandler: AreaHandler | null,
   ) => void)[] = [];
 
   readBytes(names: string[]): Sizes | Promise<Sizes> {
@@ -79,7 +87,7 @@ export class FacadeAreaHandler implements AreaHandler {
   onChange(callback: (changes: ValueChanges) => void | Promise<void>) {
     let listening = this.handler?.onChange(callback);
 
-    const listener = (newHandler: AreaBinderIO | null) => {
+    const listener = (newHandler: AreaHandler | null) => {
       listening?.stop();
       listening = newHandler?.onChange(callback);
     };
@@ -92,13 +100,6 @@ export class FacadeAreaHandler implements AreaHandler {
       },
     };
   }
-}
-
-interface StorageChange {
-  key: string | null;
-  oldValue: string | null;
-  newValue: string | null;
-  storageArea: Storage | null;
 }
 
 export class WebStorageHandler implements AreaHandler {
@@ -144,7 +145,7 @@ export class WebStorageHandler implements AreaHandler {
       } else {
         this.storage.setItem(key, newValue);
       }
-      WebStorageHandler.dispatchStorageEvent({
+      this.dispatchStorageEvent({
         key,
         oldValue,
         newValue: newValue ?? null,
@@ -175,20 +176,21 @@ export class WebStorageHandler implements AreaHandler {
 
     // We need to implement the listener because
     // "storage" event is not fired in the same window.
-    WebStorageHandler.storageEventListeners.push(listener);
+    this.storageEventListeners.push(listener);
     addEventListener("storage", listener);
     return {
       stop: () => {
-        remove(WebStorageHandler.storageEventListeners, listener);
+        remove(this.storageEventListeners, listener);
         removeEventListener("storage", listener);
       },
     };
   }
 
-  static readonly storageEventListeners: ((change: StorageChange) => void)[] =
-    [];
-  static dispatchStorageEvent(change: StorageChange) {
-    for (const l of WebStorageHandler.storageEventListeners) l(change);
+  private get storageEventListeners() {
+    return storageForm.webStorage.storageEventListeners;
+  }
+  private dispatchStorageEvent(change: StorageChange) {
+    storageForm.webStorage.dispatchEvent(change);
   }
 }
 

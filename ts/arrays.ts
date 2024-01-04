@@ -19,3 +19,20 @@ export function buildWithIndex<T>(
   for (let i = 0; i < length; i++) arr[i] = builder(i);
   return arr;
 }
+
+function* distinct<T>(iter: Iterable<T>): Generator<T> {
+  const set = new Set<T>();
+  for (const item of iter) {
+    if (set.has(item)) continue;
+    set.add(item);
+    yield item;
+  }
+}
+
+function* flatten<T>(iter: Iterable<Iterable<T>>): Generator<T> {
+  for (const subIter of iter) for (const item of subIter) yield item;
+}
+
+export function distinctConcat<T>(...arrays: T[][]): T[] {
+  return [...distinct(flatten<T>(arrays))];
+}
