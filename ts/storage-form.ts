@@ -87,10 +87,6 @@ class NamedStorageControlsCollection {
     return { oldValue, newValue };
   }
 
-  clear() {
-    this.value = undefined;
-  }
-
   [Symbol.iterator]() {
     return this.elements[Symbol.iterator]();
   }
