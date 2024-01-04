@@ -153,10 +153,12 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     override async storageChangeCallback(changes: ValueChanges) {
       const newValues = new Map<string, string | undefined>();
       if (changes.size === 0) {
+        const keys = [...this.namedControlMap.keys()];
         setAll(
           newValues,
-          await this.areaHandler.read([...this.namedControlMap.keys()]),
+          keys.map((n) => [n, undefined]),
         );
+        setAll(newValues, await this.areaHandler.read(keys));
       } else {
         setAll(
           newValues,
