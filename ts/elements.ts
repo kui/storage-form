@@ -67,3 +67,15 @@ export interface StorageFormLikeElement extends HTMLElement {
 export interface StorageElementMixin extends HTMLElement {
   storageArea: string;
 }
+
+export function parentOrShadowRootHost(
+  element: HTMLElement,
+): HTMLElement | null {
+  const parent = element.parentElement;
+  if (parent !== null) return parent;
+  const shadowRoot = element.getRootNode();
+  if (!(shadowRoot instanceof ShadowRoot)) return null;
+  const host = shadowRoot.host;
+  if (!(host instanceof HTMLElement)) return null;
+  return host;
+}

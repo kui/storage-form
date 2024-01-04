@@ -6,30 +6,31 @@ import type {
 
 import { listAreas } from "./area-handler.js";
 import { mixinMonoStorageControl } from "./storage-mono-controls.js";
-import { distinctConcat } from "./arrays.js";
+import { parentOrShadowRootHost } from "./elements.js";
 
 export function mixinAreaSelect<
   T extends HTMLElementConstructor<ValueContainerElement>,
 >(base: T): T {
   return class extends base {
-    target: StorageElementMixin | null = null;
+    #target: StorageElementMixin | null = null;
     readonly isNotStorageControl = true;
     private readonly onChangeListener = (event: Event) => {
       if (event.target !== this) return;
-      if (this.target === null) return;
-      this.target.storageArea = this.value;
+      const target = this.target;
+      if (target === null) return;
+      target.storageArea = this.value;
     };
 
-    get targetSelector(): string | null {
-      return this.getAttribute("target-selector");
+    get target(): StorageElementMixin | null {
+      return this.#target ?? this.getTargetByParent();
     }
-    set targetSelector(v: string | null) {
-      if (v === null) this.removeAttribute("target-selector");
-      else this.setAttribute("target-selector", v);
+    set target(v: StorageElementMixin | null) {
+      this.#target = v;
     }
 
     connectedCallback() {
       super.connectedCallback?.();
+
       if (this instanceof HTMLSelectElement && this.options.length === 0) {
         for (const area of listAreas()) {
           const option = document.createElement("option");
@@ -38,9 +39,6 @@ export function mixinAreaSelect<
           this.appendChild(option);
         }
       }
-      this.target =
-        this.target ?? this.getTargetByAttribute() ?? this.getTargetByParent();
-      if (this.target !== null) this.target.storageArea = this.value;
 
       this.addEventListener("change", this.onChangeListener);
       this.addEventListener("input", this.onChangeListener);
@@ -52,35 +50,14 @@ export function mixinAreaSelect<
       this.removeEventListener("input", this.onChangeListener);
     }
 
-    private getTargetByAttribute(): StorageElementMixin | null {
-      const selector = this.targetSelector;
-      return selector === null ? null : document.querySelector(selector);
-    }
-
     private getTargetByParent(): StorageElementMixin | null {
-      let parent = this.parentElement;
+      let parent = parentOrShadowRootHost(this);
       while (parent !== null) {
         if (typeof (parent as StorageElementMixin).storageArea === "string")
           return parent as StorageElementMixin;
-        parent = parent.parentElement;
+        parent = parentOrShadowRootHost(parent);
       }
       return null;
-    }
-
-    static readonly observedAttributes = distinctConcat(
-      super.observedAttributes ?? [],
-      ["target-selector"],
-    );
-
-    attributeChangedCallback(
-      name: string,
-      oldValue: string | null,
-      newValue: string | null,
-    ): void {
-      super.attributeChangedCallback?.(name, oldValue, newValue);
-      if (name === "target-selector") {
-        this.target = this.getTargetByAttribute();
-      }
     }
   };
 }

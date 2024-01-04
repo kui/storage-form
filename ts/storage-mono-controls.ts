@@ -63,14 +63,21 @@ export function mixinMonoStorageControl<
     }
 
     override async storageChangeCallback(changes: ValueChanges) {
-      let newValue: string | undefined;
       if (changes.size === 0) {
-        newValue = (await this.areaHandler.read([this.name])).get(this.name);
-      } else {
-        newValue = changes.get(this.name)?.newValue;
+        // If empty, it means to change storage entry binded with this element.
+        // So, fetch the new entry.
+        const newValue = (await this.areaHandler.read([this.name])).get(
+          this.name,
+        );
+        this.#value = newValue;
+        storageControlsHandler.write(this, newValue);
+      } else if (changes.has(this.name)) {
+        // If not empty and contains this element's name, it just means that
+        // the storage value has changed.
+        const newValue = changes.get(this.name)?.newValue;
+        this.#value = newValue;
+        storageControlsHandler.write(this, newValue);
       }
-      this.#value = newValue;
-      storageControlsHandler.write(this, newValue);
     }
 
     private invokeValueChangedCallback(): void {

@@ -19,7 +19,6 @@ import {
  * Registers all custom elements defined in this package.
  */
 export function register(): void {
-  HTMLStorageFormElement.register();
   HTMLStorageInputElement.register();
   HTMLStorageSelectElement.register();
   HTMLStorageTextAreaElement.register();
@@ -29,4 +28,5 @@ export function register(): void {
   HTMLStorageUsageElement.register();
   HTMLStorageUsageMeterElement.register();
   HTMLStorageQuotaElement.register();
+  HTMLStorageFormElement.register();
 }

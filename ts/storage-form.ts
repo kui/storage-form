@@ -22,21 +22,25 @@ function matchesStorageControl(e: unknown): e is HTMLStorageFormControlElement {
     e instanceof Element &&
     // Child storage custom elements should be ignored
     !(e as Partial<StorageFormLikeElement>).isNotStorageControl &&
-    "name" in e &&
+    e.hasAttribute("name") &&
     e.matches(STORAGE_CONTROL_SELECTOR)
   );
 }
 
 class NamedStorageControlsCollection {
   private readonly elements = new Set<HTMLStorageFormControlElement>();
-
+  readonly name: string;
   #value: string | undefined = undefined;
 
-  constructor(readonly name: string) {}
+  constructor(e: HTMLStorageFormControlElement) {
+    this.name = e.name;
+  }
 
   add(e: HTMLStorageFormControlElement) {
     if (e.name !== this.name) throw Error("Invalid name");
     this.elements.add(e);
+    storageControlsHandler.write(e, this.#value);
+    // Donot dispatch change event here because it is overwritten by the value
     return this;
   }
 
@@ -99,10 +103,10 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
   return class extends mixinAreaHandlerElement(base) {
     readonly isNotStorageControl = true;
     private readonly taskExecutor = new SerialTaskExecutor();
-    private readonly namedControlMap = new NamedSetMap<
-      NamedStorageControlsCollection,
-      HTMLStorageFormControlElement
-    >((n) => new NamedStorageControlsCollection(n));
+    private readonly namedControlMap = new NamedSetMap(
+      (e: HTMLStorageFormControlElement) =>
+        new NamedStorageControlsCollection(e),
+    );
     private readonly mutationObserver = new MutationObserver(
       this.handleMutations.bind(this),
     );
@@ -120,6 +124,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     }
 
     private initControls() {
+      this.namedControlMap.clear();
       for (const e of this.querySelectorAll(STORAGE_CONTROL_SELECTOR)) {
         if (matchesStorageControl(e)) this.namedControlMap.add(e);
       }
@@ -194,8 +199,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
           if (!matchesStorageControl(mutation.target)) continue;
           const oldName = mutation.oldValue;
           this.namedControlMap.deleteByKeyValue(oldName ?? "", mutation.target);
-          const newName = mutation.target.name;
-          if (newName) this.namedControlMap.add(mutation.target);
+          this.namedControlMap.add(mutation.target);
           shouldDispatch = true;
         }
       }

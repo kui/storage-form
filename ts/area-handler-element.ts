@@ -8,6 +8,7 @@ import type { ValueChanges } from "./area-handler.js";
 import { FacadeAreaHandler } from "./area-handler.js";
 import { SerialTaskExecutor } from "./promises.js";
 import { distinctConcat } from "./arrays.js";
+import { parentOrShadowRootHost } from "./elements.js";
 
 export interface AreaHandlerElement extends HTMLElement {
   storageArea: string;
@@ -177,14 +178,4 @@ export function mixinStorageFormChildAreaHandlerElement<
       this.areaHandler.updateArea(this.storageArea);
     }
   };
-}
-
-function parentOrShadowRootHost(element: HTMLElement): HTMLElement | null {
-  const parent = element.parentElement;
-  if (parent !== null) return parent;
-  const shadowRoot = element.getRootNode();
-  if (!(shadowRoot instanceof ShadowRoot)) return null;
-  const host = shadowRoot.host;
-  if (!(host instanceof HTMLElement)) return null;
-  return host;
 }
