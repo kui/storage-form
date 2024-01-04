@@ -169,7 +169,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       }
 
       for (const [name, elementSet] of this.namedControlMap) {
-        elementSet.value = newValues.get(name);
+        if (newValues.has(name)) elementSet.value = newValues.get(name);
       }
     }
 
