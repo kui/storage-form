@@ -1,11 +1,11 @@
-import type { AreaHandlerElement } from "./area-handler-element.js";
-import { mixinAreaHandlerElement } from "./area-handler-element.js";
+import { mixinAreaHandlerElement, type AreaHandlerElement } from "./area-handler-element.js";
 import type { ValueChanges, WroteValues } from "./area-handler.js";
 import { distinctConcat } from "./arrays.js";
-import type {
-  HTMLElementConstructor,
-  StorageFormLikeElement,
-  ValueContainerElement,
+import {
+  dispatchChangeEvent,
+  type HTMLElementConstructor,
+  type StorageFormLikeElement,
+  type ValueContainerElement,
 } from "./elements.js";
 import { SerialTaskExecutor } from "./promises.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";
@@ -62,6 +62,7 @@ export function mixinMonoStorageControl<
     }
 
     override async storageChangeCallback(changes: ValueChanges) {
+      let isUpdated = false;
       if (changes.size === 0) {
         // If empty, it means to change storage entry binded with this element.
         // So, fetch the new entry.
@@ -69,14 +70,15 @@ export function mixinMonoStorageControl<
           this.name,
         );
         this.#value = newValue;
-        storageControlsHandler.write(this, newValue);
+        isUpdated = storageControlsHandler.write(this, newValue);
       } else if (changes.has(this.name)) {
         // If not empty and contains this element's name, it just means that
         // the storage value has changed.
         const newValue = changes.get(this.name)?.newValue;
         this.#value = newValue;
-        storageControlsHandler.write(this, newValue);
+        isUpdated = storageControlsHandler.write(this, newValue);
       }
+      if (isUpdated) dispatchChangeEvent(this);
     }
 
     private invokeValueChangedCallback(): void {
