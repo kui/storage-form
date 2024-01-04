@@ -25,7 +25,6 @@ function ts(files, project) {
       plugins: { "@typescript-eslint": pluginTs },
       rules: {
         ...config.rules,
-        "@typescript-eslint/prefer-namespace-keyword": "off",
       },
     }));
 }

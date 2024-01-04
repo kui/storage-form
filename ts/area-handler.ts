@@ -108,6 +108,24 @@ interface StorageChange {
   storageArea: Storage | null;
 }
 
+declare global {
+  // eslint-disable-next-line no-var
+  var storageForm: {
+    webStorage: {
+      storageEventListeners: ((change: StorageChange) => void)[];
+      dispatchEvent(change: StorageChange): void;
+    };
+  };
+}
+globalThis.storageForm = {
+  webStorage: {
+    storageEventListeners: [],
+    dispatchEvent(change: StorageChange) {
+      for (const l of storageForm.webStorage.storageEventListeners) l(change);
+    },
+  },
+};
+
 export class WebStorageHandler implements AreaHandler {
   constructor(
     private readonly storage: Storage,
@@ -151,7 +169,7 @@ export class WebStorageHandler implements AreaHandler {
       } else {
         this.storage.setItem(key, newValue);
       }
-      WebStorageHandler.dispatchStorageEvent({
+      this.dispatchStorageEvent({
         key,
         oldValue,
         newValue: newValue ?? null,
@@ -182,20 +200,21 @@ export class WebStorageHandler implements AreaHandler {
 
     // We need to implement the listener because
     // "storage" event is not fired in the same window.
-    WebStorageHandler.storageEventListeners.push(listener);
+    this.storageEventListeners.push(listener);
     addEventListener("storage", listener);
     return {
       stop: () => {
-        remove(WebStorageHandler.storageEventListeners, listener);
+        remove(this.storageEventListeners, listener);
         removeEventListener("storage", listener);
       },
     };
   }
 
-  static readonly storageEventListeners: ((change: StorageChange) => void)[] =
-    [];
-  static dispatchStorageEvent(change: StorageChange) {
-    for (const l of WebStorageHandler.storageEventListeners) l(change);
+  private get storageEventListeners() {
+    return storageForm.webStorage.storageEventListeners;
+  }
+  private dispatchStorageEvent(change: StorageChange) {
+    storageForm.webStorage.dispatchEvent(change);
   }
 }
 
