@@ -54,7 +54,7 @@ export function diff(
   | { type: "unselected" }
   | { type: "value"; value: string }
   | { type: "nochange" } {
-  const h = handlers.get(element.tagName);
+  const h = handlers.get(element.localName);
   if (!h) {
     console.warn("No handler for %o", element);
     return NOCHANGE;
@@ -71,7 +71,7 @@ export function write(
   element: HTMLElement,
   value: string | undefined,
 ): boolean {
-  const h = handlers.get(element.tagName);
+  const h = handlers.get(element.localName);
   if (!h) {
     console.warn("No handler for %o", element);
     return false;
@@ -97,7 +97,7 @@ function registerHandler(
   handlers.set(tagName, handler);
 }
 
-registerHandler("INPUT", {
+registerHandler("input", {
   diff(element: HTMLInputElement, oldValue) {
     const h = inputHandlers.get(element.type as InputType);
     if (h) {
@@ -118,7 +118,7 @@ registerHandler("INPUT", {
   },
 });
 
-registerHandler("SELECT", {
+registerHandler("select", {
   diff(element: HTMLSelectElement, oldValue) {
     if (element.selectedIndex < 0) {
       for (const options of element.options) {
@@ -152,8 +152,8 @@ const plainValueHandler: StorageControlsHandler = {
   },
 };
 
-registerHandler("TEXTAREA", plainValueHandler);
-registerHandler("OUTPUT", plainValueHandler);
+registerHandler("textarea", plainValueHandler);
+registerHandler("output", plainValueHandler);
 
 ///////////////////////////////////////////////////////////////////////
 // Input type handlers
