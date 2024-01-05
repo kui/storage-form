@@ -10,7 +10,6 @@ import {
   type ValueContainerElement,
 } from "./elements.js";
 import { WroteValues } from "./globals.js";
-import { SerialTaskExecutor } from "./promises.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";
 
 export interface FormControlLikeElement<V = string>
@@ -27,9 +26,8 @@ export function mixinMonoStorageControl<
 >(base: T): T & HTMLElementConstructor<MonoStorageControlMixin> {
   return class extends mixinAreaHandlerElement(base) {
     readonly isNotStorageControl = true;
-    private readonly taskExecutor = new SerialTaskExecutor();
     private readonly valueChangedListener = (event: Event) => {
-      if (event.target === this) this.invokeValueChangedCallback();
+      if (event.target === this) this.valueChangedCallback().catch(console.error);
     };
 
     #value = this.defaultValue;
@@ -60,7 +58,7 @@ export function mixinMonoStorageControl<
       if (name === "name") {
         this.invokeStorageChangeCallback();
       } else if (name === "value") {
-        this.invokeValueChangedCallback();
+        this.valueChangedCallback().catch(console.error);
       }
     }
 
@@ -82,10 +80,6 @@ export function mixinMonoStorageControl<
         isUpdated = storageControlsHandler.write(this, newValue);
       }
       if (isUpdated) dispatchChangeEvent(this);
-    }
-
-    private invokeValueChangedCallback(): void {
-      this.taskExecutor.enqueueNoWait(() => this.valueChangedCallback());
     }
 
     private async valueChangedCallback(): Promise<void> {

@@ -7,8 +7,7 @@ import {
   type StorageFormLikeElement,
 } from "./elements.js";
 import { WroteValues } from "./globals.js";
-import { NamedSetMap, mapValues, setAll } from "./maps.js";
-import { SerialTaskExecutor } from "./promises.js";
+import { mapValues, NamedSetMap, setAll } from "./maps.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";
 
 const STORAGE_CONTROL_TAGS = ["input", "select", "textarea", "output"] as const;
@@ -97,7 +96,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
 ): T & HTMLElementConstructor<StorageElementMixin & StorageFormLikeElement> {
   return class extends mixinAreaHandlerElement(base) {
     readonly isNotStorageControl = true;
-    private readonly taskExecutor = new SerialTaskExecutor();
+
     private readonly namedControlMap = new NamedSetMap(
       (e: HTMLStorageFormControlElement) =>
         new NamedStorageControlsCollection(e),
@@ -107,7 +106,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     );
     private readonly changeListener = (event: Event) => {
       if (matchesStorageControl(event.target))
-        this.invokeValueChangedCallback();
+        this.valueChangedCallback().catch(console.error);
     };
 
     connectedCallback() {
@@ -201,10 +200,6 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
         }
       }
       if (shouldDispatch) this.invokeStorageChangeCallback();
-    }
-
-    private invokeValueChangedCallback(): void {
-      this.taskExecutor.enqueueNoWait(() => this.valueChangedCallback());
     }
 
     private async valueChangedCallback(): Promise<void> {
