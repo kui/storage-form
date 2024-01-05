@@ -10,5 +10,13 @@ const config: JestConfigWithTsJest = {
     // Or it seems good to use @swc/jest
     "^(\\.\\.?\\/.+)\\.js$": "$1",
   },
+
+  transform: {
+    "^.+\\.ts$": [
+      "ts-jest",
+      // Already type checked by tsc in lint
+      { diagnostics: false },
+    ],
+  },
 };
 export default config;
