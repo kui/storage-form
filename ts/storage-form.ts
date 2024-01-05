@@ -25,10 +25,12 @@ function matchesStorageControl(e: unknown): e is HTMLStorageFormControlElement {
   );
 }
 
+const notInitialized = Symbol("notInitialized");
+
 class NamedStorageControlsCollection {
   private readonly elements = new Set<HTMLStorageFormControlElement>();
   readonly name: string;
-  #value: string | undefined = undefined;
+  #value: string | undefined | typeof notInitialized = notInitialized;
 
   constructor(e: HTMLStorageFormControlElement) {
     this.name = e.name;
@@ -37,7 +39,9 @@ class NamedStorageControlsCollection {
   add(e: HTMLStorageFormControlElement) {
     if (e.name !== this.name) throw Error("Invalid name");
     this.elements.add(e);
-    storageControlsHandler.write(e, this.#value);
+    if (this.#value !== notInitialized) {
+      storageControlsHandler.write(e, this.#value);
+    }
     // Donot dispatch change event here because it is overwritten by the value
     return this;
   }
@@ -50,7 +54,7 @@ class NamedStorageControlsCollection {
     return this.elements.size;
   }
 
-  get value(): string | undefined {
+  get value(): string | undefined | typeof notInitialized {
     return this.#value;
   }
   set value(newValue: string | undefined) {
@@ -65,6 +69,8 @@ class NamedStorageControlsCollection {
   }
 
   diff() {
+    if (this.#value === notInitialized) return "notInitialized";
+
     const oldValue = this.#value;
     let newValue: string | undefined = undefined;
     let unselected = false;
@@ -206,7 +212,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       const entries: WroteValues = new Map();
       for (const [name, elementSet] of this.namedControlMap) {
         const diff = elementSet.diff();
-        if (diff === "nochange") continue;
+        if (diff === "nochange" || diff === "notInitialized") continue;
         entries.set(name, diff.newValue);
       }
       if (entries.size > 0) await this.areaHandler.write(entries);

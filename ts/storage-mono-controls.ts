@@ -21,16 +21,19 @@ export type MonoStorageControlMixin = AreaHandlerElement &
   FormControlLikeElement &
   StorageFormLikeElement;
 
+const notInitialized = Symbol("notInitialized");
+
 export function mixinMonoStorageControl<
   T extends HTMLElementConstructor<FormControlLikeElement>,
 >(base: T): T & HTMLElementConstructor<MonoStorageControlMixin> {
   return class extends mixinAreaHandlerElement(base) {
     readonly isNotStorageControl = true;
     private readonly valueChangedListener = (event: Event) => {
-      if (event.target === this) this.valueChangedCallback().catch(console.error);
+      if (event.target === this)
+        this.valueChangedCallback().catch(console.error);
     };
 
-    #value = this.defaultValue;
+    #value: string | typeof notInitialized | undefined = notInitialized;
 
     override connectedCallback() {
       super.connectedCallback?.();
@@ -83,6 +86,8 @@ export function mixinMonoStorageControl<
     }
 
     private async valueChangedCallback(): Promise<void> {
+      if (this.#value === notInitialized) return;
+
       const entries: WroteValues = new Map();
       const diff = storageControlsHandler.diff(this, this.#value);
       if (diff.type === "unselected") {
