@@ -1,17 +1,12 @@
 import { buildWithIndex, remove } from "./arrays.js";
-import { type StorageChange } from "./globals.js";
+import {
+  StoredValues,
+  UpdateEventListenerCollection,
+  WroteValues,
+} from "./globals.js";
 import { mapValues, setAll } from "./maps.js";
 import { sleep } from "./promises.js";
 import { byteLength } from "./strings.js";
-
-export interface ValueChange {
-  oldValue?: string;
-  newValue?: string;
-}
-export type ValueChanges = Map<string, ValueChange>;
-
-export type StoredValues = Map<string, string>;
-export type WroteValues = Map<string, string | undefined>;
 
 type Sizes = Map<string, number>;
 
@@ -22,7 +17,7 @@ export interface AreaHandler {
   readTotalBytes(): number | Promise<number>;
   get quotaBytes(): number | undefined;
   get totalQuotaBytes(): number | undefined;
-  onChange(callback: (changes: ValueChanges) => void | Promise<void>): {
+  onChange(callback: (update: WroteValues) => void | Promise<void>): {
     stop: () => void;
   };
 }
@@ -39,13 +34,13 @@ export function registerHandler(area: string, handler: AreaHandler) {
   handlers.set(area, handler);
 }
 
-export function findHandler(area: string): AreaHandler | null {
+function findHandler(area: string): AreaHandler | null {
   const h = handlers.get(area) ?? null;
   if (!h) console.warn(`No handler for "%s"`, area);
   return h;
 }
 
-export function listAreas(): string[] {
+export function listNames(): string[] {
   return [...handlers.keys()];
 }
 
@@ -81,24 +76,41 @@ export class FacadeAreaHandler implements AreaHandler {
   }
 
   async write(items: WroteValues): Promise<void> {
-    await this.handler?.write(items);
+    await Promise.all([
+      this.handler?.write(items),
+      this.localListener.dispatchEvent(items),
+    ]);
   }
 
-  onChange(callback: (changes: ValueChanges) => void | Promise<void>) {
-    let listening = this.handler?.onChange(callback);
+  onChange(callback: (updates: WroteValues) => void | Promise<void>) {
+    let nativeListening = this.handler?.onChange(callback);
+    let localListening = this.localListener.addEventListener(callback);
 
-    const listener = (newHandler: AreaHandler | null) => {
-      listening?.stop();
-      listening = newHandler?.onChange(callback);
+    const areaChangeListener = (newHandler: AreaHandler | null) => {
+      nativeListening?.stop();
+      nativeListening = newHandler?.onChange(callback);
+      localListening.stop();
+      localListening = this.localListener.addEventListener(callback);
     };
-    this.areaChangeListeners.push(listener);
-
+    this.areaChangeListeners.push(areaChangeListener);
     return {
       stop: () => {
-        listening?.stop();
-        remove(this.areaChangeListeners, listener);
+        nativeListening?.stop();
+        localListening.stop();
+        remove(this.areaChangeListeners, areaChangeListener);
       },
     };
+  }
+
+  private get localListener() {
+    let listener = globalThis.storageForm.updateEventListeners.get(
+      this.handler,
+    );
+    if (!listener) {
+      listener = new UpdateEventListenerCollection();
+      globalThis.storageForm.updateEventListeners.set(this.handler, listener);
+    }
+    return listener;
   }
 }
 
@@ -145,52 +157,26 @@ export class WebStorageHandler implements AreaHandler {
       } else {
         this.storage.setItem(key, newValue);
       }
-      this.dispatchStorageEvent({
-        key,
-        oldValue,
-        newValue: newValue ?? null,
-        storageArea: this.storage,
-      });
     }
   }
 
-  onChange(callback: (changes: ValueChanges) => void | Promise<void>) {
-    const listener = ({
-      key,
-      storageArea,
-      oldValue,
-      newValue,
-    }: StorageChange) => {
+  onChange(callback: (updates: WroteValues) => void | Promise<void>) {
+    const listener = ({ key, storageArea, newValue }: StorageEvent) => {
       if (storageArea !== this.storage) return;
-      let changes: ValueChanges;
+      let updates: WroteValues;
       if (key === null) {
-        changes = new Map(this.allKeys().map((k) => [k, {}]));
+        updates = new Map(this.allKeys().map((k) => [k, undefined]));
       } else {
-        const c: ValueChange = {};
-        if (oldValue !== null) c.oldValue = oldValue;
-        if (newValue !== null) c.newValue = newValue;
-        changes = new Map([[key, c]]);
+        updates = new Map([[key, newValue ?? undefined]]);
       }
-      callback(changes)?.catch(console.error);
+      callback(updates)?.catch(console.error);
     };
-
-    // We need to implement the listener because
-    // "storage" event is not fired in the same window.
-    this.storageEventListeners.push(listener);
     addEventListener("storage", listener);
     return {
       stop: () => {
-        remove(this.storageEventListeners, listener);
         removeEventListener("storage", listener);
       },
     };
-  }
-
-  private get storageEventListeners() {
-    return storageForm.webStorage.storageEventListeners;
-  }
-  private dispatchStorageEvent(change: StorageChange) {
-    storageForm.webStorage.dispatchEvent(change);
   }
 }
 
@@ -258,21 +244,26 @@ export class ChromeStorageHandler implements AreaHandler {
     ]);
   }
 
-  onChange(callback: (changes: ValueChanges) => void | Promise<void>) {
+  onChange(callback: (updates: WroteValues) => void | Promise<void>) {
     const listener = (
       changes: Record<string, chrome.storage.StorageChange>,
     ) => {
-      const c: ValueChanges = Object.entries(changes).reduce<ValueChanges>(
-        (acc, [key, { oldValue, newValue }]) => {
-          const d: ValueChange = {};
-          if (oldValue != null) d.oldValue = oldValue as string;
-          if (newValue != null) d.newValue = newValue as string;
-          acc.set(key, d);
+      const u = Object.entries(changes).reduce<WroteValues>(
+        (acc, [key, { newValue }]) => {
+          if (typeof newValue === "string" || typeof newValue === "undefined") {
+            acc.set(key, newValue);
+          } else {
+            console.warn(
+              "Unexpected type of stored value: type=%s, value=%o",
+              typeof newValue,
+              newValue,
+            );
+          }
           return acc;
         },
         new Map(),
       );
-      callback(c)?.catch(console.error);
+      callback(u)?.catch(console.error);
     };
     this.storage.onChanged.addListener(listener);
     return {
@@ -293,12 +284,10 @@ export class BufferedWriteHandler implements AreaHandler {
 
   constructor(
     private readonly delegate: AreaHandler,
-    maxWritePerHour: number,
+    delayMillis: number,
   ) {
-    // how interval we should keep for a write operation.
     this.delayMillis =
-      (60 * 60 * 1000) / maxWritePerHour +
-      BufferedWriteHandler.WRITE_INTERVAL_MERGIN_MILLIS;
+      delayMillis + BufferedWriteHandler.WRITE_INTERVAL_MERGIN_MILLIS;
   }
 
   get quotaBytes(): number | undefined {
@@ -340,7 +329,7 @@ export class BufferedWriteHandler implements AreaHandler {
     return this.writePromise;
   }
 
-  onChange(callback: (changes: ValueChanges) => void | Promise<void>): {
+  onChange(callback: (updates: WroteValues) => void | Promise<void>): {
     stop: () => void;
   } {
     return this.delegate.onChange(callback);
@@ -368,7 +357,11 @@ if ("chrome" in globalThis && chrome.storage) {
           chrome.storage.sync.QUOTA_BYTES_PER_ITEM,
           chrome.storage.sync.QUOTA_BYTES,
         ),
-        chrome.storage.sync.MAX_WRITE_OPERATIONS_PER_HOUR,
+        Math.max(
+          (60 * 60 * 1000) / chrome.storage.sync.MAX_WRITE_OPERATIONS_PER_HOUR,
+          (60 * 1000) / chrome.storage.sync.MAX_WRITE_OPERATIONS_PER_MINUTE,
+          200,
+        ),
       ),
     );
 }

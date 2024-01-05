@@ -1,4 +1,4 @@
-import { listAreas } from "./area-handler.js";
+import { listNames } from "./area-handler.js";
 import {
   parentOrShadowRootHost,
   type HTMLElementConstructor,
@@ -30,7 +30,7 @@ export function mixinAreaSelect<
       super.connectedCallback?.();
 
       if (this instanceof HTMLSelectElement && this.options.length === 0) {
-        for (const area of listAreas()) {
+        for (const area of listNames()) {
           const option = document.createElement("option");
           option.value = area;
           option.textContent = area;

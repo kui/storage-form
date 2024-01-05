@@ -1,5 +1,4 @@
 import { mixinAreaHandlerElement } from "./area-handler-element.js";
-import type { ValueChanges, WroteValues } from "./area-handler.js";
 import { distinctConcat } from "./arrays.js";
 import {
   dispatchChangeEvent,
@@ -7,6 +6,7 @@ import {
   type StorageElementMixin,
   type StorageFormLikeElement,
 } from "./elements.js";
+import { WroteValues } from "./globals.js";
 import { NamedSetMap, mapValues, setAll } from "./maps.js";
 import { SerialTaskExecutor } from "./promises.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";
@@ -150,9 +150,9 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
 
     //
 
-    override async storageChangeCallback(changes: ValueChanges) {
+    override async storageChangeCallback(updates: WroteValues) {
       const newValues = new Map<string, string | undefined>();
-      if (changes.size === 0) {
+      if (updates.size === 0) {
         const keys = [...this.namedControlMap.keys()];
         setAll(
           newValues,
@@ -162,7 +162,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       } else {
         setAll(
           newValues,
-          mapValues(changes, (_, c) => c.newValue),
+          mapValues(updates, (_, v) => v),
         );
       }
 

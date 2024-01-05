@@ -1,20 +1,21 @@
-import { FacadeAreaHandler, type ValueChanges } from "./area-handler.js";
+import { FacadeAreaHandler } from "./area-handler.js";
 import { distinctConcat } from "./arrays.js";
 import type {
   HTMLElementConstructor,
   StorageElementMixin,
 } from "./elements.js";
 import { parentOrShadowRootHost } from "./elements.js";
+import { WroteValues, allCustomElementsDefinedEvent } from "./globals.js";
 import { SerialTaskExecutor } from "./promises.js";
 
 export interface AreaHandlerElement extends HTMLElement {
   storageArea: string;
   readonly areaHandler: FacadeAreaHandler;
-  invokeStorageChangeCallback(changes?: ValueChanges): void;
+  invokeStorageChangeCallback(updates?: WroteValues): void;
   /**
    * @param changes If no entries, it means to change storage area reference.
    */
-  storageChangeCallback(changes: ValueChanges): void | Promise<void>;
+  storageChangeCallback(updates: WroteValues): void | Promise<void>;
 }
 
 export function mixinAreaHandlerElement<
@@ -74,9 +75,9 @@ export function mixinAreaHandlerElement<
       }
     }
 
-    invokeStorageChangeCallback(changes: ValueChanges = new Map()) {
+    invokeStorageChangeCallback(updates: WroteValues = new Map()) {
       this.taskExecutor.enqueueNoWait(() =>
-        this.storageChangeCallback(changes),
+        this.storageChangeCallback(updates),
       );
     }
 
@@ -85,10 +86,10 @@ export function mixinAreaHandlerElement<
      *
      * Should not call this method directly. Call {@link invokeStorageChangeCallback} instead.
      *
-     * @param _changes If no entries, it means to change storage area reference.
+     * @param _updates If no entries, it means to change storage area reference.
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    storageChangeCallback(_changes: ValueChanges): void | Promise<void> {
+    storageChangeCallback(_updates: WroteValues): void | Promise<void> {
       throw new Error("Method not implemented.");
     }
   };
@@ -132,6 +133,9 @@ export function mixinStorageFormChildAreaHandlerElement<
     connectedCallback() {
       super.connectedCallback?.();
       this.updateStorageForm();
+      allCustomElementsDefinedEvent.listeners.push(() => {
+        this.updateStorageForm();
+      });
     }
 
     adoptedCallback() {

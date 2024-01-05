@@ -1,28 +1,42 @@
-export interface StorageChange {
-  key: string | null;
-  oldValue: string | null;
-  newValue: string | null;
-  storageArea: Storage | null;
+export interface ValueChange {
+  oldValue?: string;
+  newValue?: string;
+}
+export type ValueChanges = Map<string, ValueChange>;
+export type StoredValues = Map<string, string>;
+export type WroteValues = Map<string, string | undefined>;
+
+export class UpdateEventListenerCollection {
+  private listeners: ((updates: WroteValues) => void | Promise<void>)[] = [];
+
+  addEventListener(listener: (updates: WroteValues) => void | Promise<void>): {
+    stop: () => boolean;
+  } {
+    this.listeners.push(listener);
+    return { stop: () => this.removeEventListener(listener) };
+  }
+  removeEventListener(
+    listener: (updates: WroteValues) => void | Promise<void>,
+  ): boolean {
+    const index = this.listeners.indexOf(listener);
+    this.listeners = this.listeners.filter((l) => l !== listener);
+    return index >= 0;
+  }
+  dispatchEvent(updates: WroteValues) {
+    return Promise.all(this.listeners.map((l) => l(updates)));
+  }
 }
 
 declare global {
   // eslint-disable-next-line no-var
   var storageForm: {
-    webStorage: {
-      storageEventListeners: ((change: StorageChange) => void)[];
-      dispatchEvent(change: StorageChange): void;
-    };
+    updateEventListeners: Map<unknown, UpdateEventListenerCollection>;
   };
 }
 
 if (typeof globalThis.storageForm === "undefined") {
   globalThis.storageForm = {
-    webStorage: {
-      storageEventListeners: [],
-      dispatchEvent(change: StorageChange) {
-        for (const l of storageForm.webStorage.storageEventListeners) l(change);
-      },
-    },
+    updateEventListeners: new Map(),
   };
 }
 
