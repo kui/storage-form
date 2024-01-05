@@ -6,7 +6,7 @@ describe("BufferedWriteChromeStorageAreaHandler", () => {
       const mockedWrite = jest.fn();
       const handler = new BufferedWriteHandler(
         { write: mockedWrite } as unknown as AreaHandler,
-        14400,
+        200,
       );
 
       const start = performance.now();
@@ -20,7 +20,7 @@ describe("BufferedWriteChromeStorageAreaHandler", () => {
       console.log("secondElapsedMillis:", secondElapsedMillis);
 
       expect(firstElapsedMillis).toBeLessThan(100);
-      expect(secondElapsedMillis).toBeGreaterThanOrEqual(400);
+      expect(secondElapsedMillis).toBeGreaterThan(400);
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockedWrite).toHaveBeenCalledTimes(2);
