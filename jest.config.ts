@@ -1,7 +1,10 @@
 import type { JestConfigWithTsJest } from "ts-jest";
 
 const config: JestConfigWithTsJest = {
-  preset: "ts-jest/presets/default-esm",
+  testMatch: ["<rootDir>/tests/**/*.test.ts"],
+  testEnvironment: "jsdom",
+  setupFiles: ["./tests/helpers/setup.ts"],
+  restoreMocks: true,
 
   moduleNameMapper: {
     // Workaround:
@@ -14,8 +17,17 @@ const config: JestConfigWithTsJest = {
   transform: {
     "^.+\\.ts$": [
       "ts-jest",
-      // Already type checked by tsc in lint
-      { diagnostics: false },
+      {
+        // Already type checked by tsc in lint
+        diagnostics: false,
+        // Jest needs --experimental-vm-modules to run ES modules, which are
+        // emitted with the "type" field in package.json and tsconfig.json.
+        tsconfig: {
+          isolatedModules: true,
+          module: "CommonJS",
+          target: "ES2022",
+        },
+      },
     ],
   },
 };

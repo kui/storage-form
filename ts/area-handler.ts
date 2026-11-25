@@ -117,8 +117,11 @@ export class FacadeAreaHandler implements AreaHandler {
 export class WebStorageHandler implements AreaHandler {
   constructor(
     private readonly storage: Storage,
+    // Optional parameters make the properties optional, but AreaHandler requires them.
+    /* eslint-disable @typescript-eslint/no-useless-default-assignment */
     readonly quotaBytes: number | undefined = undefined,
     readonly totalQuotaBytes: number | undefined = undefined,
+    /* eslint-enable @typescript-eslint/no-useless-default-assignment */
   ) {}
 
   readBytes(names: string[]): Sizes {
@@ -194,8 +197,11 @@ if ("sessionStorage" in globalThis)
 export class ChromeStorageHandler implements AreaHandler {
   constructor(
     private readonly storage: chrome.storage.StorageArea,
+    // Optional parameters make the properties optional, but AreaHandler requires them.
+    /* eslint-disable @typescript-eslint/no-useless-default-assignment */
     readonly quotaBytes: number | undefined = undefined,
     readonly totalQuotaBytes: number | undefined = undefined,
+    /* eslint-enable @typescript-eslint/no-useless-default-assignment */
   ) {}
 
   async readBytes(names: string[]): Promise<Sizes> {

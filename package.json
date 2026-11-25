@@ -12,12 +12,15 @@
   "scripts": {
     "prepare": "npm run build:ts",
     "test": "jest",
+    "pretest:e2e": "npm run docs",
+    "test:e2e": "playwright test",
     "build:ts": "tsc --project ts",
     "build:docs": "cp -vur ts js docs",
     "docs": "run-s build:ts build:docs",
     "lint:eslint": "eslint .",
     "lint:prettier": "prettier --check .",
     "lint:ts": "tsc --noEmit --project ts",
+    "lint:ts-tests": "tsc --noEmit --project .",
     "lint": "run-p -l lint:*",
     "fix:eslint": "eslint . --fix",
     "fix:prettier": "prettier --write .",
@@ -39,26 +42,31 @@
   "author": "Keiichiro Ui",
   "license": "MIT",
   "devDependencies": {
-    "@eslint/js": "^8.55.0",
-    "@trivago/prettier-plugin-sort-imports": "^4.3.0",
-    "@types/chrome": "^0.0.254",
-    "@types/jest": "^29.5.11",
-    "@typescript-eslint/eslint-plugin": "^6.14.0",
-    "@typescript-eslint/parser": "^6.14.0",
-    "eslint": "^8.55.0",
-    "eslint-config-prettier": "^9.1.0",
-    "globals": "^13.24.0",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.2",
+    "@types/chrome": "^0.3.8",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.6.10",
+    "eslint": "^10.15.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.14.0",
     "http-server": "^14.1.1",
-    "jest": "^29.7.0",
-    "npm-run-all2": "^6.1.1",
+    "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
+    "npm-run-all2": "^9.1.0",
     "onchange": "^7.1.0",
-    "prettier": "^3.1.1",
-    "ts-jest": "^29.1.1",
-    "ts-node": "^10.9.2",
-    "typescript": "~5.3.3"
+    "prettier": "^3.10.1",
+    "ts-jest": "^29.4.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.74.0"
   },
-  "engine": {
-    "node": "^20.x"
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^26.0.0",
+      "onFail": "warn"
+    }
   },
   "repository": "https://github.com/kui/storage-form.git"
 }

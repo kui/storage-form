@@ -12,8 +12,9 @@ import {
 import { WroteValues } from "./globals.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";
 
-export interface FormControlLikeElement<V = string>
-  extends ValueContainerElement<V> {
+export interface FormControlLikeElement<
+  V = string,
+> extends ValueContainerElement<V> {
   defaultValue?: V;
 }
 

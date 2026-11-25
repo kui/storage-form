@@ -23,12 +23,11 @@ export class UpdateEventListenerCollection {
     return index >= 0;
   }
   dispatchEvent(updates: WroteValues) {
-    return Promise.all(this.listeners.map((l) => l(updates)));
+    return Promise.all(this.listeners.map((l) => Promise.resolve(l(updates))));
   }
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var storageForm: {
     updateEventListeners: Map<unknown, UpdateEventListenerCollection>;
   };

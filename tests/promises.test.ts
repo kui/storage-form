@@ -16,7 +16,35 @@ describe("sleep", () => {
 });
 
 describe("SerialTaskExecutor", () => {
+  describe("#enqueueNoWait", () => {
+    it("should log an error if the task is rejected", async () => {
+      const spy = jest.spyOn(console, "error").mockImplementation();
+      const executor = new SerialTaskExecutor();
+      const error = Error("test");
+      executor.enqueueNoWait(() => Promise.reject(error));
+      await sleep(0);
+      expect(spy).toHaveBeenCalledWith(error);
+    });
+  });
+
   describe("#enqueue", () => {
+    it("should execute a task after the queue gets empty", async () => {
+      const executor = new SerialTaskExecutor();
+      const task = jest.fn();
+      await executor.enqueue(task);
+      await sleep(0);
+      await executor.enqueue(task);
+      expect(task).toHaveBeenCalledTimes(2);
+    });
+
+    it("should reject if the task throws synchronously", async () => {
+      const executor = new SerialTaskExecutor();
+      const p = executor.enqueue(() => {
+        throw Error("test");
+      });
+      await expect(p).rejects.toThrow("test");
+    });
+
     it("should execute tasks serially", async () => {
       const executor = new SerialTaskExecutor();
       const results: number[] = [];
