@@ -408,6 +408,37 @@ describe("ChromeStorageHandler", () => {
     expect(values).toEqual({ b: "3", c: "" });
   });
 
+  it.each(["set", "remove"] as const)(
+    "should reject if %s is rejected",
+    async (method) => {
+      const { area, mock } = fakeChromeStorageArea();
+      mock[method].mockRejectedValueOnce(Error("test"));
+      await expect(
+        new ChromeStorageHandler(area).write(new Map([["a", "1"]])),
+      ).rejects.toThrow("test");
+    },
+  );
+
+  it.each([
+    ["set", "remove"],
+    ["remove", "set"],
+  ] as const)(
+    "should wait for %s to end even if %s is rejected",
+    async (pending, rejected) => {
+      const { area, mock } = fakeChromeStorageArea();
+      const { promise, resolve } = withResolves();
+      mock[pending].mockReturnValueOnce(promise);
+      mock[rejected].mockRejectedValueOnce(Error("test"));
+      const settled = jest.fn();
+      const p = new ChromeStorageHandler(area).write(new Map([["a", "1"]]));
+      p.then(settled, settled);
+      await flush();
+      expect(settled).not.toHaveBeenCalled();
+      resolve();
+      await expect(p).rejects.toThrow("test");
+    },
+  );
+
   describe("#onChange", () => {
     it("should notify changes until stopped", () => {
       const { area, emit } = fakeChromeStorageArea();
@@ -545,35 +576,190 @@ describe("BufferedWriteHandler", () => {
       );
     });
 
-    // https://github.com/kui/storage-form/issues/38
-    it.failing("should write again after a rejected write", async () => {
+    it("should write again after a rejected write", async () => {
       const delegate = stubHandler();
       delegate.write.mockRejectedValueOnce(Error("test"));
       const handler = new BufferedWriteHandler(delegate, 200);
-      await handler.write(new Map([["n1", "v1"]])).catch(() => undefined);
-      const p = handler.write(new Map([["n2", "v2"]])).catch(() => undefined);
-      await jest.advanceTimersByTimeAsync(INTERVAL);
+      await expect(handler.write(new Map([["n1", "v1"]]))).rejects.toThrow();
+      const p = handler.write(new Map([["n2", "v2"]]));
+      await jest.advanceTimersByTimeAsync(INTERVAL - 1);
+      expect(delegate.write).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1);
       await p;
-      expect(delegate.write).toHaveBeenCalledTimes(2);
+      expect(delegate.write.mock.calls).toEqual([
+        [new Map([["n1", "v1"]])],
+        [new Map([["n2", "v2"]])],
+      ]);
     });
 
-    // https://github.com/kui/storage-form/issues/39
-    it.failing("should write items added while writing", async () => {
+    it("should reject all the merged writes if the delegate is rejected", async () => {
       const delegate = stubHandler();
-      const { promise, resolve } = withResolves();
-      const written = new Map<string, string | undefined>();
-      delegate.write.mockImplementation((items: WroteValues) => {
-        for (const [k, v] of items) written.set(k, v);
-        return promise;
-      });
       const handler = new BufferedWriteHandler(delegate, 200);
-      const p1 = handler.write(new Map([["n1", "v1"]]));
-      await jest.advanceTimersByTimeAsync(0);
-      const p2 = handler.write(new Map([["n2", "v2"]]));
-      resolve();
+      await handler.write(new Map([["n1", "v1"]]));
+      delegate.write.mockRejectedValueOnce(Error("test"));
+      const p = Promise.allSettled([
+        handler.write(new Map([["n2", "v2"]])),
+        handler.write(new Map([["n3", "v3"]])),
+      ]);
       await jest.advanceTimersByTimeAsync(INTERVAL);
-      await Promise.all([p1, p2]);
-      expect(written.get("n2")).toBe("v2");
+      expect((await p).map((r) => r.status)).toEqual(["rejected", "rejected"]);
+    });
+
+    it("should merge writes in the same task", async () => {
+      const delegate = stubHandler();
+      const handler = new BufferedWriteHandler(delegate, 200);
+      await Promise.all([
+        handler.write(new Map([["n1", "v1"]])),
+        handler.write(new Map([["n2", "v2"]])),
+      ]);
+      expect(delegate.write.mock.calls).toEqual([
+        [
+          new Map([
+            ["n1", "v1"],
+            ["n2", "v2"],
+          ]),
+        ],
+      ]);
+    });
+
+    it("should merge items added while sleeping without extending the delay", async () => {
+      const delegate = stubHandler();
+      const handler = new BufferedWriteHandler(delegate, 200);
+      await handler.write(new Map([["n1", "v1"]]));
+      const p2 = handler.write(new Map([["n2", "v2"]]));
+      await jest.advanceTimersByTimeAsync(INTERVAL - 1);
+      const p3 = handler.write(new Map([["n3", "v3"]]));
+      await jest.advanceTimersByTimeAsync(1);
+      await Promise.all([p2, p3]);
+      expect(delegate.write).toHaveBeenCalledTimes(2);
+      expect(delegate.write).toHaveBeenLastCalledWith(
+        new Map([
+          ["n2", "v2"],
+          ["n3", "v3"],
+        ]),
+      );
+    });
+
+    describe("while the delegate is writing", () => {
+      /** A handler whose delegate writes are settled by the test. */
+      function pendingHandler() {
+        const delegate = stubHandler();
+        const writes: {
+          items: WroteValues;
+          resolve: () => void;
+          reject: (reason: unknown) => void;
+        }[] = [];
+        delegate.write.mockImplementation((items: WroteValues) => {
+          const { promise, resolve, reject } = withResolves();
+          // Copy the items because they could be modified after the call.
+          writes.push({ items: new Map(items), resolve, reject });
+          return promise;
+        });
+        return { handler: new BufferedWriteHandler(delegate, 200), writes };
+      }
+
+      it("should write items added while writing", async () => {
+        const { handler, writes } = pendingHandler();
+        const p1 = handler.write(new Map([["k", "v1"]]));
+        await jest.advanceTimersByTimeAsync(0);
+        const p2 = handler.write(new Map([["k", "v2"]]));
+        writes[0].resolve();
+        await p1;
+        await jest.advanceTimersByTimeAsync(INTERVAL);
+        expect(writes.map((w) => w.items)).toEqual([
+          new Map([["k", "v1"]]),
+          new Map([["k", "v2"]]),
+        ]);
+        writes[1].resolve();
+        await p2;
+      });
+
+      it("should not resolve the added write by the running one", async () => {
+        const { handler, writes } = pendingHandler();
+        void handler.write(new Map([["n1", "v1"]]));
+        await jest.advanceTimersByTimeAsync(0);
+        const done = jest.fn();
+        void handler.write(new Map([["n2", "v2"]])).then(done);
+        writes[0].resolve();
+        await jest.advanceTimersByTimeAsync(INTERVAL);
+        expect(done).not.toHaveBeenCalled();
+        writes[1].resolve();
+        await jest.advanceTimersByTimeAsync(0);
+        expect(done).toHaveBeenCalled();
+      });
+
+      it("should not start the next write until the running one ends and the interval passes", async () => {
+        const { handler, writes } = pendingHandler();
+        void handler.write(new Map([["n1", "v1"]]));
+        await jest.advanceTimersByTimeAsync(0);
+        void handler.write(new Map([["n2", "v2"]]));
+        await jest.advanceTimersByTimeAsync(INTERVAL * 3);
+        expect(writes).toHaveLength(1);
+        writes[0].resolve();
+        await jest.advanceTimersByTimeAsync(INTERVAL - 1);
+        expect(writes).toHaveLength(1);
+        await jest.advanceTimersByTimeAsync(1);
+        expect(writes).toHaveLength(2);
+      });
+
+      it("should merge items added many times into the next write", async () => {
+        const { handler, writes } = pendingHandler();
+        void handler.write(new Map([["n1", "v1"]]));
+        await jest.advanceTimersByTimeAsync(0);
+        const promises = [
+          handler.write(new Map([["n2", "old"]])),
+          handler.write(new Map([["n3", "v3"]])),
+        ];
+        await jest.advanceTimersByTimeAsync(INTERVAL);
+        promises.push(handler.write(new Map([["n2", "new"]])));
+        writes[0].resolve();
+        await jest.advanceTimersByTimeAsync(1);
+        promises.push(handler.write(new Map([["n4", undefined]])));
+        await jest.advanceTimersByTimeAsync(INTERVAL - 1);
+        expect(writes.slice(1).map((w) => w.items)).toEqual([
+          new Map([
+            ["n2", "new"],
+            ["n3", "v3"],
+            ["n4", undefined],
+          ]),
+        ]);
+        writes[1].resolve();
+        await Promise.all(promises);
+        await jest.advanceTimersByTimeAsync(INTERVAL);
+        expect(writes).toHaveLength(2);
+      });
+
+      it("should keep the order and the interval over three writes", async () => {
+        const { handler, writes } = pendingHandler();
+        void handler.write(new Map([["k", "1"]]));
+        await jest.advanceTimersByTimeAsync(0);
+        void handler.write(new Map([["k", "2"]]));
+        writes[0].resolve();
+        await jest.advanceTimersByTimeAsync(INTERVAL);
+        void handler.write(new Map([["k", "3"]]));
+        await jest.advanceTimersByTimeAsync(INTERVAL);
+        expect(writes).toHaveLength(2);
+        writes[1].resolve();
+        await jest.advanceTimersByTimeAsync(INTERVAL - 1);
+        expect(writes).toHaveLength(2);
+        await jest.advanceTimersByTimeAsync(1);
+        expect(writes.map((w) => w.items.get("k"))).toEqual(["1", "2", "3"]);
+      });
+
+      it("should write the added items even if the running write is rejected", async () => {
+        const { handler, writes } = pendingHandler();
+        const p1 = handler.write(new Map([["n1", "v1"]]));
+        await jest.advanceTimersByTimeAsync(0);
+        const p2 = handler.write(new Map([["n2", "v2"]]));
+        writes[0].reject(Error("test"));
+        await expect(p1).rejects.toThrow("test");
+        await jest.advanceTimersByTimeAsync(INTERVAL - 1);
+        expect(writes).toHaveLength(1);
+        await jest.advanceTimersByTimeAsync(1);
+        expect(writes[1].items).toEqual(new Map([["n2", "v2"]]));
+        writes[1].resolve();
+        await expect(p2).resolves.toBeUndefined();
+      });
     });
   });
 });
