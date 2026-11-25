@@ -105,6 +105,35 @@ describe("area-select", () => {
     expect(form().storageArea).toBe("local-storage");
   });
 
+  it("should not update the target by the definition after disconnected", async () => {
+    await render(
+      `<storage-form><select is="area-select"></select></storage-form>`,
+    );
+    const e = select();
+    e.target = form();
+    e.remove();
+    form().removeAttribute("storage-area");
+    allCustomElementsDefinedEvent.dispatchEvent();
+    expect(form().hasAttribute("storage-area")).toBe(false);
+
+    form().append(e);
+    form().removeAttribute("storage-area");
+    allCustomElementsDefinedEvent.dispatchEvent();
+    expect(form().storageArea).toBe("local-storage");
+  });
+
+  it("should not leave listeners after disconnected", async () => {
+    await render(`<select is="area-select"></select>`);
+    const { size } = allCustomElementsDefinedEvent.listeners;
+    const e = select();
+    for (let i = 0; i < 5; i++) {
+      e.remove();
+      expect(allCustomElementsDefinedEvent.listeners.size).toBe(size - 1);
+      document.body.append(e);
+      expect(allCustomElementsDefinedEvent.listeners.size).toBe(size);
+    }
+  });
+
   it("should not be stored by the ancestor form", async () => {
     await render(`
       <storage-form><select is="area-select" name="area"></select></storage-form>`);

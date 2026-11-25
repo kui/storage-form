@@ -83,6 +83,18 @@ describe("storage-usage", () => {
     expect(e.textContent).toBe("5B");
   });
 
+  it("should not leave listeners after disconnected", async () => {
+    await render(`<storage-usage storage-area=small></storage-usage>`);
+    const { size } = allCustomElementsDefinedEvent.listeners;
+    const e = usage();
+    for (let i = 0; i < 5; i++) {
+      e.remove();
+      expect(allCustomElementsDefinedEvent.listeners.size).toBe(size - 1);
+      document.body.append(e);
+      expect(allCustomElementsDefinedEvent.listeners.size).toBe(size);
+    }
+  });
+
   describe("in storage-form", () => {
     it("should use the area of the form", async () => {
       await render(`
@@ -136,6 +148,20 @@ describe("storage-usage", () => {
       allCustomElementsDefinedEvent.dispatchEvent();
       await flush();
       expect(usage().textContent).toBe("5B");
+    });
+
+    it("should find the form after all elements are defined even if reconnected", async () => {
+      await render(
+        `<storage-form><storage-usage name="foo"></storage-usage></storage-form>`,
+      );
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      e.remove();
+      form.append(e);
+      form.storageArea = "small";
+      allCustomElementsDefinedEvent.dispatchEvent();
+      await flush();
+      expect(e.textContent).toBe("5B");
     });
 
     // https://github.com/kui/storage-form/issues/44

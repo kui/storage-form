@@ -57,10 +57,46 @@ describe("UpdateEventListenerCollection", () => {
 });
 
 describe("allCustomElementsDefinedEvent", () => {
+  const { listeners } = allCustomElementsDefinedEvent;
+
+  afterEach(() => {
+    listeners.clear();
+  });
+
   it("should call listeners on dispatch", () => {
     const listener = jest.fn();
-    allCustomElementsDefinedEvent.listeners.push(listener);
+    listeners.add(listener);
     expect(listener).not.toHaveBeenCalled();
+    allCustomElementsDefinedEvent.dispatchEvent();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("should not skip listeners if one is deleted on dispatch", () => {
+    const first: jest.Mock = jest.fn(() => listeners.delete(first));
+    const second = jest.fn();
+    listeners.add(first);
+    listeners.add(second);
+    allCustomElementsDefinedEvent.dispatchEvent();
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("should not call listeners deleted on dispatch", () => {
+    const deleted = jest.fn();
+    listeners.add(() => listeners.delete(deleted));
+    listeners.add(deleted);
+    allCustomElementsDefinedEvent.dispatchEvent();
+    expect(deleted).not.toHaveBeenCalled();
+  });
+
+  it("should call a listener once if it is added again on dispatch", () => {
+    const listener = jest.fn(() => {
+      // Avoid an endless loop if this test fails.
+      if (listener.mock.calls.length > 1) return;
+      listeners.delete(listener);
+      listeners.add(listener);
+    });
+    listeners.add(listener);
     allCustomElementsDefinedEvent.dispatchEvent();
     expect(listener).toHaveBeenCalledTimes(1);
   });

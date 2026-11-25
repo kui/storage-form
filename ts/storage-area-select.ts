@@ -18,6 +18,9 @@ export function mixinAreaSelect<
       if (event.target !== this) return;
       this.updateTargetStorage();
     };
+    private readonly allCustomElementsDefinedListener = () => {
+      this.updateTargetStorage();
+    };
 
     get target(): StorageElementMixin | null {
       return this.#target ?? this.getTargetByParent();
@@ -39,9 +42,9 @@ export function mixinAreaSelect<
       }
 
       this.updateTargetStorage();
-      allCustomElementsDefinedEvent.listeners.push(() => {
-        this.updateTargetStorage();
-      });
+      allCustomElementsDefinedEvent.listeners.add(
+        this.allCustomElementsDefinedListener,
+      );
 
       this.addEventListener("change", this.onChangeListener);
       this.addEventListener("input", this.onChangeListener);
@@ -49,6 +52,9 @@ export function mixinAreaSelect<
 
     disconnectedCallback() {
       super.disconnectedCallback?.();
+      allCustomElementsDefinedEvent.listeners.delete(
+        this.allCustomElementsDefinedListener,
+      );
       this.removeEventListener("change", this.onChangeListener);
       this.removeEventListener("input", this.onChangeListener);
     }

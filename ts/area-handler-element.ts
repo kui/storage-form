@@ -107,6 +107,9 @@ export function mixinStorageFormChildAreaHandlerElement<
     private readonly storageFormObserver = new MutationObserver(
       this.onStorageFormMutation.bind(this),
     );
+    private readonly allCustomElementsDefinedListener = () => {
+      this.updateStorageForm();
+    };
 
     get storageForm() {
       return this.#storageForm;
@@ -133,9 +136,9 @@ export function mixinStorageFormChildAreaHandlerElement<
     connectedCallback() {
       super.connectedCallback?.();
       this.updateStorageForm();
-      allCustomElementsDefinedEvent.listeners.push(() => {
-        this.updateStorageForm();
-      });
+      allCustomElementsDefinedEvent.listeners.add(
+        this.allCustomElementsDefinedListener,
+      );
     }
 
     adoptedCallback() {
@@ -146,6 +149,9 @@ export function mixinStorageFormChildAreaHandlerElement<
     disconnectedCallback() {
       super.disconnectedCallback?.();
       this.storageFormObserver.disconnect();
+      allCustomElementsDefinedEvent.listeners.delete(
+        this.allCustomElementsDefinedListener,
+      );
     }
 
     //
