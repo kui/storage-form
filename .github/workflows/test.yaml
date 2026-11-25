@@ -10,13 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Setup Node
-        uses: actions/setup-node@v7
+      - name: Setup mise
+        uses: jdx/mise-action@v5
+      - name: Cache npm packages
+        uses: actions/cache@v6
         with:
-          node-version-file: mise.toml
-          cache: npm
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Run linter
         run: npm run lint
       - name: Run tests
