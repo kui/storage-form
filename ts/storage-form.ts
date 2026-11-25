@@ -113,6 +113,9 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     };
 
     connectedCallback() {
+      // Storage custom elements cannot be told from plain controls until they are
+      // upgraded, and descendants are upgraded after this by default.
+      customElements.upgrade(this);
       this.initControls();
       super.connectedCallback?.();
       this.mutationObserver.observe(this, this.observerOptions);

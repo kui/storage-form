@@ -35,6 +35,7 @@ export function mixinMonoStorageControl<
     };
 
     #value: string | typeof notInitialized | undefined = notInitialized;
+    #queuedLoadCount = 0;
 
     override connectedCallback() {
       super.connectedCallback?.();
@@ -43,6 +44,7 @@ export function mixinMonoStorageControl<
     }
 
     override disconnectedCallback() {
+      this.#value = notInitialized;
       super.disconnectedCallback?.();
       this.removeEventListener("change", this.valueChangedListener);
       this.removeEventListener("input", this.valueChangedListener);
@@ -58,6 +60,11 @@ export function mixinMonoStorageControl<
       oldValue: string | null,
       newValue: string | null,
     ) {
+      // The known value belongs to the previous entry, so it must not be
+      // compared with inputs until the new entry is loaded.
+      if (name === "name" || name === "storage-area")
+        this.#value = notInitialized;
+
       super.attributeChangedCallback?.(name, oldValue, newValue);
       if (name === "name") {
         this.invokeStorageChangeCallback();
@@ -66,7 +73,15 @@ export function mixinMonoStorageControl<
       }
     }
 
+    override invokeStorageChangeCallback(updates: WroteValues = new Map()) {
+      if (updates.size === 0) this.#queuedLoadCount++;
+      super.invokeStorageChangeCallback(updates);
+    }
+
     override async storageChangeCallback(updates: WroteValues) {
+      if (updates.size === 0) this.#queuedLoadCount--;
+      if (!this.#canApplyStoredValue()) return;
+
       let isUpdated = false;
       if (updates.size === 0) {
         // If empty, it means to change storage entry binded with this element.
@@ -74,6 +89,7 @@ export function mixinMonoStorageControl<
         const newValue = (await this.areaHandler.read([this.name])).get(
           this.name,
         );
+        if (!this.#canApplyStoredValue()) return;
         this.#value = newValue;
         isUpdated = storageControlsHandler.write(this, newValue);
       } else if (updates.has(this.name)) {
@@ -84,6 +100,16 @@ export function mixinMonoStorageControl<
         isUpdated = storageControlsHandler.write(this, newValue);
       }
       if (isUpdated) dispatchChangeEvent(this);
+    }
+
+    #canApplyStoredValue(): boolean {
+      return (
+        this.isConnected &&
+        this.storageArea !== "" &&
+        // A queued load means that this one may be for a previous entry, or may
+        // have run before connectedCallback sets the area during an upgrade.
+        this.#queuedLoadCount === 0
+      );
     }
 
     private async valueChangedCallback(): Promise<void> {
