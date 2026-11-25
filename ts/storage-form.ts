@@ -199,26 +199,11 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       subtree: true,
       attributes: true,
       attributeFilter: ["name"],
-      attributeOldValue: true,
     };
 
-    private handleMutations(mutations: MutationRecord[]) {
-      let shouldUpdateControls = false;
-      let shouldDispatch = false;
-      for (const mutation of mutations) {
-        if (mutation.type === "childList") {
-          shouldUpdateControls = true;
-          shouldDispatch = true;
-        } else if (mutation.attributeName === "name") {
-          if (!matchesStorageControl(mutation.target)) continue;
-          const oldName = mutation.oldValue;
-          this.namedControlMap.deleteByKeyValue(oldName ?? "", mutation.target);
-          this.namedControlMap.add(mutation.target);
-          shouldDispatch = true;
-        }
-      }
-      if (shouldUpdateControls) this.updateControls();
-      if (shouldDispatch) this.invokeStorageChangeCallback();
+    private handleMutations() {
+      this.updateControls();
+      this.invokeStorageChangeCallback();
     }
 
     private async valueChangedCallback(): Promise<void> {

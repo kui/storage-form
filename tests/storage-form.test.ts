@@ -398,8 +398,37 @@ describe("DOM mutations", () => {
     expect(e.value).toBe("stored");
   });
 
-  // https://github.com/kui/storage-form/issues/43
-  it.failing("should release a control after its name is removed", async () => {
+  it("should release a control renamed and unnamed at once", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><input name="foo" id="b">
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    b.name = "bar";
+    b.removeAttribute("name");
+    await flush();
+    await input(query("#a"), "typed");
+    await updateFromAnotherWindow(localStorage, "bar", "updated");
+    expect(b.value).toBe("");
+  });
+
+  it("should handle a control after its name is restored", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="local-storage"><input name="foo"></storage-form>`);
+    const e = query<HTMLInputElement>("input");
+    e.removeAttribute("name");
+    await flush();
+    await input(e, "typed");
+    expect(localStorage.getItem("foo")).toBe("stored");
+    e.name = "foo";
+    await flush();
+    expect(e.value).toBe("stored");
+    await input(e, "retyped");
+    expect(localStorage.getItem("foo")).toBe("retyped");
+  });
+
+  it("should release a control after its name is removed", async () => {
     await render(`
       <storage-form storage-area="local-storage">
         <input name="foo" id="a"><input name="foo" id="b">
