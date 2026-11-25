@@ -164,8 +164,7 @@ describe("storage-usage", () => {
       expect(e.textContent).toBe("5B");
     });
 
-    // https://github.com/kui/storage-form/issues/44
-    it.failing("should follow the form after reconnected", async () => {
+    it("should follow the form after reconnected", async () => {
       sessionStorage.setItem("foo", "1");
       await render(`
         <storage-form storage-area="small">
@@ -179,6 +178,141 @@ describe("storage-usage", () => {
       form.storageArea = "session-storage";
       await flush();
       expect(e.textContent).toBe("1B");
+    });
+
+    it("should follow the area change of the form while disconnected", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      e.remove();
+      form.storageArea = "session-storage";
+      await flush();
+      expect(e.textContent).toBe("5B");
+      form.append(e);
+      await flush();
+      expect(e.textContent).toBe("1B");
+    });
+
+    it("should follow only the new form after moved", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form id="old" storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>
+        <storage-form id="new" storage-area="session-storage"></storage-form>`);
+      const oldForm = query<HTMLStorageFormElement>("#old");
+      const newForm = query<HTMLStorageFormElement>("#new");
+      const e = usage();
+      newForm.append(e);
+      await flush();
+      expect(e.storageForm).toBe(newForm);
+      expect(e.textContent).toBe("1B");
+
+      const updateArea = jest.spyOn(e.areaHandler, "updateArea");
+      oldForm.storageArea = "session-storage";
+      await flush();
+      expect(updateArea).not.toHaveBeenCalled();
+      newForm.storageArea = "small";
+      await flush();
+      expect(e.textContent).toBe("5B");
+    });
+
+    it("should follow only the nearest form after all elements are defined", async () => {
+      await render(`
+        <storage-form id="outer" storage-area="session-storage">
+          <storage-form id="inner">
+            <storage-usage name="foo"></storage-usage>
+          </storage-form>
+        </storage-form>`);
+      const outer = query<HTMLStorageFormElement>("#outer");
+      const inner = query<HTMLStorageFormElement>("#inner");
+      const e = usage();
+      expect(e.storageForm).toBe(outer);
+      inner.storageArea = "small";
+      allCustomElementsDefinedEvent.dispatchEvent();
+      await flush();
+      expect(e.storageForm).toBe(inner);
+      expect(e.textContent).toBe("5B");
+
+      const updateArea = jest.spyOn(e.areaHandler, "updateArea");
+      outer.storageArea = "small";
+      await flush();
+      expect(updateArea).not.toHaveBeenCalled();
+    });
+
+    it("should not follow the form after moved out of it", async () => {
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      document.body.append(e);
+      await flush();
+      expect(e.storageForm).toBeNull();
+      expect(e.storageArea).toBe("");
+      expect(e.textContent).toBe("0B");
+
+      const updateArea = jest.spyOn(e.areaHandler, "updateArea");
+      form.storageArea = "session-storage";
+      await flush();
+      expect(updateArea).not.toHaveBeenCalled();
+    });
+
+    it("should use the area of the form after its own area is removed while disconnected", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo" storage-area="session-storage"></storage-usage>
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      e.remove();
+      e.removeAttribute("storage-area");
+      form.append(e);
+      await flush();
+      expect(e.textContent).toBe("5B");
+    });
+
+    it("should use its own area set while disconnected", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      e.remove();
+      e.setAttribute("storage-area", "session-storage");
+      form.append(e);
+      await flush();
+      expect(e.textContent).toBe("1B");
+      form.storageArea = "local-storage";
+      await flush();
+      expect(e.textContent).toBe("1B");
+    });
+
+    it("should not show the value without the area when reconnected", async () => {
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      const values: number[] = [];
+      const { value } = e;
+      Object.defineProperty(e, "value", {
+        get: () => value,
+        set: (v: number) => values.push(v),
+      });
+      e.remove();
+      form.append(e);
+      await flush();
+      expect(new Set(values)).toEqual(new Set([5]));
     });
   });
 });

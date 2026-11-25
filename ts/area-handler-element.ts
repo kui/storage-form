@@ -134,8 +134,10 @@ export function mixinStorageFormChildAreaHandlerElement<
     }
 
     connectedCallback() {
+      // The super class reads the storage, so the form should be found before
+      // it to avoid showing the value without the area.
+      this.findStorageForm();
       super.connectedCallback?.();
-      this.updateStorageForm();
       allCustomElementsDefinedEvent.listeners.add(
         this.allCustomElementsDefinedListener,
       );
@@ -149,6 +151,7 @@ export function mixinStorageFormChildAreaHandlerElement<
     disconnectedCallback() {
       super.disconnectedCallback?.();
       this.storageFormObserver.disconnect();
+      this.#storageForm = null;
       allCustomElementsDefinedEvent.listeners.delete(
         this.allCustomElementsDefinedListener,
       );
@@ -157,21 +160,25 @@ export function mixinStorageFormChildAreaHandlerElement<
     //
 
     private updateStorageForm() {
-      const form = this.getStorageForm();
-      if (form === this.#storageForm) return;
+      if (!this.findStorageForm()) return;
+      this.updateArea();
+      this.invokeStorageChangeCallback();
+    }
 
-      if (form === null) {
-        this.storageFormObserver.disconnect();
-      } else {
-        this.storageFormObserver.disconnect();
+    /** @return true if the form is changed. */
+    private findStorageForm(): boolean {
+      const form = this.getStorageForm();
+      if (form === this.#storageForm) return false;
+
+      this.storageFormObserver.disconnect();
+      if (form !== null) {
         this.storageFormObserver.observe(form, {
           attributes: true,
           attributeFilter: ["storage-area"],
         });
       }
       this.#storageForm = form;
-      this.updateArea();
-      this.invokeStorageChangeCallback();
+      return true;
     }
 
     private getStorageForm(): StorageElementMixin | null {
