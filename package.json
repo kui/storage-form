@@ -58,8 +58,12 @@
     "ts-node": "^10.9.2",
     "typescript": "~5.3.3"
   },
-  "engine": {
-    "node": "^20.x"
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^26.0.0",
+      "onFail": "warn"
+    }
   },
   "repository": "https://github.com/kui/storage-form.git"
 }
