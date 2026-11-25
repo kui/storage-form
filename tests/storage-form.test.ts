@@ -1,4 +1,5 @@
 import { HTMLStorageFormElement } from "../ts/storage-form.js";
+import { HTMLStorageInputElement } from "../ts/storage-mono-controls.js";
 import {
   check,
   dump,
@@ -9,6 +10,7 @@ import {
   updateFromAnotherWindow,
 } from "./helpers/dom.js";
 
+HTMLStorageInputElement.register();
 HTMLStorageFormElement.register();
 
 beforeEach(() => {
@@ -267,8 +269,7 @@ describe("DOM mutations", () => {
     expect(e.value).toBe("stored");
   });
 
-  // https://github.com/kui/storage-form/issues/42
-  it.failing("should handle controls in an added subtree", async () => {
+  it("should handle controls in an added subtree", async () => {
     localStorage.setItem("foo", "stored");
     await render(`<storage-form storage-area="local-storage"></storage-form>`);
     const div = document.createElement("div");
@@ -276,6 +277,90 @@ describe("DOM mutations", () => {
     query("storage-form").append(div);
     await flush();
     expect(query<HTMLInputElement>("input").value).toBe("stored");
+  });
+
+  it("should ignore storage custom elements in an added subtree", async () => {
+    await render(`<storage-form storage-area="local-storage"></storage-form>`);
+    const div = document.createElement("div");
+    div.innerHTML = `<input name="foo" is="storage-input"><input name="foo" id="b">`;
+    query("storage-form").append(div);
+    await flush();
+    await input(query("#b"), "typed");
+    expect(query<HTMLInputElement>("[is=storage-input]").value).toBe("");
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should not touch controls in a removed subtree", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><div><input name="foo" id="b"></div>
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    query("div").remove();
+    await flush();
+    await input(query("#a"), "typed");
+    expect(b.value).toBe("");
+  });
+
+  it("should release controls in a removed nested form", async () => {
+    await render(`
+      <storage-form storage-area="local-storage" id="outer">
+        <input name="foo" id="a">
+        <storage-form storage-area="local-storage" id="inner">
+          <div><input name="foo" id="b"></div>
+        </storage-form>
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    await input(b, "before");
+    expect(query<HTMLInputElement>("#a").value).toBe("before");
+    query("#inner").remove();
+    await flush();
+    await input(query("#a"), "after");
+    expect(b.value).toBe("before");
+  });
+
+  it("should handle controls in an added nested form", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`<storage-form storage-area="local-storage"></storage-form>`);
+    const inner = document.createElement("storage-form");
+    inner.setAttribute("storage-area", "local-storage");
+    inner.innerHTML = `<div><input name="foo"></div>`;
+    query("storage-form").append(inner);
+    await flush();
+    const e = query<HTMLInputElement>("input");
+    expect(e.value).toBe("stored");
+    await input(e, "typed");
+    expect(localStorage.getItem("foo")).toBe("typed");
+  });
+
+  it("should keep handling a control moved within the form", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <div><input name="foo"></div><p></p>
+      </storage-form>`);
+    const e = query<HTMLInputElement>("input");
+    await input(e, "typed");
+    query("p").append(query("div"));
+    await flush();
+    expect(e.value).toBe("typed");
+    await input(e, "retyped");
+    expect(localStorage.getItem("foo")).toBe("retyped");
+    await updateFromAnotherWindow(localStorage, "foo", "updated");
+    expect(e.value).toBe("updated");
+  });
+
+  it("should release a control renamed and removed at once", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><div><input name="foo" id="b"></div>
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    b.name = "bar";
+    query("div").remove();
+    await flush();
+    await input(query("#a"), "typed");
+    await updateFromAnotherWindow(localStorage, "bar", "updated");
+    expect(b.value).toBe("");
   });
 
   it("should not touch a removed control", async () => {

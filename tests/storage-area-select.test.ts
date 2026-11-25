@@ -121,8 +121,7 @@ describe("storage-area-select", () => {
       <input name="foo">
     </storage-form>`;
 
-  // https://github.com/kui/storage-form/issues/40
-  it.failing("should restore the stored area", async () => {
+  it("should restore the stored area", async () => {
     localStorage.setItem("area", "session-storage");
     sessionStorage.setItem("foo", "stored");
     await render(html);

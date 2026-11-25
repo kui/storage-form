@@ -38,6 +38,7 @@ class NamedStorageControlsCollection {
 
   add(e: HTMLStorageFormControlElement) {
     if (e.name !== this.name) throw Error("Invalid name");
+    if (this.elements.has(e)) return this;
     this.elements.add(e);
     if (this.#value !== notInitialized) {
       storageControlsHandler.write(e, this.#value);
@@ -122,9 +123,27 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
 
     private initControls() {
       this.namedControlMap.clear();
+      this.updateControls();
+    }
+
+    /**
+     * Synchronizes {@link namedControlMap} with the current DOM tree.
+     *
+     * The tree is scanned instead of tracing mutation records, because a record
+     * does not tell the state at that time, such as the name of a removed control.
+     */
+    private updateControls() {
+      const controls = new Set<HTMLStorageFormControlElement>();
       for (const e of this.querySelectorAll(STORAGE_CONTROL_SELECTOR)) {
-        if (matchesStorageControl(e)) this.namedControlMap.add(e);
+        if (matchesStorageControl(e)) controls.add(e);
       }
+      for (const [name, elementSet] of this.namedControlMap) {
+        for (const e of elementSet) {
+          if (!controls.has(e) || e.name !== name)
+            this.namedControlMap.deleteByKeyValue(name, e);
+        }
+      }
+      for (const e of controls) this.namedControlMap.add(e);
     }
 
     disconnectedCallback() {
@@ -184,15 +203,11 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     };
 
     private handleMutations(mutations: MutationRecord[]) {
+      let shouldUpdateControls = false;
       let shouldDispatch = false;
       for (const mutation of mutations) {
         if (mutation.type === "childList") {
-          for (const e of mutation.addedNodes) {
-            if (matchesStorageControl(e)) this.namedControlMap.add(e);
-          }
-          for (const e of mutation.removedNodes) {
-            if (matchesStorageControl(e)) this.namedControlMap.deleteByValue(e);
-          }
+          shouldUpdateControls = true;
           shouldDispatch = true;
         } else if (mutation.attributeName === "name") {
           if (!matchesStorageControl(mutation.target)) continue;
@@ -202,6 +217,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
           shouldDispatch = true;
         }
       }
+      if (shouldUpdateControls) this.updateControls();
       if (shouldDispatch) this.invokeStorageChangeCallback();
     }
 
