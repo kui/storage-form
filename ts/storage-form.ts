@@ -1,13 +1,12 @@
 import { mixinAreaHandlerElement } from "./area-handler-element.js";
 import { distinctConcat } from "./arrays.js";
 import {
-  dispatchChangeEvent,
   type HTMLElementConstructor,
   type StorageElementMixin,
   type StorageFormLikeElement,
 } from "./elements.js";
 import { WroteValues } from "./globals.js";
-import { NamedSetMap } from "./maps.js";
+import { NamedSetMap, setAll } from "./maps.js";
 import * as storageControlsHandler from "./storage-controls-handler.js";
 
 const STORAGE_CONTROL_TAGS = ["input", "select", "textarea", "output"] as const;
@@ -25,6 +24,17 @@ function matchesStorageControl(e: unknown): e is HTMLStorageFormControlElement {
   );
 }
 
+/** Change events dispatched by storage forms, not by users. */
+const ownEvents = new WeakSet<Event>();
+
+function dispatchOwnChangeEvents(elements: Iterable<EventTarget>) {
+  for (const element of elements) {
+    const event = new Event("change", { bubbles: true });
+    ownEvents.add(event);
+    element.dispatchEvent(event);
+  }
+}
+
 const notInitialized = Symbol("notInitialized");
 
 class NamedStorageControlsCollection {
@@ -33,6 +43,8 @@ class NamedStorageControlsCollection {
   #value: string | undefined | typeof notInitialized = notInitialized;
   /** The last control edited before the value is initialized. */
   private edited: HTMLStorageFormControlElement | undefined;
+  /** The edited value being written by {@link load}. */
+  private pendingValue: string | undefined;
 
   constructor(e: HTMLStorageFormControlElement) {
     this.name = e.name;
@@ -43,7 +55,7 @@ class NamedStorageControlsCollection {
     if (this.elements.has(e)) return this;
     this.elements.add(e);
     if (this.#value !== notInitialized) {
-      storageControlsHandler.write(e, this.#value);
+      storageControlsHandler.write(e, this.pendingValue ?? this.#value);
     }
     // Donot dispatch change event here because it is overwritten by the value
     return this;
@@ -67,54 +79,63 @@ class NamedStorageControlsCollection {
     this.#value = notInitialized;
   }
 
+  get isPending(): boolean {
+    return this.pendingValue !== undefined;
+  }
+
   markAsEdited(e: HTMLStorageFormControlElement) {
-    if (!this.isInitialized && this.elements.has(e)) this.edited = e;
+    if (this.elements.has(e)) this.edited = e;
   }
 
   /**
-   * @returns The value edited before the initialization if it should be stored
-   *   because nothing is stored.
+   * Change events should be dispatched to `changed` by the caller.
+   *
+   * @returns `editedValue` is the value edited before the initialization. It
+   *   should be stored if defined, because nothing is stored.
    */
-  load(storedValue: string | undefined): string | undefined {
+  load(storedValue: string | undefined): {
+    editedValue?: string;
+    changed: HTMLStorageFormControlElement[];
+  } {
     const edited = this.edited;
     this.edited = undefined;
-    if (storedValue !== undefined || edited === undefined) {
-      this.value = storedValue;
-      return undefined;
-    }
+    if (storedValue !== undefined || edited === undefined)
+      return { changed: this.setValue(storedValue) };
 
     // Not the edited value, because the following queued reads may also return
     // nothing while the write is delayed, and then reset the controls.
     this.#value = undefined;
     const change = storageControlsHandler.diff(edited, undefined);
     const editedValue = change.type === "value" ? change.value : undefined;
-    this.writeElements(editedValue, edited);
-    return editedValue;
+    this.pendingValue = editedValue;
+    return { editedValue, changed: this.writeElements(editedValue, edited) };
   }
 
-  set value(newValue: string | undefined) {
-    if (this.#value === newValue) return;
+  /** @returns The changed controls, to which change events should be dispatched. */
+  setValue(newValue: string | undefined): HTMLStorageFormControlElement[] {
+    if (this.#value === newValue) return [];
     this.#value = newValue;
-    this.writeElements(newValue);
+    this.pendingValue = undefined;
+    return this.writeElements(newValue);
   }
 
   private writeElements(
     value: string | undefined,
     except?: HTMLStorageFormControlElement,
   ) {
-    const changedElements: HTMLStorageFormControlElement[] = [];
+    const changed: HTMLStorageFormControlElement[] = [];
     for (const e of this.elements) {
       if (e === except) continue;
       const isUpdated = storageControlsHandler.write(e, value);
-      if (isUpdated) changedElements.push(e);
+      if (isUpdated) changed.push(e);
     }
-    if (changedElements.length > 0) dispatchChangeEvent(...changedElements);
+    return changed;
   }
 
   diff() {
     if (this.#value === notInitialized) return "notInitialized";
 
-    const oldValue = this.#value;
+    const oldValue = this.pendingValue ?? this.#value;
     let newValue: string | undefined = undefined;
     let unselected = false;
     for (const e of this.elements) {
@@ -153,11 +174,19 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     private readonly mutationObserver = new MutationObserver(
       this.handleMutations.bind(this),
     );
+    /** The number of loadings being queued or running */
+    private remainingLoads = 0;
     private readonly changeListener = (event: Event) => {
       const e = event.target;
       if (!matchesStorageControl(e)) return;
-      this.namedControlMap.get(e.name)?.markAsEdited(e);
-      this.valueChangedCallback().catch(console.error);
+      const isOwnEvent = ownEvents.has(event);
+      const elementSet = this.namedControlMap.get(e.name);
+      if (!isOwnEvent && elementSet?.isInitialized === false) {
+        elementSet.markAsEdited(e);
+        // Retry if the last loading failed
+        if (this.remainingLoads === 0) this.invokeStorageChangeCallback();
+      }
+      this.valueChangedCallback(isOwnEvent).catch(console.error);
     };
 
     connectedCallback() {
@@ -169,8 +198,8 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     }
 
     private initControls() {
-      this.updateControls();
       this.uninitializeControls();
+      this.updateControls();
     }
 
     private uninitializeControls() {
@@ -225,35 +254,50 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
 
     //
 
+    override invokeStorageChangeCallback(updates: WroteValues = new Map()) {
+      if (updates.size === 0) this.remainingLoads++;
+      super.invokeStorageChangeCallback(updates);
+    }
+
     override async storageChangeCallback(updates: WroteValues) {
-      if (updates.size === 0) {
-        await this.loadValues();
+      if (updates.size > 0) {
+        this.applyValues(updates);
         return;
       }
-      for (const [name, elementSet] of this.namedControlMap) {
-        // Uninitialized values will be loaded by a queued task.
-        if (elementSet.isInitialized && updates.has(name))
-          elementSet.value = updates.get(name);
+      try {
+        await this.loadValues();
+      } finally {
+        this.remainingLoads--;
       }
     }
 
     private async loadValues() {
       const area = this.storageArea;
-      const keys = [...this.namedControlMap.keys()];
-      const storedValues = await this.areaHandler.read(keys);
+      const values: WroteValues = new Map(
+        [...this.namedControlMap.keys()].map((n) => [n, undefined]),
+      );
+      setAll(values, await this.areaHandler.read([...values.keys()]));
       // Values of the new area will be loaded by a queued task.
-      if (area !== this.storageArea) return;
+      if (area === this.storageArea) this.applyValues(values, true);
+    }
 
+    private applyValues(values: WroteValues, isLoading = false) {
       const editedValues: WroteValues = new Map();
-      for (const name of keys) {
-        const editedValue = this.namedControlMap
-          .get(name)
-          ?.load(storedValues.get(name));
+      const changedControls: HTMLStorageFormControlElement[] = [];
+      for (const [name, elementSet] of this.namedControlMap) {
+        if (!values.has(name)) continue;
+        // Uninitialized values will be loaded by a queued task.
+        if (!isLoading && !elementSet.isInitialized && this.remainingLoads > 0)
+          continue;
+        const { editedValue, changed } = elementSet.load(values.get(name));
         if (editedValue !== undefined) editedValues.set(name, editedValue);
+        changedControls.push(...changed);
       }
       // Not awaited, because a delayed write would block queued tasks.
       if (editedValues.size > 0)
         this.areaHandler.write(editedValues).catch(console.error);
+      // At the end, because listeners may change the area.
+      dispatchOwnChangeEvents(changedControls);
     }
 
     //
@@ -270,9 +314,11 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       this.invokeStorageChangeCallback();
     }
 
-    private async valueChangedCallback(): Promise<void> {
+    private async valueChangedCallback(isOwnEvent: boolean): Promise<void> {
       const entries: WroteValues = new Map();
       for (const [name, elementSet] of this.namedControlMap) {
+        // Events by loading must not write values of other controls over the edit.
+        if (isOwnEvent && elementSet.isPending) continue;
         const diff = elementSet.diff();
         if (diff === "nochange" || diff === "notInitialized") continue;
         entries.set(name, diff.newValue);
