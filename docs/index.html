@@ -92,9 +92,7 @@
 </script>
 
 <h1>
-  <a href="https://github.com/kui/storage-elements"
-    ><code>storage-form</code></a
-  >
+  <a href="https://github.com/kui/storage-form"><code>storage-form</code></a>
   Examples
 </h1>
 
@@ -105,7 +103,7 @@
 
 <p>
   See
-  <a href="https://github.com/kui/storage-elements/blob/master/docs/index.html"
+  <a href="https://github.com/kui/storage-form/blob/master/docs/index.html"
     >HTML souce</a
   >.
 </p>
@@ -144,8 +142,8 @@
 <h2>Supported storages</h2>
 
 <p>
-  the storage is selected by <code>area</code> attribute. The
-  <code>area</code> attribute can be one of the following values:
+  the storage is selected by <code>storage-area</code> attribute. The
+  <code>storage-area</code> attribute can be one of the following values:
 </p>
 
 <dl>
@@ -522,13 +520,17 @@
     <li>Usage of "foo" in localStorage:
       <storage-usage storage-area="local-storage" name="foo"></storage-usage>
     <li>Quota of localStorage:
-      <storage-usage storage-area="local-storage" type="quota"></storage-usage>
+      <storage-quota storage-area="local-storage" name></storage-quota>
     <li>Total quota of localStorage:
-      <storage-usage storage-area="local-storage" type="total-quota"></storage-usage>
+      <storage-quota storage-area="local-storage"></storage-quota>
     <li>Usage percentage of "foo" in localStorage:
-      <storage-usage storage-area="local-storage" name="foo" type="byte-percent"></storage-usage>
+      <storage-usage storage-area="local-storage" name="foo" format="percent"></storage-usage>
     <li>Total usage percentage of localStorage:
-      <storage-usage storage-area="local-storage" type="total-byte-percent"></storage-usage>
+      <storage-usage storage-area="local-storage" format="percent"></storage-usage>
+    <li>Usage percentage meter of "foo" in localStorage:
+      <meter is="storage-usage-meter" storage-area="local-storage" name="foo"></meter>
+    <li>Total usage percentage meter of localStorage:
+      <meter is="storage-usage-meter" storage-area="local-storage"></meter>
   </ul>
 </script>
 <div class="result">
