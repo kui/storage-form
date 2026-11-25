@@ -1,40 +1,25 @@
-import { FlatCompat } from "@eslint/eslintrc";
 import js from "@eslint/js";
-import pluginTs from "@typescript-eslint/eslint-plugin";
-import parserTs from "@typescript-eslint/parser";
 import eslintConfigPrettier from "eslint-config-prettier";
+import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
-
-const compat = new FlatCompat();
+import tseslint from "typescript-eslint";
 
 function ts(files, project) {
-  return compat
-    .extends(
-      "plugin:@typescript-eslint/strict-type-checked",
-      "plugin:@typescript-eslint/stylistic-type-checked",
-    )
-    .map((config) => ({
-      ...config,
-      files,
-      languageOptions: {
-        parser: parserTs,
-        parserOptions: {
-          project,
-        },
-      },
-      plugins: { "@typescript-eslint": pluginTs },
-      rules: {
-        ...config.rules,
-      },
-    }));
+  return {
+    files,
+    extends: [
+      tseslint.configs.strictTypeChecked,
+      tseslint.configs.stylisticTypeChecked,
+    ],
+    languageOptions: { parserOptions: { project } },
+  };
 }
 
-export default [
-  { ignores: ["js", "types", "docs"] },
+export default defineConfig(
+  globalIgnores(["js", "types", "docs"]),
   js.configs.recommended,
-  eslintConfigPrettier,
-  ...ts(["*.ts", "tests/**/*.ts"], "./tsconfig.json"),
-  ...ts(["ts/**/*.ts"], "./ts/tsconfig.json"),
+  ts(["*.ts", "tests/**/*.ts"], "./tsconfig.json"),
+  ts(["ts/**/*.ts"], "./ts/tsconfig.json"),
   {
     files: ["*.config.{js,ts}"],
     languageOptions: {
@@ -52,12 +37,13 @@ export default [
     },
   },
   {
-    files: ["test/**/*.test.ts"],
+    files: ["tests/**/*.ts"],
     languageOptions: {
       globals: {
-        ...globals.node,
+        ...globals.browser,
         ...globals.jest,
       },
     },
   },
-];
+  eslintConfigPrettier,
+);

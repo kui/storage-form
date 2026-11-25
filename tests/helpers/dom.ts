@@ -9,10 +9,16 @@ export async function render(html: string): Promise<void> {
   await flush();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export function query<T extends Element>(selector: string): T {
   const e = document.querySelector<T>(selector);
   if (e === null) throw Error(`Not found: ${selector}`);
   return e;
+}
+
+/** Returns all entries of the storage. */
+export function dump(storage: Storage): Record<string, string> {
+  return Object.fromEntries(Object.entries(storage));
 }
 
 /** Changes the value as a user does. */

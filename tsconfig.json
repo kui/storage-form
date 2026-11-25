@@ -2,6 +2,7 @@
   "compilerOptions": {
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["chrome", "jest", "node"],
     "strict": true,
     "isolatedModules": true,
     "esModuleInterop": true,

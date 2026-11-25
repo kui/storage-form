@@ -4,6 +4,7 @@ const NOCHANGE = { type: "nochange" };
 const UNSELECTED = { type: "unselected" };
 const value = (v: string) => ({ type: "value", value: v });
 
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 function create<T extends HTMLElement>(html: string): T {
   const div = document.createElement("div");
   div.innerHTML = html;

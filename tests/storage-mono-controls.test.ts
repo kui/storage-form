@@ -6,6 +6,7 @@ import {
 } from "../ts/storage-mono-controls.js";
 import {
   check,
+  dump,
   flush,
   input,
   query,
@@ -114,7 +115,7 @@ describe("storage-input", () => {
     await flush();
     expect(target().value).toBe("bar value");
     await input(target(), "typed");
-    expect({ ...localStorage }).toEqual({ foo: "foo value", bar: "typed" });
+    expect(dump(localStorage)).toEqual({ foo: "foo value", bar: "typed" });
   });
 
   it("should follow the storage-area change", async () => {

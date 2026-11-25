@@ -54,9 +54,6 @@ class NamedStorageControlsCollection {
     return this.elements.size;
   }
 
-  get value(): string | undefined | typeof notInitialized {
-    return this.#value;
-  }
   set value(newValue: string | undefined) {
     if (this.#value === newValue) return;
     this.#value = newValue;

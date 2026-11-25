@@ -10,7 +10,7 @@ import {
 import { WroteValues } from "../ts/globals.js";
 import { withResolves } from "../ts/promises.js";
 import { fakeChromeStorageArea } from "./helpers/chrome.js";
-import { flush, updateFromAnotherWindow } from "./helpers/dom.js";
+import { dump, flush, updateFromAnotherWindow } from "./helpers/dom.js";
 
 const MEBI = 1024 * 1024;
 
@@ -308,7 +308,7 @@ describe("WebStorageHandler", () => {
         ["add", ""],
       ]),
     );
-    expect({ ...localStorage }).toEqual({ update: "2", add: "" });
+    expect(dump(localStorage)).toEqual({ update: "2", add: "" });
   });
 
   it("should not set the same value", () => {

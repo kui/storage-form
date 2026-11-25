@@ -1,6 +1,7 @@
 import { HTMLStorageFormElement } from "../ts/storage-form.js";
 import {
   check,
+  dump,
   flush,
   input,
   query,
@@ -73,7 +74,7 @@ describe("initialization", () => {
       </storage-form>`);
     await input(query("input"), "typed");
     expect(query<HTMLButtonElement>("button").value).toBe("default");
-    expect({ ...localStorage }).toEqual({ foo: "stored" });
+    expect(dump(localStorage)).toEqual({ foo: "stored" });
   });
 
   it("should do nothing without storage-area", async () => {
@@ -103,7 +104,7 @@ describe("writing", () => {
       </storage-form>`);
     await input(query("textarea"), "typed");
     await input(query("select"), "b");
-    expect({ ...localStorage }).toEqual({ text: "typed", select: "b" });
+    expect(dump(localStorage)).toEqual({ text: "typed", select: "b" });
   });
 
   it("should store and delete by a checkbox", async () => {
@@ -299,7 +300,7 @@ describe("DOM mutations", () => {
     await flush();
     expect(e.value).toBe("bar value");
     await input(e, "typed");
-    expect({ ...localStorage }).toEqual({ foo: "foo value", bar: "typed" });
+    expect(dump(localStorage)).toEqual({ foo: "foo value", bar: "typed" });
   });
 
   it("should handle a control after its name is set", async () => {
