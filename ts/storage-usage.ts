@@ -7,8 +7,7 @@ import {
   type ValueContainerElement,
 } from "./elements.js";
 
-export interface FormatedNumericValueElement
-  extends ValueContainerElement<number> {
+export interface FormatedNumericValueElement extends ValueContainerElement<number> {
   format: string;
 }
 
