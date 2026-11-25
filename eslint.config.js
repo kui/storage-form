@@ -16,9 +16,9 @@ function ts(files, project) {
 }
 
 export default defineConfig(
-  globalIgnores(["js", "types", "docs"]),
+  globalIgnores(["js", "types", "docs", "test-results"]),
   js.configs.recommended,
-  ts(["*.ts", "tests/**/*.ts"], "./tsconfig.json"),
+  ts(["*.ts", "tests/**/*.ts", "e2e/**/*.ts"], "./tsconfig.json"),
   ts(["ts/**/*.ts"], "./ts/tsconfig.json"),
   {
     files: ["*.config.{js,ts}"],

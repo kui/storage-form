@@ -11,5 +11,5 @@
     "moduleResolution": "Node16",
     "noEmit": true
   },
-  "exclude": ["node_modules", "docs", "ts"]
+  "exclude": ["node_modules", "docs", "test-results", "ts"]
 }

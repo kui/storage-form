@@ -27,5 +27,7 @@ jobs:
         run: npm run lint
       - name: Run tests
         run: npm test
-      - name: Build docs
-        run: npm run docs
+      - name: Install browser
+        run: npx playwright install --with-deps --no-shell chromium
+      - name: Run e2e tests
+        run: npm run test:e2e

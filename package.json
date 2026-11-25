@@ -12,6 +12,8 @@
   "scripts": {
     "prepare": "npm run build:ts",
     "test": "jest",
+    "pretest:e2e": "npm run docs",
+    "test:e2e": "playwright test",
     "build:ts": "tsc --project ts",
     "build:docs": "cp -vur ts js docs",
     "docs": "run-s build:ts build:docs",
@@ -41,6 +43,7 @@
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/chrome": "^0.3.8",
     "@types/jest": "^30.0.0",
