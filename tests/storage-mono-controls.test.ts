@@ -261,6 +261,52 @@ describe("storage-input", () => {
     expect(dump(sessionStorage)).toEqual({ foo: "new" });
   });
 
+  it.each([
+    ["name", "foo"],
+    ["storage-area", "local-storage"],
+  ])("should store the value typed with the same %s", async (attr, value) => {
+    localStorage.setItem("foo", "stored");
+    await render(html);
+    const e = target();
+    e.addEventListener(
+      "input",
+      () => {
+        e.setAttribute(attr, value);
+      },
+      { capture: true },
+    );
+    await input(e, "typed");
+    expect(e.value).toBe("typed");
+    expect(localStorage.getItem("foo")).toBe("typed");
+  });
+
+  it.each([
+    ["name", "foo"],
+    ["storage-area", "manual"],
+  ])(
+    "should store the values typed while reloading by the same %s",
+    async (attr, value) => {
+      manual.values.set("foo", "stored");
+      await render(
+        `<input is="storage-input" name="foo" storage-area="manual">`,
+      );
+      await manual.completeReads();
+      const e = target();
+      e.setAttribute(attr, value);
+      await input(e, "typed");
+      expect(manual.values.get("foo")).toBe("typed");
+      e.setAttribute(attr, value);
+      await manual.completeReads();
+      // The change must be known before the second reload is completed.
+      await input(e, "stored");
+      expect(manual.values.get("foo")).toBe("stored");
+      await manual.completeReads();
+      await manual.completeReads();
+      expect(e.value).toBe("stored");
+      expect(manual.values.get("foo")).toBe("stored");
+    },
+  );
+
   it("should ignore the old area while loading the new area", async () => {
     manual.values.set("foo", "old");
     manual2.values.set("foo", "new");

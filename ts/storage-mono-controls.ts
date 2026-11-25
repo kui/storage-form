@@ -62,7 +62,7 @@ export function mixinMonoStorageControl<
     ) {
       // The known value belongs to the previous entry, so it must not be
       // compared with inputs until the new entry is loaded.
-      if (name === "name" || name === "storage-area")
+      if ((name === "name" || name === "storage-area") && oldValue !== newValue)
         this.#value = notInitialized;
 
       super.attributeChangedCallback?.(name, oldValue, newValue);
@@ -106,9 +106,10 @@ export function mixinMonoStorageControl<
       return (
         this.isConnected &&
         this.storageArea !== "" &&
-        // A queued load means that this one may be for a previous entry, or may
-        // have run before connectedCallback sets the area during an upgrade.
-        this.#queuedLoadCount === 0
+        // Until the value is known, a queued load means that this one may be for
+        // a previous entry, or may have run before connectedCallback sets the
+        // area during an upgrade.
+        (this.#value !== notInitialized || this.#queuedLoadCount === 0)
       );
     }
 
