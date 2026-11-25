@@ -2,6 +2,9 @@ import type { JestConfigWithTsJest } from "ts-jest";
 
 const config: JestConfigWithTsJest = {
   preset: "ts-jest/presets/default-esm",
+  testEnvironment: "jsdom",
+  setupFiles: ["./tests/helpers/setup.ts"],
+  restoreMocks: true,
 
   moduleNameMapper: {
     // Workaround:
