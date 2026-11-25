@@ -18,6 +18,7 @@
     "lint:eslint": "eslint .",
     "lint:prettier": "prettier --check .",
     "lint:ts": "tsc --noEmit --project ts",
+    "lint:ts-tests": "tsc --noEmit --project .",
     "lint": "run-p -l lint:*",
     "fix:eslint": "eslint . --fix",
     "fix:prettier": "prettier --write .",
