@@ -261,70 +261,49 @@ registerInputTypeHandler("file", {
 });
 
 /**
- * A helper function to create a write function for input types
- * that accept a value that matches the given regexp,
- * otherwise the value is set to fallbackValue.
- *
- * TODO RegExp is not enough to validate the value.
+ * The last written value of each input and what the input made of it.
  */
-const writeIfRegexpMatch =
-  (
-    regexp: RegExp,
-    options: { fallbackValue?: string } = { fallbackValue: "" },
-  ): StorageControlsInputTypeHandler["write"] =>
-  (element, value) => {
-    if (value === undefined) {
-      element.value = element.defaultValue;
-    } else if (value.match(regexp)) {
-      element.value = value;
-    } else {
-      element.value = options.fallbackValue ?? "";
+const sanitizedValues = new WeakMap<
+  HTMLInputElement,
+  { written: string; sanitized: string }
+>();
+
+/**
+ * A helper function to create a handler for input types
+ * of which values are sanitized by the browser.
+ */
+const createSanitizedInputHandler = (
+  diff: StorageControlsInputTypeHandler["diff"],
+): StorageControlsInputTypeHandler => ({
+  diff(element, oldValue) {
+    // Writing dispatches a change event, so without this check the stored value
+    // would be overwritten with the sanitized one just by loading it.
+    const last = sanitizedValues.get(element);
+    if (last && last.written === oldValue && last.sanitized === element.value) {
+      return NOCHANGE;
     }
-  };
-
-registerInputTypeHandler("date", {
-  diff: diffIfNoInput,
-  write: writeIfRegexpMatch(/^\d{4}-\d{2}-\d{2}$/),
+    return diff(element, oldValue);
+  },
+  write(element, value) {
+    element.value = value ?? element.defaultValue;
+    if (value === undefined) {
+      sanitizedValues.delete(element);
+    } else {
+      sanitizedValues.set(element, {
+        written: value,
+        sanitized: element.value,
+      });
+    }
+  },
 });
 
-registerInputTypeHandler("datetime-local", {
-  diff: diffIfNoInput,
-  write: writeIfRegexpMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
-});
+for (const t of ["date", "datetime-local", "month", "time", "week"] as const)
+  registerInputTypeHandler(t, createSanitizedInputHandler(diffIfNoInput));
 
-registerInputTypeHandler("month", {
-  diff: diffIfNoInput,
-  write: writeIfRegexpMatch(/^\d{4}-\d{2}$/),
-});
-
-registerInputTypeHandler("time", {
-  diff: diffIfNoInput,
-  write: writeIfRegexpMatch(/^\d{2}:\d{2}$/),
-});
-
-registerInputTypeHandler("week", {
-  diff: diffIfNoInput,
-  write: writeIfRegexpMatch(/^\d{4}-W\d{2}$/),
-});
-
-registerInputTypeHandler("range", {
-  // TODO Should not read the value when the value is not set by the user.
-  // But there might be no way to detect it.
-  diff: diffIfChanged,
-  write: writeIfRegexpMatch(/^[-+]?\d+(\.\d+)?$/),
-});
-
-registerInputTypeHandler("color", {
-  // TODO Should not read the value when the value is not set by the user.
-  // But there might be no way to detect it.
-  diff: diffIfChanged,
-  write: writeIfRegexpMatch(/^#[0-9a-f]{6}$/i, { fallbackValue: "#000000" }),
-});
-
-registerInputTypeHandler("number", {
-  diff: diffIfChanged,
-  write: writeIfRegexpMatch(/^[-+]?\d+(\.\d+)?$/),
-});
+// TODO Should not read the value when the value is not set by the user.
+// But there might be no way to detect it.
+for (const t of ["range", "color", "number"] as const)
+  registerInputTypeHandler(t, createSanitizedInputHandler(diffIfChanged));
 
 // Check all input types are registered
 for (const t of INPUT_TYPES)
