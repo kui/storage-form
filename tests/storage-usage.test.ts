@@ -375,14 +375,128 @@ describe("formatted number", () => {
     expect(usage().getAttribute("name")).toBe("foo");
   });
 
-  // https://github.com/kui/storage-form/issues/45
-  it.failing("should show the usage of the new name", async () => {
+  it("should show the usage of the new name", async () => {
     localStorage.setItem("foo", "1");
     localStorage.setItem("bar", "123");
     await render(`<storage-usage storage-area=small name=foo></storage-usage>`);
     usage().name = "bar";
     await flush();
     expect(usage().textContent).toBe("3B");
+  });
+});
+
+describe("attribute changes of storage-usage", () => {
+  beforeEach(() => {
+    localStorage.setItem("foo", "12345");
+    localStorage.setItem("bar", "1234567890");
+  });
+
+  it.each<[string, string, string | null, number, string]>([
+    // [attributes, changed attribute, its value, value, text]
+    ["", "name", "foo", 5, "5B"],
+    ["name=foo", "name", "bar", 10, "10B"],
+    ["name=foo", "name", "none", 0, "0B"],
+    ["name=foo", "name", null, 15, "15B"],
+    ["format=percent", "name", "foo", 0.5, "50%"],
+    ["format=percent name=foo", "name", null, 0.15, "15%"],
+    ["name=foo", "format", "percent", 0.5, "50%"],
+    ["", "format", "percent", 0.15, "15%"],
+    ["format=percent name=foo", "format", null, 5, "5B"],
+    ["format=percent", "format", "", 15, "15"],
+  ])(
+    "should refresh on change from %p: %s=%p",
+    async (attrs, name, newValue, value, text) => {
+      await render(
+        `<storage-usage storage-area=small ${attrs}></storage-usage>`,
+      );
+      if (newValue === null) usage().removeAttribute(name);
+      else usage().setAttribute(name, newValue);
+      await flush();
+      expect(usage().value).toBeCloseTo(value);
+      expect(usage().textContent).toBe(text);
+    },
+  );
+
+  it("should refresh in storage-form", async () => {
+    await render(`
+      <storage-form storage-area="small">
+        <storage-usage name="foo"></storage-usage>
+      </storage-form>`);
+    usage().name = "bar";
+    await flush();
+    expect(usage().textContent).toBe("10B");
+  });
+
+  it("should dispatch a change event on the name change", async () => {
+    await render(`<storage-usage storage-area=small></storage-usage>`);
+    const listener = jest.fn();
+    usage().addEventListener("change", listener);
+    usage().name = "foo";
+    await flush();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["name", "foo"],
+    ["format", ""],
+  ])(
+    "should not read before connected on change of %s",
+    async (name, newValue) => {
+      const e = new HTMLStorageUsageElement();
+      e.setAttribute("storage-area", "small");
+      await flush();
+      e.value = 123;
+      e.setAttribute(name, newValue);
+      await flush();
+      expect(e.value).toBe(123);
+    },
+  );
+
+  it.each([
+    ["name", "foo"],
+    ["format", ""],
+  ])(
+    "should not overwrite the value without the area on change of %s",
+    async (name, newValue) => {
+      await render(`<storage-usage></storage-usage>`);
+      usage().value = 123;
+      usage().setAttribute(name, newValue);
+      await flush();
+      expect(usage().value).toBe(123);
+    },
+  );
+
+  it("should not read without the area while being upgraded", async () => {
+    const values: number[] = [];
+    class UpgradedElement extends HTMLStorageUsageElement {
+      override get value() {
+        return super.value;
+      }
+      override set value(v: number) {
+        values.push(v);
+        super.value = v;
+      }
+    }
+    await render(`
+      <storage-form storage-area="small">
+        <upgraded-usage name="foo" format=""></upgraded-usage>
+      </storage-form>
+      <upgraded-usage name="foo" format="" storage-area="small"></upgraded-usage>`);
+    customElements.define("upgraded-usage", UpgradedElement);
+    await flush();
+    expect(new Set(values)).toEqual(new Set([5]));
+  });
+
+  it("should use the name changed while disconnected", async () => {
+    await render(`<storage-usage storage-area=small name=foo></storage-usage>`);
+    const e = usage();
+    e.remove();
+    e.name = "bar";
+    await flush();
+    expect(e.textContent).toBe("5B");
+    document.body.append(e);
+    await flush();
+    expect(e.textContent).toBe("10B");
   });
 });
 
@@ -398,6 +512,37 @@ describe("storage-quota", () => {
     await render(`<storage-quota ${attrs}></storage-quota>`);
     expect(quota().value).toBe(value);
     expect(quota().textContent).toBe(text);
+  });
+
+  it("should refresh on adding, changing and removing the name", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    quota().name = "foo";
+    await flush();
+    expect(quota().textContent).toBe("10B");
+    quota().name = "bar";
+    await flush();
+    expect(quota().textContent).toBe("10B");
+    quota().removeAttribute("name");
+    await flush();
+    expect(quota().textContent).toBe("100B");
+  });
+
+  it("should keep the value on the format change", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    quota().format = "";
+    await flush();
+    expect(quota().value).toBe(100);
+    expect(quota().textContent).toBe("100");
+  });
+
+  it("should not overwrite the value before connected", async () => {
+    const e = new HTMLStorageQuotaElement();
+    e.setAttribute("storage-area", "small");
+    await flush();
+    e.value = 123;
+    e.name = "foo";
+    await flush();
+    expect(e.value).toBe(123);
   });
 });
 
@@ -438,6 +583,29 @@ describe("storage-usage-meter", () => {
     );
     await updateFromAnotherWindow(localStorage, "foo", "12");
     expect(meter().value).toBeCloseTo(0.2);
+  });
+
+  it("should refresh on adding, changing and removing the name", async () => {
+    await render(`<meter is="storage-usage-meter" storage-area=small></meter>`);
+    meter().setAttribute("name", "foo");
+    await flush();
+    expect(meter().value).toBeCloseTo(0.5);
+    meter().setAttribute("name", "bar");
+    await flush();
+    expect(meter().value).toBeCloseTo(1);
+    meter().removeAttribute("name");
+    await flush();
+    expect(meter().value).toBeCloseTo(0.15);
+  });
+
+  it("should not overwrite the value before connected", async () => {
+    const e = document.createElement("meter", { is: "storage-usage-meter" });
+    e.setAttribute("storage-area", "small");
+    await flush();
+    e.value = 0.3;
+    e.setAttribute("name", "foo");
+    await flush();
+    expect(e.value).toBeCloseTo(0.3);
   });
 
   it("should dispatch a change event on the name change", async () => {

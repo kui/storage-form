@@ -97,6 +97,10 @@ export function mixinAreaHandlerElement<
 
 export interface StorageFormChildAreaHandlerElement extends AreaHandlerElement {
   readonly storageForm: StorageElementMixin | null;
+  /**
+   * Reads the storage again if this element is connected and has an area.
+   */
+  refreshStorageValue(): void;
 }
 
 export function mixinStorageFormChildAreaHandlerElement<
@@ -104,6 +108,9 @@ export function mixinStorageFormChildAreaHandlerElement<
 >(base: T): T & HTMLElementConstructor<StorageFormChildAreaHandlerElement> {
   return class extends mixinAreaHandlerElement(base) {
     #storageForm: StorageElementMixin | null = null;
+    // Unlike isConnected, this is false in attributeChangedCallback called
+    // before connectedCallback.
+    #isReady = false;
     private readonly storageFormObserver = new MutationObserver(
       this.onStorageFormMutation.bind(this),
     );
@@ -138,6 +145,7 @@ export function mixinStorageFormChildAreaHandlerElement<
       // it to avoid showing the value without the area.
       this.findStorageForm();
       super.connectedCallback?.();
+      this.#isReady = true;
       allCustomElementsDefinedEvent.listeners.add(
         this.allCustomElementsDefinedListener,
       );
@@ -152,9 +160,15 @@ export function mixinStorageFormChildAreaHandlerElement<
       super.disconnectedCallback?.();
       this.storageFormObserver.disconnect();
       this.#storageForm = null;
+      this.#isReady = false;
       allCustomElementsDefinedEvent.listeners.delete(
         this.allCustomElementsDefinedListener,
       );
+    }
+
+    refreshStorageValue() {
+      if (!this.#isReady || this.storageArea === "") return;
+      this.invokeStorageChangeCallback();
     }
 
     //
