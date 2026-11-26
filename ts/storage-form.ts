@@ -201,6 +201,9 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     /** The number of loadings being queued or running */
     private remainingLoads = 0;
     private readonly changeListener = (event: Event) => {
+      // Name changes in the same task must be applied before the diff.
+      const records = this.mutationObserver.takeRecords();
+      if (records.length > 0) this.handleMutations();
       const e = event.target;
       if (!this.isOwnControl(e)) return;
       const isOwnEvent = ownEvents.has(event);

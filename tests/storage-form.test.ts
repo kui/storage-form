@@ -940,6 +940,19 @@ describe("DOM mutations", () => {
     expect(dump(localStorage)).toEqual({ foo: "foo value", bar: "typed" });
   });
 
+  it("should store an input in the same task as the name change under the new name", async () => {
+    localStorage.setItem("foo", "old");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><input name="foo" id="b">
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    b.name = "bar";
+    await input(b, "typed");
+    expect(dump(localStorage)).toEqual({ foo: "old", bar: "typed" });
+    expect(query<HTMLInputElement>("#a").value).toBe("old");
+  });
+
   it("should handle a control after its name is set", async () => {
     localStorage.setItem("foo", "stored");
     await render(`
