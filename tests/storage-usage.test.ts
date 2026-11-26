@@ -317,6 +317,31 @@ describe("storage-usage", () => {
   });
 });
 
+describe("storageArea property", () => {
+  it.each([
+    ["storage-usage", `<storage-usage storage-area=small></storage-usage>`],
+    ["storage-quota", `<storage-quota storage-area=small></storage-quota>`],
+    ["meter", `<meter is="storage-usage-meter" storage-area=small></meter>`],
+  ])(
+    "should reflect the property of %s to the attribute",
+    async (selector, html) => {
+      await render(html);
+      const e = query<StorageFormChildAreaHandlerElement>(selector);
+      e.storageArea = "session-storage";
+      expect(e.getAttribute("storage-area")).toBe("session-storage");
+      expect(e.storageArea).toBe("session-storage");
+    },
+  );
+
+  it("should follow the area set by the property", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    query<StorageFormChildAreaHandlerElement>("storage-quota").storageArea =
+      "local-storage";
+    await flush();
+    expect(quota().textContent).toBe("10MiB");
+  });
+});
+
 describe("formatted number", () => {
   it.each([
     [0, "0B"],

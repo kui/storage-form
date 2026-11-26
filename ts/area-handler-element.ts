@@ -128,6 +128,9 @@ export function mixinStorageFormChildAreaHandlerElement<
         ? this.storageForm.storageArea
         : a;
     }
+    set storageArea(v: string) {
+      super.storageArea = v;
+    }
 
     private onStorageFormMutation(mutaions: MutationRecord[]) {
       for (const mutaion of mutaions) {
