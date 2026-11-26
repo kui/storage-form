@@ -155,6 +155,15 @@ describe("writing", () => {
     expect(b.checked).toBe(true);
   });
 
+  it("should keep the stored value on an event without changes", async () => {
+    localStorage.setItem("foo", "x");
+    await render(`
+      <storage-form storage-area="local-storage"><input name="foo"></storage-form>`);
+    query("input").dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    expect(dump(localStorage)).toEqual({ foo: "x" });
+  });
+
   it("should not write unchanged values", async () => {
     localStorage.setItem("foo", "stored");
     await render(`
@@ -909,6 +918,19 @@ describe("DOM mutations", () => {
     expect(e.value).toBe("local");
     await input(e, "retyped");
     expect(dump(localStorage)).toEqual({ foo: "retyped" });
+    expect(dump(sessionStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should not handle edits in a nested form by the outer form", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo">
+        <storage-form storage-area="session-storage">
+          <input name="foo" id="inner">
+        </storage-form>
+      </storage-form>`);
+    await input(query("#inner"), "typed");
+    expect(localStorage.getItem("foo")).toBeNull();
     expect(dump(sessionStorage)).toEqual({ foo: "typed" });
   });
 
