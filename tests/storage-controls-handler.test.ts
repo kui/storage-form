@@ -103,10 +103,10 @@ describe.each([
     "datetime-local",
     "2020-01-02T03:04",
     "2021-12-31T23:59",
-    ["2020-01-02", "2020-01-02T03:04:05"],
+    ["2020-01-02", "2020-01-02T25:00"],
   ],
   ["month", "2020-01", "2021-12", ["2020", "2020-01-02"]],
-  ["time", "03:04", "23:59", ["3:04", "03:04:05"]],
+  ["time", "03:04", "23:59", ["3:04", "24:00"]],
   ["week", "2020-W01", "2021-W52", ["2020-01", "2020-W1"]],
 ])("formatted: %s", (type, defaultValue, newValue, invalids) => {
   it("should have a diff if a non-empty value is changed", () => {
@@ -159,6 +159,65 @@ describe.each([
     const e = createInput(`type=${type} value=${defaultValue}`);
     expect(write(e, "invalid")).toBe(true);
     expect(e.value).toBe(fallback);
+  });
+});
+
+// Seconds without a fraction are covered by e2e because jsdom appends ".000".
+describe.each([
+  ["date", "12020-01-02"],
+  ["datetime-local", "12020-01-02T03:04"],
+  ["datetime-local", "2020-01-02T03:04:05.678"],
+  ["month", "12020-01"],
+  ["time", "03:04:05"],
+  ["time", "03:04:05.678"],
+  ["week", "12020-W01"],
+  ["number", "1e5"],
+  ["number", ".5"],
+  ["number", "-.5"],
+])("valid value: type=%s value=%s", (type, v) => {
+  it("should be written as is", () => {
+    const e = createInput(`type=${type}`);
+    expect(write(e, v)).toBe(true);
+    expect(e.value).toBe(v);
+    expect(diff(e, v)).toEqual(NOCHANGE);
+  });
+});
+
+describe.each([
+  // [type, stored value, sanitized value, value edited by the user]
+  [
+    "datetime-local",
+    "2020-01-02 03:04",
+    "2020-01-02T03:04",
+    "2021-12-31T23:59",
+  ],
+  ["range", "200", "100", "20"],
+  ["number", "invalid", "", "20"],
+  ["color", "#AABBCC", "#aabbcc", "#112233"],
+  ["color", "invalid", "#000000", "#112233"],
+])("sanitized value: type=%s value=%s", (type, stored, sanitized, edited) => {
+  it("should not have a diff until the value is changed", () => {
+    const e = createInput(`type=${type}`);
+    write(e, stored);
+    expect(e.value).toBe(sanitized);
+    expect(diff(e, stored)).toEqual(NOCHANGE);
+    e.value = edited;
+    expect(diff(e, stored)).toEqual(value(edited));
+  });
+
+  it("should have a diff from another stored value", () => {
+    const e = createInput(`type=${type}`);
+    write(e, stored);
+    expect(diff(e, "other")).toEqual(value(sanitized));
+  });
+
+  it("should have a diff after reset", () => {
+    const e = createInput(`type=${type} value=${edited}`);
+    write(e, stored);
+    reset(e);
+    expect(diff(e, stored)).toEqual(value(edited));
+    e.value = sanitized;
+    expect(diff(e, stored)).toEqual(value(sanitized));
   });
 });
 
