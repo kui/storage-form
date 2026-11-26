@@ -405,6 +405,15 @@ describe("storage-input", () => {
     expect(localStorage.getItem("foo")).toBeNull();
   });
 
+  it("should not overwrite the stored value by the value attribute", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(html);
+    target().setAttribute("value", "attr");
+    await flush();
+    expect(localStorage.getItem("foo")).toBe("stored");
+    expect(target().value).toBe("stored");
+  });
+
   it("should synchronize with other elements", async () => {
     await render(
       `${html}<textarea is="storage-textarea" name="foo" storage-area="local-storage"></textarea>`,
