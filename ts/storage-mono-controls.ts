@@ -52,7 +52,7 @@ export function mixinMonoStorageControl<
 
     static readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
-      ["name", "value"],
+      ["name"],
     );
 
     override attributeChangedCallback(
@@ -68,8 +68,6 @@ export function mixinMonoStorageControl<
       super.attributeChangedCallback?.(name, oldValue, newValue);
       if (name === "name") {
         this.invokeStorageChangeCallback();
-      } else if (name === "value") {
-        this.valueChangedCallback().catch(console.error);
       }
     }
 

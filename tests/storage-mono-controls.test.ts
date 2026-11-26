@@ -398,15 +398,12 @@ describe("storage-input", () => {
   });
 
   // https://github.com/kui/storage-form/issues/41
-  it.failing(
-    "should store the value changed by the value attribute",
-    async () => {
-      await render(html);
-      target().setAttribute("value", "attr");
-      await flush();
-      expect(localStorage.getItem("foo")).toBe("attr");
-    },
-  );
+  it("should not store the value changed by the value attribute", async () => {
+    await render(html);
+    target().setAttribute("value", "attr");
+    await flush();
+    expect(localStorage.getItem("foo")).toBeNull();
+  });
 
   it("should synchronize with other elements", async () => {
     await render(
