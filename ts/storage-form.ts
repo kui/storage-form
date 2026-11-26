@@ -79,6 +79,11 @@ class NamedStorageControlsCollection {
     this.#value = notInitialized;
   }
 
+  /** Called if the write of the edited value failed. */
+  discardPendingValue(value: string) {
+    if (this.pendingValue === value) this.pendingValue = undefined;
+  }
+
   get isPending(): boolean {
     return this.pendingValue !== undefined;
   }
@@ -295,7 +300,12 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       }
       // Not awaited, because a delayed write would block queued tasks.
       if (editedValues.size > 0)
-        this.areaHandler.write(editedValues).catch(console.error);
+        this.areaHandler.write(editedValues).catch((error: unknown) => {
+          for (const [name, value] of editedValues)
+            if (value !== undefined)
+              this.namedControlMap.get(name)?.discardPendingValue(value);
+          console.error(error);
+        });
       // At the end, because listeners may change the area.
       dispatchOwnChangeEvents(changedControls);
     }

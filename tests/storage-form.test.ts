@@ -428,6 +428,25 @@ describe("edits before the initial loading", () => {
     expect(dump(localStorage)).toEqual({ foo: "retyped", bar: "on" });
   });
 
+  it("should store the edited value again after its write failed", async () => {
+    const error = jest.spyOn(console, "error").mockReturnValue();
+    const write = jest
+      .spyOn(WebStorageHandler.prototype, "write")
+      .mockImplementationOnce(() => {
+        // Storage#setItem throws synchronously if the quota is exceeded.
+        throw Error("quota exceeded");
+      });
+    await render(`
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+    await input(query("input"), "typed");
+    await completeReads();
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(localStorage).toHaveLength(0);
+    await input(query("input"), "typed");
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
   it("should store the same value again after it is deleted", async () => {
     await render(`
       <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
