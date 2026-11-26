@@ -836,6 +836,24 @@ describe("DOM mutations", () => {
     expect(b.value).toBe("");
   });
 
+  it("should leave controls in a nested form to the nested form", async () => {
+    localStorage.setItem("foo", "local");
+    sessionStorage.setItem("foo", "session");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a">
+        <storage-form storage-area="session-storage">
+          <div><input name="foo" id="b"></div>
+        </storage-form>
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    expect(query<HTMLInputElement>("#a").value).toBe("local");
+    expect(b.value).toBe("session");
+    await input(b, "typed");
+    expect(dump(localStorage)).toEqual({ foo: "local" });
+    expect(dump(sessionStorage)).toEqual({ foo: "typed" });
+  });
+
   it("should release controls in a removed nested form", async () => {
     await render(`
       <storage-form storage-area="local-storage" id="outer">

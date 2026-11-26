@@ -24,6 +24,15 @@ function matchesStorageControl(e: unknown): e is HTMLStorageFormControlElement {
   );
 }
 
+const storageFormMarker = Symbol("storageForm");
+
+function closestStorageForm(e: Element): Element | null {
+  for (let p = e.parentElement; p !== null; p = p.parentElement) {
+    if ((p as { [storageFormMarker]?: true })[storageFormMarker]) return p;
+  }
+  return null;
+}
+
 /** Change events dispatched by storage forms, not by users. */
 const ownEvents = new WeakSet<Event>();
 
@@ -180,6 +189,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
 ): T & HTMLElementConstructor<StorageElementMixin & StorageFormLikeElement> {
   return class extends mixinAreaHandlerElement(base) {
     readonly isNotStorageControl = true;
+    readonly [storageFormMarker] = true;
 
     private readonly namedControlMap = new NamedSetMap(
       (e: HTMLStorageFormControlElement) =>
@@ -192,7 +202,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     private remainingLoads = 0;
     private readonly changeListener = (event: Event) => {
       const e = event.target;
-      if (!matchesStorageControl(e)) return;
+      if (!this.isOwnControl(e)) return;
       const isOwnEvent = ownEvents.has(event);
       const elementSet = this.namedControlMap.get(e.name);
       if (!isOwnEvent && elementSet?.isInitialized === false) {
@@ -233,7 +243,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     private updateControls() {
       const controls = new Set<HTMLStorageFormControlElement>();
       for (const e of this.querySelectorAll(STORAGE_CONTROL_SELECTOR)) {
-        if (matchesStorageControl(e)) controls.add(e);
+        if (this.isOwnControl(e)) controls.add(e);
       }
       for (const [name, elementSet] of this.namedControlMap) {
         for (const e of elementSet) {
@@ -242,6 +252,11 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
         }
       }
       for (const e of controls) this.namedControlMap.add(e);
+    }
+
+    /** Controls in a nested storage form are left to the nested form. */
+    private isOwnControl(e: unknown): e is HTMLStorageFormControlElement {
+      return matchesStorageControl(e) && closestStorageForm(e) === this;
     }
 
     disconnectedCallback() {
