@@ -202,6 +202,16 @@ describe("synchronization", () => {
     expect(query<HTMLInputElement>("[name=bar]").value).toBe("");
   });
 
+  it("should store the value of the edited control of the same name", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><input name="foo" id="b">
+      </storage-form>`);
+    await input(query("#b"), "typed");
+    expect(localStorage.getItem("foo")).toBe("typed");
+    expect(query<HTMLInputElement>("#a").value).toBe("typed");
+  });
+
   it("should synchronize between forms of the same area", async () => {
     await render(`
       <storage-form storage-area="local-storage"><input name="foo" id="a"></storage-form>

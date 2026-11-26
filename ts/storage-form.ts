@@ -137,13 +137,22 @@ class NamedStorageControlsCollection {
     return changed;
   }
 
-  diff() {
+  /**
+   * @param edited The control which dispatched the event. It is checked first,
+   *   because other controls of the same name may also differ from the value,
+   *   such as text inputs when nothing is stored.
+   */
+  diff(edited?: HTMLStorageFormControlElement) {
     if (this.#value === notInitialized) return "notInitialized";
 
     const oldValue = this.pendingValue ?? this.#value;
     let newValue: string | undefined = undefined;
     let unselected = false;
-    for (const e of this.elements) {
+    const elements =
+      edited !== undefined && this.elements.has(edited)
+        ? [edited, ...this.elements]
+        : this.elements;
+    for (const e of elements) {
       const change = storageControlsHandler.diff(e, oldValue);
       if (change.type === "unselected") {
         unselected = true;
@@ -191,7 +200,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
         // Retry if the last loading failed
         if (this.remainingLoads === 0) this.invokeStorageChangeCallback();
       }
-      this.valueChangedCallback(isOwnEvent).catch(console.error);
+      this.valueChangedCallback(e, isOwnEvent).catch(console.error);
     };
 
     connectedCallback() {
@@ -327,12 +336,15 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       this.invokeStorageChangeCallback();
     }
 
-    private async valueChangedCallback(isOwnEvent: boolean): Promise<void> {
+    private async valueChangedCallback(
+      edited: HTMLStorageFormControlElement,
+      isOwnEvent: boolean,
+    ): Promise<void> {
       const entries: WroteValues = new Map();
       for (const [name, elementSet] of this.namedControlMap) {
         // Events by loading must not write values of other controls over the edit.
         if (isOwnEvent && elementSet.isPending) continue;
-        const diff = elementSet.diff();
+        const diff = elementSet.diff(edited);
         if (diff === "nochange" || diff === "notInitialized") continue;
         entries.set(name, diff.newValue);
       }
