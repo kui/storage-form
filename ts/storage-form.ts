@@ -93,10 +93,6 @@ class NamedStorageControlsCollection {
     if (this.pendingValue === value) this.pendingValue = undefined;
   }
 
-  get isPending(): boolean {
-    return this.pendingValue !== undefined;
-  }
-
   markAsEdited(e: HTMLStorageFormControlElement) {
     if (this.elements.has(e)) this.edited = e;
   }
@@ -206,14 +202,16 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       if (records.length > 0) this.handleMutations();
       const e = event.target;
       if (!this.isOwnControl(e)) return;
-      const isOwnEvent = ownEvents.has(event);
+      // Values written by storage forms are the stored ones or the defaults
+      // of removed values, which must not be stored.
+      if (ownEvents.has(event)) return;
       const elementSet = this.namedControlMap.get(e.name);
-      if (!isOwnEvent && elementSet?.isInitialized === false) {
+      if (elementSet?.isInitialized === false) {
         elementSet.markAsEdited(e);
         // Retry if the last loading failed
         if (this.remainingLoads === 0) this.invokeStorageChangeCallback();
       }
-      this.valueChangedCallback(e, isOwnEvent).catch(console.error);
+      this.valueChangedCallback(e).catch(console.error);
     };
 
     connectedCallback() {
@@ -356,12 +354,9 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
 
     private async valueChangedCallback(
       edited: HTMLStorageFormControlElement,
-      isOwnEvent: boolean,
     ): Promise<void> {
       const entries: WroteValues = new Map();
       for (const [name, elementSet] of this.namedControlMap) {
-        // Events by loading must not write values of other controls over the edit.
-        if (isOwnEvent && elementSet.isPending) continue;
         const diff = elementSet.diff(edited);
         if (diff === "nochange" || diff === "notInitialized") continue;
         entries.set(name, diff.newValue);

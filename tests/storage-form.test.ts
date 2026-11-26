@@ -236,6 +236,17 @@ describe("synchronization", () => {
     expect(query<HTMLInputElement>("[name=bar]").value).toBe("default");
   });
 
+  it("should not store the default value again after another window removes the value", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" value="default">
+      </storage-form>`);
+    await updateFromAnotherWindow(localStorage, "foo", null);
+    expect(query<HTMLInputElement>("input").value).toBe("default");
+    expect(localStorage.getItem("foo")).toBeNull();
+  });
+
   it("should reset values if the storage is cleared by another window", async () => {
     localStorage.setItem("foo", "stored");
     await render(`
