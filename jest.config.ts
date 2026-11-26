@@ -1,7 +1,7 @@
 import type { JestConfigWithTsJest } from "ts-jest";
 
 const config: JestConfigWithTsJest = {
-  testMatch: ["<rootDir>/tests/**/*.test.ts"],
+  testMatch: ["**/tests/**/*.test.ts"],
   testEnvironment: "jsdom",
   setupFiles: ["./tests/helpers/setup.ts"],
   restoreMocks: true,
