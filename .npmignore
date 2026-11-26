@@ -1,7 +1,0 @@
-/docs/
-/.github/
-*.tgz
-
-!/types/
-!/js/
-/mise.toml

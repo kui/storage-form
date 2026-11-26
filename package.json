@@ -9,6 +9,11 @@
       "types": "./types/storage-elements-registerer.d.ts"
     }
   },
+  "files": [
+    "js",
+    "types",
+    "ts/*.ts"
+  ],
   "scripts": {
     "prepare": "npm run build:ts",
     "test": "jest",
