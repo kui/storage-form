@@ -288,6 +288,72 @@ describe("FacadeAreaHandler", () => {
       );
       expect(callback).not.toHaveBeenCalled();
     });
+
+    describe("if a listener fails", () => {
+      const unhandled = jest.fn();
+      beforeEach(() => {
+        unhandled.mockClear();
+        process.on("unhandledRejection", unhandled);
+      });
+      afterEach(() => {
+        process.off("unhandledRejection", unhandled);
+      });
+      /** Waits for the unhandled rejections to be reported. */
+      async function tick() {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+
+      function facadeWithPendingWrite(
+        callback: (updates: WroteValues) => void | Promise<void>,
+      ) {
+        const { name, handler } = registerStubHandler();
+        const write = withResolves();
+        handler.write.mockReturnValueOnce(write.promise);
+        const facade = new FacadeAreaHandler();
+        facade.updateArea(name);
+        facade.onChange(callback);
+        return { facade, write };
+      }
+
+      it("should reject after the write without unhandled rejections", async () => {
+        const { facade, write } = facadeWithPendingWrite(() =>
+          Promise.reject(Error("listener")),
+        );
+        const done = jest.fn();
+        const p = facade.write(new Map([["k", "v2"]])).catch(done);
+        await tick();
+        expect(unhandled).not.toHaveBeenCalled();
+        expect(done).not.toHaveBeenCalled();
+        write.resolve();
+        await p;
+        expect(done).toHaveBeenCalledWith(Error("listener"));
+      });
+
+      it("should reject if a listener throws synchronously", async () => {
+        const { facade, write } = facadeWithPendingWrite(() => {
+          throw Error("listener");
+        });
+        const p = facade.write(new Map([["k", "v2"]]));
+        write.resolve();
+        await expect(p).rejects.toThrow("listener");
+      });
+
+      it("should reject with the write error if both fail", async () => {
+        const error = jest.spyOn(console, "error").mockImplementation();
+        // Only the first notification, not the restoring one.
+        const callback = jest.fn().mockImplementationOnce(() => {
+          throw Error("listener");
+        });
+        const { facade, write } = facadeWithPendingWrite(callback);
+        const p = facade.write(new Map([["k", "v2"]]));
+        write.reject(Error("write"));
+        await expect(p).rejects.toThrow("write");
+        await tick();
+        expect(unhandled).not.toHaveBeenCalled();
+        expect(error.mock.calls).toEqual([[Error("listener")]]);
+        expect(callback).toHaveBeenCalledTimes(2);
+      });
+    });
   });
 
   describe("#onChange", () => {

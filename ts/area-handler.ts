@@ -80,16 +80,16 @@ export class FacadeAreaHandler implements AreaHandler {
     const listener = this.localListener;
     const writing = handler?.write(items);
     // Not after the write, because asynchronous writes may be delayed for long.
-    const notifying = listener.dispatchEvent(items);
-    try {
-      await writing;
-    } catch (error) {
-      // The write error is thrown instead.
-      notifying.catch(console.error);
-      if (handler) await notifyStoredValues(handler, listener, items);
-      throw error;
+    // Async to reject instead of throwing if a listener throws synchronously.
+    const notifying = (async () => listener.dispatchEvent(items))();
+    // Wait for both, so that neither of them is left unhandled.
+    const [written, notified] = await Promise.allSettled([writing, notifying]);
+    if (written.status === "rejected") {
+      if (notified.status === "rejected") console.error(notified.reason);
+      if (handler) await notifyReadValues(handler, listener, items);
+      throw written.reason;
     }
-    await notifying;
+    if (notified.status === "rejected") throw notified.reason;
   }
 
   onChange(callback: (updates: WroteValues) => void | Promise<void>) {
@@ -124,8 +124,11 @@ export class FacadeAreaHandler implements AreaHandler {
   }
 }
 
-/** Restores the values notified by a rejected write. */
-async function notifyStoredValues(
+/**
+ * Restores the values notified by a rejected write, with the values which the
+ * handler reads. They may include the entries waiting to be written.
+ */
+async function notifyReadValues(
   handler: AreaHandler,
   listener: UpdateEventListenerCollection,
   items: WroteValues,
@@ -341,7 +344,10 @@ export class BufferedWriteHandler implements AreaHandler {
 
   async read(names: string[]): Promise<StoredValues> {
     const values = new Map(await this.delegate.read(names));
-    // After reading, to include the entries added while reading.
+    // After reading, to include the entries added while reading. The entries
+    // whose write started while reading are still overlaid here, because the
+    // storage completes the operations in order, so the read completes before
+    // the write.
     for (const entries of [this.writingEntries, this.pendingEntries]) {
       if (!entries) continue;
       for (const name of names) {
