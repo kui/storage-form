@@ -231,6 +231,7 @@ describe("FacadeAreaHandler", () => {
     });
 
     it("should notify the stored values if the write is rejected", async () => {
+      const error = jest.spyOn(console, "error").mockImplementation();
       const { name, handler } = registerStubHandler();
       handler.write.mockRejectedValueOnce(Error("test"));
       const facade = new FacadeAreaHandler();
@@ -253,6 +254,7 @@ describe("FacadeAreaHandler", () => {
           ]),
         ],
       ]);
+      expect(error).not.toHaveBeenCalled();
     });
 
     it("should reject with the write error even if the read fails", async () => {
@@ -833,8 +835,11 @@ describe("BufferedWriteHandler", () => {
         const p = handler.write(new Map([["a", "writing"]]));
         await jest.advanceTimersByTimeAsync(0);
         expect(delegate.write).toHaveBeenCalledTimes(1);
-        await expect(handler.read(["a"])).resolves.toEqual(
-          new Map([["a", "writing"]]),
+        await expect(handler.read(["a", "b"])).resolves.toEqual(
+          new Map([
+            ["a", "writing"],
+            ["b", "stored"],
+          ]),
         );
         resolve();
         await p;
