@@ -5,7 +5,7 @@ import {
   HTMLStorageAreaSelectElement,
 } from "../ts/storage-area-select.js";
 import { HTMLStorageFormElement } from "../ts/storage-form.js";
-import { flush, input, query, render } from "./helpers/dom.js";
+import { dump, flush, input, query, render } from "./helpers/dom.js";
 
 HTMLAreaSelectElement.register();
 HTMLStorageAreaSelectElement.register();
@@ -121,8 +121,7 @@ describe("storage-area-select", () => {
       <input name="foo">
     </storage-form>`;
 
-  // https://github.com/kui/storage-form/issues/40
-  it.failing("should restore the stored area", async () => {
+  it("should restore the stored area", async () => {
     localStorage.setItem("area", "session-storage");
     sessionStorage.setItem("foo", "stored");
     await render(html);
@@ -130,6 +129,28 @@ describe("storage-area-select", () => {
     expect(form().storageArea).toBe("session-storage");
     await flush();
     expect(query<HTMLInputElement>("input").value).toBe("stored");
+  });
+
+  it("should restore the stored areas of nested forms", async () => {
+    localStorage.setItem("outer", "session-storage");
+    sessionStorage.setItem("inner", "local-storage");
+    const areaSelect = (name: string, area: string) =>
+      `<select is="storage-area-select" name="${name}" storage-area="${area}"></select>`;
+    await render(`
+      <storage-form id="outer">
+        <storage-form id="inner">
+          ${areaSelect("inner", "session-storage")}
+        </storage-form>
+        ${areaSelect("outer", "local-storage")}
+      </storage-form>`);
+    expect(query<HTMLStorageFormElement>("#outer").storageArea).toBe(
+      "session-storage",
+    );
+    expect(query<HTMLStorageFormElement>("#inner").storageArea).toBe(
+      "local-storage",
+    );
+    expect(dump(localStorage)).toEqual({ outer: "session-storage" });
+    expect(dump(sessionStorage)).toEqual({ inner: "local-storage" });
   });
 
   it("should store the selected area", async () => {
