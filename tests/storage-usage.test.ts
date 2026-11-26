@@ -83,6 +83,18 @@ describe("storage-usage", () => {
     expect(e.textContent).toBe("5B");
   });
 
+  it("should not leave listeners after disconnected", async () => {
+    await render(`<storage-usage storage-area=small></storage-usage>`);
+    const { size } = allCustomElementsDefinedEvent.listeners;
+    const e = usage();
+    for (let i = 0; i < 5; i++) {
+      e.remove();
+      expect(allCustomElementsDefinedEvent.listeners.size).toBe(size - 1);
+      document.body.append(e);
+      expect(allCustomElementsDefinedEvent.listeners.size).toBe(size);
+    }
+  });
+
   describe("in storage-form", () => {
     it("should use the area of the form", async () => {
       await render(`
@@ -138,8 +150,21 @@ describe("storage-usage", () => {
       expect(usage().textContent).toBe("5B");
     });
 
-    // https://github.com/kui/storage-form/issues/44
-    it.failing("should follow the form after reconnected", async () => {
+    it("should find the form after all elements are defined even if reconnected", async () => {
+      await render(
+        `<storage-form><storage-usage name="foo"></storage-usage></storage-form>`,
+      );
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      e.remove();
+      form.append(e);
+      form.storageArea = "small";
+      allCustomElementsDefinedEvent.dispatchEvent();
+      await flush();
+      expect(e.textContent).toBe("5B");
+    });
+
+    it("should follow the form after reconnected", async () => {
       sessionStorage.setItem("foo", "1");
       await render(`
         <storage-form storage-area="small">
@@ -153,6 +178,141 @@ describe("storage-usage", () => {
       form.storageArea = "session-storage";
       await flush();
       expect(e.textContent).toBe("1B");
+    });
+
+    it("should follow the area change of the form while disconnected", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      e.remove();
+      form.storageArea = "session-storage";
+      await flush();
+      expect(e.textContent).toBe("5B");
+      form.append(e);
+      await flush();
+      expect(e.textContent).toBe("1B");
+    });
+
+    it("should follow only the new form after moved", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form id="old" storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>
+        <storage-form id="new" storage-area="session-storage"></storage-form>`);
+      const oldForm = query<HTMLStorageFormElement>("#old");
+      const newForm = query<HTMLStorageFormElement>("#new");
+      const e = usage();
+      newForm.append(e);
+      await flush();
+      expect(e.storageForm).toBe(newForm);
+      expect(e.textContent).toBe("1B");
+
+      const updateArea = jest.spyOn(e.areaHandler, "updateArea");
+      oldForm.storageArea = "session-storage";
+      await flush();
+      expect(updateArea).not.toHaveBeenCalled();
+      newForm.storageArea = "small";
+      await flush();
+      expect(e.textContent).toBe("5B");
+    });
+
+    it("should follow only the nearest form after all elements are defined", async () => {
+      await render(`
+        <storage-form id="outer" storage-area="session-storage">
+          <storage-form id="inner">
+            <storage-usage name="foo"></storage-usage>
+          </storage-form>
+        </storage-form>`);
+      const outer = query<HTMLStorageFormElement>("#outer");
+      const inner = query<HTMLStorageFormElement>("#inner");
+      const e = usage();
+      expect(e.storageForm).toBe(outer);
+      inner.storageArea = "small";
+      allCustomElementsDefinedEvent.dispatchEvent();
+      await flush();
+      expect(e.storageForm).toBe(inner);
+      expect(e.textContent).toBe("5B");
+
+      const updateArea = jest.spyOn(e.areaHandler, "updateArea");
+      outer.storageArea = "small";
+      await flush();
+      expect(updateArea).not.toHaveBeenCalled();
+    });
+
+    it("should not follow the form after moved out of it", async () => {
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      document.body.append(e);
+      await flush();
+      expect(e.storageForm).toBeNull();
+      expect(e.storageArea).toBe("");
+      expect(e.textContent).toBe("0B");
+
+      const updateArea = jest.spyOn(e.areaHandler, "updateArea");
+      form.storageArea = "session-storage";
+      await flush();
+      expect(updateArea).not.toHaveBeenCalled();
+    });
+
+    it("should use the area of the form after its own area is removed while disconnected", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo" storage-area="session-storage"></storage-usage>
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      e.remove();
+      e.removeAttribute("storage-area");
+      form.append(e);
+      await flush();
+      expect(e.textContent).toBe("5B");
+    });
+
+    it("should use its own area set while disconnected", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      e.remove();
+      e.setAttribute("storage-area", "session-storage");
+      form.append(e);
+      await flush();
+      expect(e.textContent).toBe("1B");
+      form.storageArea = "local-storage";
+      await flush();
+      expect(e.textContent).toBe("1B");
+    });
+
+    it("should not show the value without the area when reconnected", async () => {
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      const e = usage();
+      const values: number[] = [];
+      const { value } = e;
+      Object.defineProperty(e, "value", {
+        get: () => value,
+        set: (v: number) => values.push(v),
+      });
+      e.remove();
+      form.append(e);
+      await flush();
+      expect(new Set(values)).toEqual(new Set([5]));
     });
   });
 });
@@ -215,14 +375,136 @@ describe("formatted number", () => {
     expect(usage().getAttribute("name")).toBe("foo");
   });
 
-  // https://github.com/kui/storage-form/issues/45
-  it.failing("should show the usage of the new name", async () => {
+  it("should show the usage of the new name", async () => {
     localStorage.setItem("foo", "1");
     localStorage.setItem("bar", "123");
     await render(`<storage-usage storage-area=small name=foo></storage-usage>`);
     usage().name = "bar";
     await flush();
     expect(usage().textContent).toBe("3B");
+  });
+});
+
+describe("attribute changes of storage-usage", () => {
+  beforeEach(() => {
+    localStorage.setItem("foo", "12345");
+    localStorage.setItem("bar", "1234567890");
+  });
+
+  it.each<[string, string, string | null, number, string]>([
+    // [attributes, changed attribute, its value, value, text]
+    ["", "name", "foo", 5, "5B"],
+    ["name=foo", "name", "bar", 10, "10B"],
+    ["name=foo", "name", "none", 0, "0B"],
+    ["name=foo", "name", null, 15, "15B"],
+    ["format=percent", "name", "foo", 0.5, "50%"],
+    ["format=percent name=foo", "name", null, 0.15, "15%"],
+    ["name=foo", "format", "percent", 0.5, "50%"],
+    ["", "format", "percent", 0.15, "15%"],
+    ["format=percent name=foo", "format", null, 5, "5B"],
+    ["format=percent", "format", "", 15, "15"],
+  ])(
+    "should refresh on change from %p: %s=%p",
+    async (attrs, name, newValue, value, text) => {
+      await render(
+        `<storage-usage storage-area=small ${attrs}></storage-usage>`,
+      );
+      if (newValue === null) usage().removeAttribute(name);
+      else usage().setAttribute(name, newValue);
+      await flush();
+      expect(usage().value).toBeCloseTo(value);
+      expect(usage().textContent).toBe(text);
+    },
+  );
+
+  it("should refresh in storage-form", async () => {
+    await render(`
+      <storage-form storage-area="small">
+        <storage-usage name="foo"></storage-usage>
+      </storage-form>`);
+    usage().name = "bar";
+    await flush();
+    expect(usage().textContent).toBe("10B");
+  });
+
+  it("should dispatch a change event on the name change", async () => {
+    await render(`<storage-usage storage-area=small></storage-usage>`);
+    const listener = jest.fn();
+    usage().addEventListener("change", listener);
+    usage().name = "foo";
+    await flush();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["name", "foo"],
+    ["format", ""],
+  ])(
+    "should not read before connected on change of %s",
+    async (name, newValue) => {
+      const e = new HTMLStorageUsageElement();
+      e.setAttribute("storage-area", "small");
+      await flush();
+      e.value = 123;
+      e.setAttribute(name, newValue);
+      await flush();
+      expect(e.value).toBe(123);
+    },
+  );
+
+  it.each([
+    ["name", "foo"],
+    ["format", ""],
+  ])(
+    "should not overwrite the value without the area on change of %s",
+    async (name, newValue) => {
+      await render(`<storage-usage></storage-usage>`);
+      usage().value = 123;
+      usage().setAttribute(name, newValue);
+      await flush();
+      expect(usage().value).toBe(123);
+    },
+  );
+
+  it("should not read without the area while being upgraded", async () => {
+    const values: number[] = [];
+    class UpgradedElement extends HTMLStorageUsageElement {
+      override get value() {
+        return super.value;
+      }
+      override set value(v: number) {
+        values.push(v);
+        super.value = v;
+      }
+    }
+    await render(`
+      <storage-form storage-area="small">
+        <upgraded-usage name="foo" format=""></upgraded-usage>
+      </storage-form>
+      <upgraded-usage name="foo" format="" storage-area="small"></upgraded-usage>`);
+    customElements.define("upgraded-usage", UpgradedElement);
+    await flush();
+    expect(new Set(values)).toEqual(new Set([5]));
+  });
+
+  it("should not refresh on the value change", async () => {
+    await render(`<storage-usage storage-area=small></storage-usage>`);
+    usage().setAttribute("value", "2048");
+    await flush();
+    expect(usage().value).toBe(2048);
+    expect(usage().textContent).toBe("2KiB");
+  });
+
+  it("should use the name changed while disconnected", async () => {
+    await render(`<storage-usage storage-area=small name=foo></storage-usage>`);
+    const e = usage();
+    e.remove();
+    e.name = "bar";
+    await flush();
+    expect(e.textContent).toBe("5B");
+    document.body.append(e);
+    await flush();
+    expect(e.textContent).toBe("10B");
   });
 });
 
@@ -238,6 +520,58 @@ describe("storage-quota", () => {
     await render(`<storage-quota ${attrs}></storage-quota>`);
     expect(quota().value).toBe(value);
     expect(quota().textContent).toBe(text);
+  });
+
+  it("should refresh on adding, changing and removing the name", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    quota().name = "foo";
+    await flush();
+    expect(quota().textContent).toBe("10B");
+    quota().name = "bar";
+    await flush();
+    expect(quota().textContent).toBe("10B");
+    quota().removeAttribute("name");
+    await flush();
+    expect(quota().textContent).toBe("100B");
+  });
+
+  it("should not refresh on the value change", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    quota().setAttribute("value", "2048");
+    await flush();
+    expect(quota().value).toBe(2048);
+    expect(quota().textContent).toBe("2KiB");
+  });
+
+  it("should reflect the format attribute", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    quota().setAttribute("format", "");
+    expect(quota().textContent).toBe("100");
+  });
+
+  it("should follow the change of the storage-area attribute", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    quota().setAttribute("storage-area", "local-storage");
+    await flush();
+    expect(quota().textContent).toBe("10MiB");
+  });
+
+  it("should keep the value on the format change", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    quota().format = "";
+    await flush();
+    expect(quota().value).toBe(100);
+    expect(quota().textContent).toBe("100");
+  });
+
+  it("should not overwrite the value before connected", async () => {
+    const e = new HTMLStorageQuotaElement();
+    e.setAttribute("storage-area", "small");
+    await flush();
+    e.value = 123;
+    e.name = "foo";
+    await flush();
+    expect(e.value).toBe(123);
   });
 });
 
@@ -278,6 +612,29 @@ describe("storage-usage-meter", () => {
     );
     await updateFromAnotherWindow(localStorage, "foo", "12");
     expect(meter().value).toBeCloseTo(0.2);
+  });
+
+  it("should refresh on adding, changing and removing the name", async () => {
+    await render(`<meter is="storage-usage-meter" storage-area=small></meter>`);
+    meter().setAttribute("name", "foo");
+    await flush();
+    expect(meter().value).toBeCloseTo(0.5);
+    meter().setAttribute("name", "bar");
+    await flush();
+    expect(meter().value).toBeCloseTo(1);
+    meter().removeAttribute("name");
+    await flush();
+    expect(meter().value).toBeCloseTo(0.15);
+  });
+
+  it("should not overwrite the value before connected", async () => {
+    const e = document.createElement("meter", { is: "storage-usage-meter" });
+    e.setAttribute("storage-area", "small");
+    await flush();
+    e.value = 0.3;
+    e.setAttribute("name", "foo");
+    await flush();
+    expect(e.value).toBeCloseTo(0.3);
   });
 
   it("should dispatch a change event on the name change", async () => {

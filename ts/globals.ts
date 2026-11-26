@@ -40,8 +40,11 @@ if (typeof globalThis.storageForm === "undefined") {
 }
 
 export const allCustomElementsDefinedEvent = {
-  listeners: [] as (() => void)[],
+  listeners: new Set<() => void>(),
   dispatchEvent() {
-    for (const l of allCustomElementsDefinedEvent.listeners) l();
+    const { listeners } = allCustomElementsDefinedEvent;
+    // Iterate over a copy because a listener that is deleted and added again
+    // while iterating over the set itself is visited endlessly.
+    for (const l of [...listeners]) if (listeners.has(l)) l();
   },
 };

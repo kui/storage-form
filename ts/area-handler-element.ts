@@ -97,6 +97,10 @@ export function mixinAreaHandlerElement<
 
 export interface StorageFormChildAreaHandlerElement extends AreaHandlerElement {
   readonly storageForm: StorageElementMixin | null;
+  /**
+   * Reads the storage again if this element is connected and has an area.
+   */
+  refreshStorageValue(): void;
 }
 
 export function mixinStorageFormChildAreaHandlerElement<
@@ -104,9 +108,15 @@ export function mixinStorageFormChildAreaHandlerElement<
 >(base: T): T & HTMLElementConstructor<StorageFormChildAreaHandlerElement> {
   return class extends mixinAreaHandlerElement(base) {
     #storageForm: StorageElementMixin | null = null;
+    // Unlike isConnected, this is false in attributeChangedCallback called
+    // before connectedCallback.
+    #isReady = false;
     private readonly storageFormObserver = new MutationObserver(
       this.onStorageFormMutation.bind(this),
     );
+    private readonly allCustomElementsDefinedListener = () => {
+      this.updateStorageForm();
+    };
 
     get storageForm() {
       return this.#storageForm;
@@ -131,11 +141,14 @@ export function mixinStorageFormChildAreaHandlerElement<
     }
 
     connectedCallback() {
+      // The super class reads the storage, so the form should be found before
+      // it to avoid showing the value without the area.
+      this.findStorageForm();
       super.connectedCallback?.();
-      this.updateStorageForm();
-      allCustomElementsDefinedEvent.listeners.push(() => {
-        this.updateStorageForm();
-      });
+      this.#isReady = true;
+      allCustomElementsDefinedEvent.listeners.add(
+        this.allCustomElementsDefinedListener,
+      );
     }
 
     adoptedCallback() {
@@ -146,26 +159,40 @@ export function mixinStorageFormChildAreaHandlerElement<
     disconnectedCallback() {
       super.disconnectedCallback?.();
       this.storageFormObserver.disconnect();
+      this.#storageForm = null;
+      this.#isReady = false;
+      allCustomElementsDefinedEvent.listeners.delete(
+        this.allCustomElementsDefinedListener,
+      );
+    }
+
+    refreshStorageValue() {
+      if (!this.#isReady || this.storageArea === "") return;
+      this.invokeStorageChangeCallback();
     }
 
     //
 
     private updateStorageForm() {
-      const form = this.getStorageForm();
-      if (form === this.#storageForm) return;
+      if (!this.findStorageForm()) return;
+      this.updateArea();
+      this.invokeStorageChangeCallback();
+    }
 
-      if (form === null) {
-        this.storageFormObserver.disconnect();
-      } else {
-        this.storageFormObserver.disconnect();
+    /** @return true if the form is changed. */
+    private findStorageForm(): boolean {
+      const form = this.getStorageForm();
+      if (form === this.#storageForm) return false;
+
+      this.storageFormObserver.disconnect();
+      if (form !== null) {
         this.storageFormObserver.observe(form, {
           attributes: true,
           attributeFilter: ["storage-area"],
         });
       }
       this.#storageForm = form;
-      this.updateArea();
-      this.invokeStorageChangeCallback();
+      return true;
     }
 
     private getStorageForm(): StorageElementMixin | null {

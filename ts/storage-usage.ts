@@ -164,6 +164,7 @@ export function mixinStorageUsageMeterElement<
       super.attributeChangedCallback?.(name, oldValue, newValue);
       if (name === "name") {
         dispatchChangeEvent(this);
+        this.refreshStorageValue();
       }
     }
   };
@@ -212,6 +213,20 @@ export function mixinStorageUsageElement<
         }
       }
     }
+
+    static readonly observedAttributes = distinctConcat(
+      super.observedAttributes ?? [],
+      ["name", "format"],
+    );
+
+    attributeChangedCallback(
+      name: string,
+      oldValue: string | null,
+      newValue: string | null,
+    ) {
+      super.attributeChangedCallback?.(name, oldValue, newValue);
+      if (name === "name" || name === "format") this.refreshStorageValue();
+    }
   };
 }
 
@@ -233,6 +248,20 @@ export function mixinStorageQuotaElement<
       } else {
         this.value = this.areaHandler.totalQuotaBytes ?? NaN;
       }
+    }
+
+    static readonly observedAttributes = distinctConcat(
+      super.observedAttributes ?? [],
+      ["name"],
+    );
+
+    attributeChangedCallback(
+      name: string,
+      oldValue: string | null,
+      newValue: string | null,
+    ) {
+      super.attributeChangedCallback?.(name, oldValue, newValue);
+      if (name === "name") this.refreshStorageValue();
     }
   };
 }
