@@ -22,13 +22,13 @@ export function fakeChromeStorageArea(
           .reduce((acc, [k, v]) => acc + k.length + String(v).length, 0),
       ),
     ),
-    set: jest.fn((items: Record<string, unknown>, callback: () => void) => {
+    set: jest.fn((items: Record<string, unknown>) => {
       Object.assign(values, items);
-      callback();
+      return Promise.resolve();
     }),
-    remove: jest.fn((keys: string[], callback: () => void) => {
+    remove: jest.fn((keys: string[]) => {
       for (const k of keys) Reflect.deleteProperty(values, k);
-      callback();
+      return Promise.resolve();
     }),
     onChanged: {
       addListener: (l: (changes: Changes) => void) => listeners.add(l),

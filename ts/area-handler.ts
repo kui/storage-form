@@ -240,14 +240,13 @@ export class ChromeStorageHandler implements AreaHandler {
       if (value === undefined) removeKeys.push(key);
       else setItems[key] = value;
     }
-    await Promise.all([
-      new Promise<void>((resolve) => {
-        this.storage.remove(removeKeys, resolve);
-      }),
-      new Promise<void>((resolve) => {
-        this.storage.set(setItems, resolve);
-      }),
+    // Unlike Promise.all(), wait for both operations even if one of them fails.
+    // Otherwise, the caller could start the next write during this one.
+    const results = await Promise.allSettled([
+      this.storage.remove(removeKeys),
+      this.storage.set(setItems),
     ]);
+    for (const r of results) if (r.status === "rejected") throw r.reason;
   }
 
   onChange(callback: (updates: WroteValues) => void | Promise<void>) {
@@ -282,7 +281,8 @@ export class ChromeStorageHandler implements AreaHandler {
 
 export class BufferedWriteHandler implements AreaHandler {
   private readonly delayMillis: number;
-  private updatedEntries: WroteValues | null = null;
+  /** Entries which are not passed to the delegate yet. */
+  private pendingEntries: WroteValues | null = null;
   private writePromise: Promise<void> = Promise.resolve();
   private lastWriteTime = 0;
 
@@ -316,20 +316,27 @@ export class BufferedWriteHandler implements AreaHandler {
   }
 
   write(items: WroteValues): Promise<void> {
-    if (this.updatedEntries) {
-      setAll(this.updatedEntries, items);
+    if (this.pendingEntries) {
+      setAll(this.pendingEntries, items);
       return this.writePromise;
     }
 
-    const updatedEntries = new Map(items);
-    this.updatedEntries = updatedEntries;
+    const entries = new Map(items);
+    this.pendingEntries = entries;
+    // The callers of the previous write are the ones to handle its error.
+    const previousWrite = this.writePromise.catch(() => undefined);
     this.writePromise = (async () => {
+      await previousWrite;
       const diffTime = Date.now() - this.lastWriteTime;
       const sleepTime = this.delayMillis - diffTime;
       if (sleepTime > 0) await sleep(sleepTime);
-      await this.delegate.write(updatedEntries);
-      this.updatedEntries = null;
-      this.lastWriteTime = Date.now();
+      this.pendingEntries = null;
+      try {
+        await this.delegate.write(entries);
+      } finally {
+        // Failed writes may also consume the rate limit of the storage.
+        this.lastWriteTime = Date.now();
+      }
     })();
 
     return this.writePromise;
