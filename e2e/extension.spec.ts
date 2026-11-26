@@ -41,22 +41,16 @@ for (const area of ["local", "sync"] as const) {
     const checkbox = form.locator("[name=checkbox]");
 
     await page.goto(optionsUrl);
-    // Inputs before the initial loading are discarded, so retry them.
-    // https://github.com/kui/storage-form/issues/52
-    await expect(async () => {
-      await text.fill("typed");
-      await checkbox.check();
-      expect(await stored()).toEqual({ text: "typed", checkbox: "on" });
-    }).toPass();
+    await text.fill("typed");
+    await checkbox.check();
+    await expect.poll(stored).toEqual({ text: "typed", checkbox: "on" });
 
     await page.reload();
     await expect(text).toHaveValue("typed");
     await expect(checkbox).toBeChecked();
 
-    await expect(async () => {
-      await checkbox.uncheck();
-      expect(await stored()).toEqual({ text: "typed" });
-    }).toPass();
+    await checkbox.uncheck();
+    await expect.poll(stored).toEqual({ text: "typed" });
 
     // Changes by others, such as another tab and a synchronized browser
     await page.evaluate(

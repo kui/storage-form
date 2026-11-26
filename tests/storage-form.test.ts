@@ -1,4 +1,11 @@
+import {
+  registerHandler,
+  WebStorageHandler,
+  type AreaHandler,
+} from "../ts/area-handler.js";
+import { withResolves } from "../ts/promises.js";
 import { HTMLStorageFormElement } from "../ts/storage-form.js";
+import { HTMLStorageInputElement } from "../ts/storage-mono-controls.js";
 import {
   check,
   dump,
@@ -9,6 +16,7 @@ import {
   updateFromAnotherWindow,
 } from "./helpers/dom.js";
 
+HTMLStorageInputElement.register();
 HTMLStorageFormElement.register();
 
 beforeEach(() => {
@@ -243,6 +251,509 @@ describe("storage-area", () => {
   });
 });
 
+describe("edits before the initial loading", () => {
+  const reads: ReturnType<typeof withResolves<void>>[] = [];
+  const asyncHandler = (storage: Storage): AreaHandler => {
+    const handler = new WebStorageHandler(storage);
+    return Object.assign(Object.create(handler) as WebStorageHandler, {
+      read: async (names: string[]) => {
+        if (isReadFailing) throw Error("read failed");
+        // The value is decided when the read starts, as slow storages do.
+        const result = handler.read(names);
+        const read = withResolves();
+        reads.push(read);
+        await read.promise;
+        return result;
+      },
+    });
+  };
+  let isReadFailing = false;
+  registerHandler("async-local", asyncHandler(localStorage));
+  registerHandler("async-session", asyncHandler(sessionStorage));
+
+  /** Completes all reads including ones started by the completion. */
+  async function completeReads() {
+    while (reads.length > 0) {
+      for (const r of reads.splice(0)) r.resolve();
+      await flush();
+    }
+  }
+
+  afterEach(async () => {
+    isReadFailing = false;
+    await completeReads();
+  });
+
+  it("should store the edited value if nothing is stored", async () => {
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo" value="default"><input name="bar" type="checkbox">
+      </storage-form>`);
+    const foo = query<HTMLInputElement>("[name=foo]");
+    await input(foo, "typed");
+    await check(query("[name=bar]"), true);
+    expect(localStorage).toHaveLength(0);
+
+    const listener = jest.fn();
+    document.body.addEventListener("change", listener);
+    await completeReads();
+    document.body.removeEventListener("change", listener);
+    expect(foo.value).toBe("typed");
+    expect(query<HTMLInputElement>("[name=bar]").checked).toBe(true);
+    expect(dump(localStorage)).toEqual({ foo: "typed", bar: "on" });
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("should store an emptied value", async () => {
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo" value="default">
+      </storage-form>`);
+    await input(query("input"), "");
+    await completeReads();
+    expect(query<HTMLInputElement>("input").value).toBe("");
+    expect(dump(localStorage)).toEqual({ foo: "" });
+  });
+
+  it("should keep an unchecked checkbox", async () => {
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo" type="checkbox" checked>
+      </storage-form>`);
+    await check(query("input"), false);
+    await completeReads();
+    expect(query<HTMLInputElement>("input").checked).toBe(false);
+    expect(localStorage).toHaveLength(0);
+  });
+
+  it("should keep the edited value while its writing is delayed", async () => {
+    const write = jest
+      .spyOn(WebStorageHandler.prototype, "write")
+      .mockReturnValue(new Promise(() => undefined) as never);
+    await render(`
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+    await input(query("input"), "typed");
+    await completeReads();
+    expect(query<HTMLInputElement>("input").value).toBe("typed");
+    expect(write.mock.calls).toEqual([[new Map([["foo", "typed"]])]]);
+    await updateFromAnotherWindow(localStorage, "foo", "updated");
+    expect(query<HTMLInputElement>("input").value).toBe("updated");
+  });
+
+  it("should respect the stored value", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+    await input(query("input"), "typed");
+    await completeReads();
+    expect(query<HTMLInputElement>("input").value).toBe("stored");
+    expect(dump(localStorage)).toEqual({ foo: "stored" });
+  });
+
+  it("should reset controls changed without events", async () => {
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo" value="default"><input name="bar">
+      </storage-form>`);
+    const foo = query<HTMLInputElement>("[name=foo]");
+    foo.value = "changed";
+    await input(query("[name=bar]"), "typed");
+    await completeReads();
+    expect(foo.value).toBe("default");
+    expect(localStorage.getItem("bar")).toBe("typed");
+  });
+
+  it("should prefer the last edited control of the same name", async () => {
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo" id="a" value="default">
+        <input name="foo" id="b">
+        <input name="foo" id="c">
+      </storage-form>`);
+    await input(query("#c"), "first");
+    await input(query("#b"), "last");
+    await completeReads();
+    for (const id of ["#a", "#b", "#c"])
+      expect(query<HTMLInputElement>(id).value).toBe("last");
+    expect(dump(localStorage)).toEqual({ foo: "last" });
+  });
+
+  it("should store only the edited value if another control is loaded", async () => {
+    localStorage.setItem("bar", "stored");
+    const write = jest.spyOn(WebStorageHandler.prototype, "write");
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo" id="a" value="default"><input name="foo" id="b">
+        <input name="bar">
+      </storage-form>`);
+    await input(query("#b"), "typed");
+    await completeReads();
+    for (const [items] of write.mock.calls)
+      expect(items).toEqual(new Map([["foo", "typed"]]));
+    expect(dump(localStorage)).toEqual({ foo: "typed", bar: "stored" });
+  });
+
+  it("should not write the edited value twice nor sanitized values", async () => {
+    const write = jest.spyOn(WebStorageHandler.prototype, "write");
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo" type="number" value="1"><input name="foo" id="b">
+      </storage-form>`);
+    await input(query("#b"), "typed");
+    await completeReads();
+    expect(write.mock.calls).toEqual([[new Map([["foo", "typed"]])]]);
+    expect(query<HTMLInputElement>("#b").value).toBe("typed");
+  });
+
+  it("should store edits made before the write is notified", async () => {
+    const write = jest.spyOn(WebStorageHandler.prototype, "write");
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo"><input name="bar" type="checkbox">
+      </storage-form>`);
+    // Queued loadings delay the notification.
+    query("storage-form").append("text");
+    await flush();
+    await input(query("[name=foo]"), "typed");
+    while (write.mock.calls.length === 0) {
+      reads.shift()?.resolve();
+      await flush();
+    }
+    await check(query("[name=bar]"), true);
+    expect(write.mock.lastCall).toEqual([new Map([["bar", "on"]])]);
+    await input(query("[name=foo]"), "retyped");
+    expect(write.mock.lastCall?.[0].get("foo")).toBe("retyped");
+    await completeReads();
+    expect(query<HTMLInputElement>("[name=foo]").value).toBe("retyped");
+    expect(dump(localStorage)).toEqual({ foo: "retyped", bar: "on" });
+  });
+
+  it("should store the edited value again after its write failed", async () => {
+    const error = jest.spyOn(console, "error").mockReturnValue();
+    const write = jest
+      .spyOn(WebStorageHandler.prototype, "write")
+      .mockImplementationOnce(() => {
+        // Storage#setItem throws synchronously if the quota is exceeded.
+        throw Error("quota exceeded");
+      });
+    await render(`
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+    await input(query("input"), "typed");
+    await completeReads();
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(localStorage).toHaveLength(0);
+    await input(query("input"), "typed");
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should store the same value again after it is deleted", async () => {
+    await render(`
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+    await input(query("input"), "typed");
+    await completeReads();
+    await updateFromAnotherWindow(localStorage, "foo", null);
+    localStorage.clear();
+    await input(query("input"), "typed");
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should not load again by edits while loading", async () => {
+    const read = jest.spyOn(WebStorageHandler.prototype, "read");
+    const html = `
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`;
+    await render(html);
+    await completeReads();
+    const count = read.mock.calls.length;
+    read.mockClear();
+    await render(html);
+    await input(query("input"), "a");
+    await input(query("input"), "ab");
+    await completeReads();
+    expect(read).toHaveBeenCalledTimes(count);
+  });
+
+  it("should write the edited value into a control added before the write is notified", async () => {
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo"><input name="foo" id="b" value="default">
+      </storage-form>`);
+    const form = query("storage-form");
+    const added = document.createElement("input");
+    added.name = "foo";
+    // Queued loadings delay the notification.
+    form.append("text");
+    await flush();
+    await input(query("input"), "typed");
+    query("#b").addEventListener("change", () => {
+      form.append(added);
+    });
+    while (!added.isConnected) {
+      reads.shift()?.resolve();
+      await flush();
+    }
+    expect(added.value).toBe("typed");
+    await completeReads();
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
+  it.each([
+    ["initial", "async-local", localStorage],
+    ["new", "async-session", sessionStorage],
+  ])(
+    "should recover from a failure to read the %s area",
+    async (_, area, storage) => {
+      const error = jest.spyOn(console, "error").mockReturnValue();
+      const isInitial = storage === localStorage;
+      isReadFailing = isInitial;
+      await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo"><input name="bar"><input name="baz">
+      </storage-form>`);
+      await completeReads();
+      isReadFailing = true;
+      query<HTMLStorageFormElement>("storage-form").storageArea = area;
+      await flush();
+      const foo = query<HTMLInputElement>("[name=foo]");
+      const bar = query<HTMLInputElement>("[name=bar]");
+      const baz = query<HTMLInputElement>("[name=baz]");
+
+      await updateFromAnotherWindow(storage, "foo", "new");
+      expect(foo.value).toBe("new");
+
+      error.mockClear();
+      await input(bar, "failed");
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(storage.getItem("bar")).toBeNull();
+
+      isReadFailing = false;
+      storage.setItem("baz", "stored");
+      await input(foo, "typed");
+      expect(storage.getItem("foo")).toBe("typed");
+      await input(bar, "typed");
+      await input(baz, "typed");
+      expect(reads).toHaveLength(1);
+      await completeReads();
+      expect(dump(storage)).toEqual({
+        foo: "typed",
+        bar: "typed",
+        baz: "stored",
+      });
+      expect(baz.value).toBe("stored");
+    },
+  );
+
+  it.each(["foo", "area"])(
+    "should not mix areas if a listener changes the area, with %s first",
+    async (first) => {
+      localStorage.setItem("area", "async-session");
+      sessionStorage.setItem("foo", "precious");
+      const foo = `<input name="foo">`;
+      const select = `
+        <select name="area"><option>async-local<option>async-session</select>`;
+      await render(`
+        <storage-form storage-area="async-local">
+          ${first === "foo" ? foo + select : select + foo}
+        </storage-form>`);
+      const form = query<HTMLStorageFormElement>("storage-form");
+      query("select").addEventListener(
+        "change",
+        () => {
+          form.storageArea = "async-session";
+        },
+        { once: true },
+      );
+      await input(query("input"), "typed");
+      await completeReads();
+      expect(query<HTMLInputElement>("input").value).toBe("precious");
+      expect(sessionStorage.getItem("foo")).toBe("precious");
+      expect(localStorage.getItem("foo")).toBe("typed");
+      // The change event by loading is not an edit in the new area.
+      expect(query<HTMLSelectElement>("select").value).toBe("async-local");
+      expect(sessionStorage.getItem("area")).not.toBe("async-session");
+    },
+  );
+
+  it("should not write the old value into a control added while disconnected", async () => {
+    localStorage.setItem("foo", "old");
+    await render(`
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+    await completeReads();
+    const form = query("storage-form");
+    form.remove();
+    const added = document.createElement("input");
+    added.name = "foo";
+    form.append(added);
+    document.body.append(form);
+    expect(added.value).toBe("");
+    await completeReads();
+    expect(added.value).toBe("old");
+  });
+
+  it("should store the checked radio instead of the default one", async () => {
+    await render(`
+      <storage-form storage-area="async-local">
+        <input type="radio" name="foo" value="a" checked>
+        <input type="radio" name="foo" value="b">
+        <input type="radio" name="foo" value="c">
+      </storage-form>`);
+    await check(query("[value=c]"), true);
+    await check(query("[value=b]"), true);
+    await completeReads();
+    expect(query<HTMLInputElement>(":checked").value).toBe("b");
+    expect(dump(localStorage)).toEqual({ foo: "b" });
+  });
+
+  it("should respect the stored radio", async () => {
+    localStorage.setItem("foo", "a");
+    await render(`
+      <storage-form storage-area="async-local">
+        <input type="radio" name="foo" value="a">
+        <input type="radio" name="foo" value="b">
+      </storage-form>`);
+    await check(query("[value=b]"), true);
+    await completeReads();
+    expect(query<HTMLInputElement>(":checked").value).toBe("a");
+    expect(dump(localStorage)).toEqual({ foo: "a" });
+  });
+
+  it("should keep the edit even if another control is loaded", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo"><input name="bar">
+      </storage-form>`);
+    await input(query("[name=bar]"), "typed");
+    await completeReads();
+    expect(query<HTMLInputElement>("[name=bar]").value).toBe("typed");
+    expect(dump(localStorage)).toEqual({ foo: "stored", bar: "typed" });
+  });
+
+  it("should store the edit of a control added later", async () => {
+    await render(`<storage-form storage-area="async-local"></storage-form>`);
+    await completeReads();
+    const div = document.createElement("div");
+    div.innerHTML = `<input name="foo">`;
+    query("storage-form").append(div);
+    await flush();
+    await input(query("input"), "typed");
+    expect(localStorage).toHaveLength(0);
+    await completeReads();
+    expect(query<HTMLInputElement>("input").value).toBe("typed");
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should forget the edit of a removed control", async () => {
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo" id="a" value="default"><input name="foo" id="b">
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    await input(b, "typed");
+    b.remove();
+    await completeReads();
+    expect(query<HTMLInputElement>("#a").value).toBe("default");
+    expect(localStorage).toHaveLength(0);
+  });
+
+  it("should respect the stored value after reconnected", async () => {
+    await render(`
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+    await completeReads();
+    const form = query("storage-form");
+    form.remove();
+    localStorage.setItem("foo", "stored");
+    document.body.append(form);
+    await input(query("input"), "typed");
+    await completeReads();
+    expect(query<HTMLInputElement>("input").value).toBe("stored");
+    expect(dump(localStorage)).toEqual({ foo: "stored" });
+  });
+
+  it("should not carry a stored edit over to the new area", async () => {
+    await render(`
+      <storage-form storage-area="async-local">
+        <input name="foo" type="checkbox">
+      </storage-form>`);
+    await completeReads();
+    await check(query("input"), true);
+    query<HTMLStorageFormElement>("storage-form").storageArea = "async-session";
+    await completeReads();
+    expect(query<HTMLInputElement>("input").checked).toBe(false);
+    expect(dump(localStorage)).toEqual({ foo: "on" });
+    expect(sessionStorage).toHaveLength(0);
+  });
+
+  it("should keep the edit when the form is moved", async () => {
+    await render(`
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+    await input(query("input"), "typed");
+    document.body.append(query("storage-form"));
+    await completeReads();
+    expect(query<HTMLInputElement>("input").value).toBe("typed");
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
+  it.each([
+    ["nothing", undefined, "typed"],
+    ["a value", "stored", "stored"],
+  ])(
+    "should handle the edit if the area is changed to one storing %s",
+    async (_, stored, expected) => {
+      if (stored) sessionStorage.setItem("foo", stored);
+      await render(`
+        <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+      await input(query("input"), "typed");
+      query<HTMLStorageFormElement>("storage-form").storageArea =
+        "async-session";
+      await completeReads();
+      expect(query<HTMLInputElement>("input").value).toBe(expected);
+      expect(localStorage).toHaveLength(0);
+      expect(dump(sessionStorage)).toEqual({ foo: expected });
+    },
+  );
+
+  it.each([
+    ["nothing", undefined, "typed"],
+    ["a value", "stored", "stored"],
+  ])(
+    "should handle an edit while loading the new area storing %s",
+    async (_, stored, expected) => {
+      localStorage.setItem("foo", "local");
+      if (stored) sessionStorage.setItem("foo", stored);
+      await render(`
+        <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+      await completeReads();
+      query<HTMLStorageFormElement>("storage-form").storageArea =
+        "async-session";
+      await input(query("input"), "typed");
+      await completeReads();
+      expect(query<HTMLInputElement>("input").value).toBe(expected);
+      expect(dump(localStorage)).toEqual({ foo: "local" });
+      expect(dump(sessionStorage)).toEqual({ foo: expected });
+    },
+  );
+
+  it("should ignore an update of the old area", async () => {
+    sessionStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+    await completeReads();
+    const form = query<HTMLStorageFormElement>("storage-form");
+    // Mutations start a reload.
+    form.append("text");
+    await flush();
+    await updateFromAnotherWindow(localStorage, "foo", "updated");
+    form.storageArea = "async-session";
+    for (const r of reads.splice(0)) r.resolve();
+    await flush();
+    await input(query("input"), "typed");
+    await completeReads();
+    expect(query<HTMLInputElement>("input").value).toBe("stored");
+    expect(dump(sessionStorage)).toEqual({ foo: "stored" });
+  });
+});
+
 describe("DOM mutations", () => {
   it("should handle an added control", async () => {
     localStorage.setItem("foo", "stored");
@@ -267,8 +778,7 @@ describe("DOM mutations", () => {
     expect(e.value).toBe("stored");
   });
 
-  // https://github.com/kui/storage-form/issues/42
-  it.failing("should handle controls in an added subtree", async () => {
+  it("should handle controls in an added subtree", async () => {
     localStorage.setItem("foo", "stored");
     await render(`<storage-form storage-area="local-storage"></storage-form>`);
     const div = document.createElement("div");
@@ -276,6 +786,90 @@ describe("DOM mutations", () => {
     query("storage-form").append(div);
     await flush();
     expect(query<HTMLInputElement>("input").value).toBe("stored");
+  });
+
+  it("should ignore storage custom elements in an added subtree", async () => {
+    await render(`<storage-form storage-area="local-storage"></storage-form>`);
+    const div = document.createElement("div");
+    div.innerHTML = `<input name="foo" is="storage-input"><input name="foo" id="b">`;
+    query("storage-form").append(div);
+    await flush();
+    await input(query("#b"), "typed");
+    expect(query<HTMLInputElement>("[is=storage-input]").value).toBe("");
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should not touch controls in a removed subtree", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><div><input name="foo" id="b"></div>
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    query("div").remove();
+    await flush();
+    await input(query("#a"), "typed");
+    expect(b.value).toBe("");
+  });
+
+  it("should release controls in a removed nested form", async () => {
+    await render(`
+      <storage-form storage-area="local-storage" id="outer">
+        <input name="foo" id="a">
+        <storage-form storage-area="local-storage" id="inner">
+          <div><input name="foo" id="b"></div>
+        </storage-form>
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    await input(b, "before");
+    expect(query<HTMLInputElement>("#a").value).toBe("before");
+    query("#inner").remove();
+    await flush();
+    await input(query("#a"), "after");
+    expect(b.value).toBe("before");
+  });
+
+  it("should handle controls in an added nested form", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`<storage-form storage-area="local-storage"></storage-form>`);
+    const inner = document.createElement("storage-form");
+    inner.setAttribute("storage-area", "local-storage");
+    inner.innerHTML = `<div><input name="foo"></div>`;
+    query("storage-form").append(inner);
+    await flush();
+    const e = query<HTMLInputElement>("input");
+    expect(e.value).toBe("stored");
+    await input(e, "typed");
+    expect(localStorage.getItem("foo")).toBe("typed");
+  });
+
+  it("should keep handling a control moved within the form", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <div><input name="foo"></div><p></p>
+      </storage-form>`);
+    const e = query<HTMLInputElement>("input");
+    await input(e, "typed");
+    query("p").append(query("div"));
+    await flush();
+    expect(e.value).toBe("typed");
+    await input(e, "retyped");
+    expect(localStorage.getItem("foo")).toBe("retyped");
+    await updateFromAnotherWindow(localStorage, "foo", "updated");
+    expect(e.value).toBe("updated");
+  });
+
+  it("should release a control renamed and removed at once", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><div><input name="foo" id="b"></div>
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    b.name = "bar";
+    query("div").remove();
+    await flush();
+    await input(query("#a"), "typed");
+    await updateFromAnotherWindow(localStorage, "bar", "updated");
+    expect(b.value).toBe("");
   });
 
   it("should not touch a removed control", async () => {
@@ -313,8 +907,37 @@ describe("DOM mutations", () => {
     expect(e.value).toBe("stored");
   });
 
-  // https://github.com/kui/storage-form/issues/43
-  it.failing("should release a control after its name is removed", async () => {
+  it("should release a control renamed and unnamed at once", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><input name="foo" id="b">
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    b.name = "bar";
+    b.removeAttribute("name");
+    await flush();
+    await input(query("#a"), "typed");
+    await updateFromAnotherWindow(localStorage, "bar", "updated");
+    expect(b.value).toBe("");
+  });
+
+  it("should handle a control after its name is restored", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="local-storage"><input name="foo"></storage-form>`);
+    const e = query<HTMLInputElement>("input");
+    e.removeAttribute("name");
+    await flush();
+    await input(e, "typed");
+    expect(localStorage.getItem("foo")).toBe("stored");
+    e.name = "foo";
+    await flush();
+    expect(e.value).toBe("stored");
+    await input(e, "retyped");
+    expect(localStorage.getItem("foo")).toBe("retyped");
+  });
+
+  it("should release a control after its name is removed", async () => {
     await render(`
       <storage-form storage-area="local-storage">
         <input name="foo" id="a"><input name="foo" id="b">
