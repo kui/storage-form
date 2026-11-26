@@ -70,7 +70,7 @@ export function mixinAreaHandlerElement<
     ) {
       super.attributeChangedCallback?.(name, oldValue, newValue);
       if (name === "storage-area") {
-        this.areaHandler.updateArea(newValue);
+        this.areaHandler.updateArea(this.storageArea);
         this.invokeStorageChangeCallback();
       }
     }

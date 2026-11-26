@@ -278,6 +278,19 @@ describe("storage-usage", () => {
       expect(e.textContent).toBe("5B");
     });
 
+    it("should use the area of the form after its own area is removed", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo" storage-area="session-storage"></storage-usage>
+        </storage-form>`);
+      expect(usage().textContent).toBe("1B");
+      usage().removeAttribute("storage-area");
+      await flush();
+      expect(usage().storageArea).toBe("small");
+      expect(usage().textContent).toBe("5B");
+    });
+
     it("should use its own area set while disconnected", async () => {
       sessionStorage.setItem("foo", "1");
       await render(`
