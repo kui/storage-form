@@ -60,6 +60,21 @@ describe("initialization", () => {
     expect(localStorage.getItem("foo")).toBe("stored");
   });
 
+  it("should not manage storage-input elements added with the form", async () => {
+    localStorage.setItem("foo", "local");
+    sessionStorage.setItem("foo", "session");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input is="storage-input" storage-area="session-storage" name="foo">
+        <input name="foo">
+      </storage-form>`);
+    const [mono, control] = Array.from(
+      document.querySelectorAll<HTMLInputElement>("input"),
+    );
+    expect(mono.value).toBe("session");
+    expect(control.value).toBe("local");
+  });
+
   it("should dispatch a change event if the value is changed", async () => {
     localStorage.setItem("foo", "stored");
     const listener = jest.fn();
