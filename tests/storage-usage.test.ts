@@ -487,6 +487,14 @@ describe("attribute changes of storage-usage", () => {
     expect(new Set(values)).toEqual(new Set([5]));
   });
 
+  it("should not refresh on the value change", async () => {
+    await render(`<storage-usage storage-area=small></storage-usage>`);
+    usage().setAttribute("value", "2048");
+    await flush();
+    expect(usage().value).toBe(2048);
+    expect(usage().textContent).toBe("2KiB");
+  });
+
   it("should use the name changed while disconnected", async () => {
     await render(`<storage-usage storage-area=small name=foo></storage-usage>`);
     const e = usage();
@@ -525,6 +533,27 @@ describe("storage-quota", () => {
     quota().removeAttribute("name");
     await flush();
     expect(quota().textContent).toBe("100B");
+  });
+
+  it("should not refresh on the value change", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    quota().setAttribute("value", "2048");
+    await flush();
+    expect(quota().value).toBe(2048);
+    expect(quota().textContent).toBe("2KiB");
+  });
+
+  it("should reflect the format attribute", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    quota().setAttribute("format", "");
+    expect(quota().textContent).toBe("100");
+  });
+
+  it("should follow the change of the storage-area attribute", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    quota().setAttribute("storage-area", "local-storage");
+    await flush();
+    expect(quota().textContent).toBe("10MiB");
   });
 
   it("should keep the value on the format change", async () => {
