@@ -37,6 +37,14 @@ function dispatchOwnChangeEvents(elements: Iterable<EventTarget>) {
   }
 }
 
+/**
+ * Controls edited while no storage form owned them, with the order of the
+ * edits. The form which gets storage-area later keeps the edits as the ones
+ * before the initial loading.
+ */
+const unownedEdits = new WeakMap<HTMLStorageFormControlElement, number>();
+let unownedEditCount = 0;
+
 const notInitialized = Symbol("notInitialized");
 
 class NamedStorageControlsCollection {
@@ -202,7 +210,11 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       // diff, and before telling whether the control is owned by this form.
       if (this.hasUnhandledRecords(this.mutationObserver.takeRecords()))
         this.handleMutations(e);
-      if (!this.isOwnControl(e)) return;
+      if (!this.isOwnControl(e)) {
+        if (findStorageForm(e, { crossShadowRoots: false }).owner === null)
+          unownedEdits.set(e, unownedEditCount++);
+        return;
+      }
       const elementSet = this.namedControlMap.get(e.name);
       if (elementSet?.isInitialized === false) {
         elementSet.markAsEdited(e);
@@ -258,6 +270,22 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
         const elementSet = this.namedControlMap.get(e.name);
         if (elementSet === undefined) this.namedControlMap.add(e);
         else elementSet.add(e, e !== edited);
+      }
+      this.takeUnownedEdits(controls);
+    }
+
+    /** Values edited while not owned are not stored yet. */
+    private takeUnownedEdits(controls: Set<HTMLStorageFormControlElement>) {
+      const edits = [...controls]
+        .filter((e) => unownedEdits.has(e))
+        .sort(
+          (a, b) => (unownedEdits.get(a) ?? 0) - (unownedEdits.get(b) ?? 0),
+        );
+      for (const e of edits) {
+        unownedEdits.delete(e);
+        const elementSet = this.namedControlMap.get(e.name);
+        // An initialized value has been shown to the control by add().
+        if (elementSet?.isInitialized === false) elementSet.markAsEdited(e);
       }
     }
 

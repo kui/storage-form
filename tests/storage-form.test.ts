@@ -350,6 +350,90 @@ describe("storage-area", () => {
     await input(query("input"), "typed");
     expect(localStorage).toHaveLength(0);
   });
+
+  describe("edits before the area is set", () => {
+    it("should store the edited value if nothing is stored", async () => {
+      await render(`
+        <storage-form><input name="foo" value="default"></storage-form>`);
+      await input(query("input"), "typed");
+      query("storage-form").setAttribute("storage-area", "local-storage");
+      await flush();
+      expect(query<HTMLInputElement>("input").value).toBe("typed");
+      expect(dump(localStorage)).toEqual({ foo: "typed" });
+    });
+
+    it("should respect the stored value", async () => {
+      localStorage.setItem("foo", "stored");
+      await render(`
+        <storage-form><input name="foo" value="default"></storage-form>`);
+      await input(query("input"), "typed");
+      query("storage-form").setAttribute("storage-area", "local-storage");
+      await flush();
+      expect(query<HTMLInputElement>("input").value).toBe("stored");
+      expect(dump(localStorage)).toEqual({ foo: "stored" });
+    });
+
+    it("should store the last edited value of the same name", async () => {
+      await render(`
+        <storage-form>
+          <input name="foo" id="a"><input name="foo" id="b">
+        </storage-form>`);
+      await input(query("#b"), "b");
+      await input(query("#a"), "a");
+      query("storage-form").setAttribute("storage-area", "local-storage");
+      await flush();
+      expect(dump(localStorage)).toEqual({ foo: "a" });
+      expect(query<HTMLInputElement>("#b").value).toBe("a");
+    });
+
+    it("should keep the edits for the outer form which gets the area", async () => {
+      await render(`
+        <storage-form id="outer">
+          <storage-form id="inner"><input name="foo"></storage-form>
+        </storage-form>`);
+      await input(query("input"), "typed");
+      query("#outer").setAttribute("storage-area", "local-storage");
+      await flush();
+      expect(dump(localStorage)).toEqual({ foo: "typed" });
+    });
+
+    it("should keep the edits made after the area is removed", async () => {
+      await render(`
+        <storage-form storage-area="local-storage"><input name="foo"></storage-form>`);
+      const form = query("storage-form");
+      form.removeAttribute("storage-area");
+      await flush();
+      await input(query("input"), "typed");
+      form.setAttribute("storage-area", "session-storage");
+      await flush();
+      expect(localStorage).toHaveLength(0);
+      expect(dump(sessionStorage)).toEqual({ foo: "typed" });
+    });
+
+    it("should discard the edits of a control moved into a loaded form", async () => {
+      await render(`
+        <storage-form id="loaded" storage-area="local-storage"><input name="foo"></storage-form>
+        <storage-form><input name="foo" id="moved" value="default"></storage-form>`);
+      const moved = query<HTMLInputElement>("#moved");
+      await input(moved, "typed");
+      query("#loaded").append(moved);
+      await flush();
+      expect(moved.value).toBe("default");
+      expect(localStorage).toHaveLength(0);
+    });
+
+    it("should not keep edits stored by another form", async () => {
+      await render(`
+        <storage-form id="outer" storage-area="local-storage">
+          <storage-form id="inner"><input name="foo"></storage-form>
+        </storage-form>`);
+      await input(query("input"), "typed");
+      expect(dump(localStorage)).toEqual({ foo: "typed" });
+      query("#inner").setAttribute("storage-area", "session-storage");
+      await flush();
+      expect(sessionStorage).toHaveLength(0);
+    });
+  });
 });
 
 describe("edits before the initial loading", () => {
