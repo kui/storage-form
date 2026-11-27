@@ -329,6 +329,19 @@ describe("storage-area", () => {
     expect(dump(localStorage)).toEqual({ foo: "typed" });
   });
 
+  it("should not read the controls on the area change before connected", async () => {
+    localStorage.setItem("foo", "stored");
+    const form = document.createElement("storage-form");
+    form.innerHTML = `<input name="foo">`;
+    const read = jest.spyOn(WebStorageHandler.prototype, "read");
+    form.setAttribute("storage-area", "local-storage");
+    await flush();
+    expect(read).not.toHaveBeenCalledWith(["foo"]);
+    document.body.append(form);
+    await flush();
+    expect(query<HTMLInputElement>("input").value).toBe("stored");
+  });
+
   it("should release the controls after the area is removed", async () => {
     await render(`
       <storage-form storage-area="local-storage"><input name="foo"></storage-form>`);

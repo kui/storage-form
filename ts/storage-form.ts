@@ -190,6 +190,8 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     });
     /** The number of loadings being queued or running */
     private remainingLoads = 0;
+    /** Unlike isConnected, this is false before connectedCallback. */
+    #isReady = false;
     private readonly changeListener = (event: Event) => {
       // Values written by storage forms are the stored ones or the defaults
       // of removed values, which must not be stored.
@@ -217,6 +219,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       this.initControls();
       super.connectedCallback?.();
       this.mutationObserver.observe(this, this.observerOptions);
+      this.#isReady = true;
       this.addEventListener("change", this.changeListener);
       this.addEventListener("input", this.changeListener);
     }
@@ -271,6 +274,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     disconnectedCallback() {
       super.disconnectedCallback?.();
       this.mutationObserver.disconnect();
+      this.#isReady = false;
       this.removeEventListener("change", this.changeListener);
       this.removeEventListener("input", this.changeListener);
     }
@@ -288,9 +292,10 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       if (name === "storage-area") {
         // Edits must not be compared with the values of the old area.
         if (oldValue !== newValue) this.uninitializeControls();
-        // Before the loading by the super class, which reads the names of the
-        // controls at once. They are not owned while this has no area.
-        this.updateControls();
+        // The owned controls depend on the area. Updated before the super class
+        // queues the load, which may start at once and read their names.
+        // Otherwise, connectedCallback updates them.
+        if (this.#isReady) this.updateControls();
       }
       super.attributeChangedCallback?.(name, oldValue, newValue);
     }
