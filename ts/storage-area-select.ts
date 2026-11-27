@@ -1,7 +1,6 @@
 import { listNames } from "./area-handler.js";
 import {
-  isStorageForm,
-  parentOrShadowRootHost,
+  findStorageForm,
   type HTMLElementConstructor,
   type StorageElementMixin,
   type ValueContainerElement,
@@ -71,12 +70,7 @@ export function mixinAreaSelect<
      * set by this.
      */
     private getTargetByParent(): StorageElementMixin | null {
-      let parent = parentOrShadowRootHost(this);
-      while (parent !== null) {
-        if (isStorageForm(parent)) return parent;
-        parent = parentOrShadowRootHost(parent);
-      }
-      return null;
+      return findStorageForm(this, { crossShadowRoots: true }).forms[0] ?? null;
     }
   };
 }
