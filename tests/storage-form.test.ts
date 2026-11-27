@@ -1099,7 +1099,9 @@ describe("DOM mutations", () => {
     const read = jest.spyOn(WebStorageHandler.prototype, "read");
     query("[is=storage-input]").setAttribute("storage-area", "session-storage");
     await flush();
-    expect(read).not.toHaveBeenCalledWith(["foo"]);
+    expect(read.mock.calls.some(([names]) => names.includes("foo"))).toBe(
+      false,
+    );
   });
 
   it("should follow storage-area of a nested form", async () => {
