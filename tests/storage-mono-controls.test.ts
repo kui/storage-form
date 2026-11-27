@@ -1,4 +1,8 @@
-import { registerHandler, type AreaHandler } from "../ts/area-handler.js";
+import {
+  registerHandler,
+  WebStorageHandler,
+  type AreaHandler,
+} from "../ts/area-handler.js";
 import type { StoredValues, WroteValues } from "../ts/globals.js";
 import {
   HTMLStorageInputElement,
@@ -79,7 +83,25 @@ class ManualArea {
 const manual = new ManualArea("manual");
 const manual2 = new ManualArea("manual2");
 
+/** The number of the next writes to reject. */
+let rejectedWrites = 0;
+const localHandler = new WebStorageHandler(localStorage);
+registerHandler(
+  "rejecting-local",
+  Object.assign(Object.create(localHandler) as WebStorageHandler, {
+    write: async (items: Map<string, string | undefined>) => {
+      await Promise.resolve();
+      if (rejectedWrites > 0) {
+        rejectedWrites--;
+        throw Error("write rejected");
+      }
+      localHandler.write(items);
+    },
+  }),
+);
+
 beforeEach(() => {
+  rejectedWrites = 0;
   manual.reset();
   manual2.reset();
   localStorage.clear();
@@ -425,6 +447,29 @@ describe("storage-input", () => {
       expect(localStorage.getItem("foo")).toBe("b");
     },
   );
+
+  it("should not store the default value again after another window removes the value", async () => {
+    localStorage.setItem("foo", "x");
+    await render(html.replace("<input", `<input value="default"`));
+    expect(target().value).toBe("x");
+    await updateFromAnotherWindow(localStorage, "foo", null);
+    expect(target().value).toBe("default");
+    expect(dump(localStorage)).toEqual({});
+  });
+
+  it("should not store the default value after a rejected write of a value not stored", async () => {
+    jest.spyOn(console, "error").mockImplementation();
+    await render(
+      `<input is="storage-input" name="foo" value="default" storage-area="rejecting-local">`,
+    );
+    // Only the write of the typed value is rejected, and the following writes
+    // are accepted.
+    rejectedWrites = 1;
+    await input(target(), "typed");
+    await flush();
+    expect(target().value).toBe("default");
+    expect(dump(localStorage)).toEqual({});
+  });
 
   it("should synchronize with other elements", async () => {
     await render(
