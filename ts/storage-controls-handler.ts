@@ -276,8 +276,9 @@ const createSanitizedInputHandler = (
   diff: StorageControlsInputTypeHandler["diff"],
 ): StorageControlsInputTypeHandler => ({
   diff(element, oldValue) {
-    // Writing dispatches a change event, so without this check the stored value
-    // would be overwritten with the sanitized one just by loading it.
+    // Without this check, the stored value would be overwritten with the
+    // sanitized one by the change event that mono controls dispatch after
+    // writing, or by an edit of another control of the same name in a form.
     const last = sanitizedValues.get(element);
     if (last && last.written === oldValue && last.sanitized === element.value) {
       return NOCHANGE;

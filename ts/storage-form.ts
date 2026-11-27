@@ -24,6 +24,19 @@ function matchesStorageControl(e: unknown): e is HTMLStorageFormControlElement {
   );
 }
 
+const storageFormMarker = Symbol("storageForm");
+
+/** Storage forms without storage-area are skipped, as mono controls do. */
+function closestStorageForm(e: Element): Element | null {
+  for (let p = e.parentElement; p !== null; p = p.parentElement) {
+    const form = p as Partial<StorageElementMixin> & {
+      [storageFormMarker]?: true;
+    };
+    if (form[storageFormMarker] && form.storageArea) return p;
+  }
+  return null;
+}
+
 /** Change events dispatched by storage forms, not by users. */
 const ownEvents = new WeakSet<Event>();
 
@@ -50,11 +63,12 @@ class NamedStorageControlsCollection {
     this.name = e.name;
   }
 
-  add(e: HTMLStorageFormControlElement) {
+  /** @param write `false` to keep the value of the control being edited. */
+  add(e: HTMLStorageFormControlElement, write = true) {
     if (e.name !== this.name) throw Error("Invalid name");
     if (this.elements.has(e)) return this;
     this.elements.add(e);
-    if (this.#value !== notInitialized) {
+    if (write && this.#value !== notInitialized) {
       storageControlsHandler.write(e, this.pendingValue ?? this.#value);
     }
     // Donot dispatch change event here because it is overwritten by the value
@@ -82,10 +96,6 @@ class NamedStorageControlsCollection {
   /** Called if the write of the edited value failed. */
   discardPendingValue(value: string) {
     if (this.pendingValue === value) this.pendingValue = undefined;
-  }
-
-  get isPending(): boolean {
-    return this.pendingValue !== undefined;
   }
 
   markAsEdited(e: HTMLStorageFormControlElement) {
@@ -137,13 +147,22 @@ class NamedStorageControlsCollection {
     return changed;
   }
 
-  diff() {
+  /**
+   * @param edited The control which dispatched the event. It is checked first,
+   *   because other controls of the same name may also differ from the value,
+   *   such as text inputs when nothing is stored.
+   */
+  diff(edited?: HTMLStorageFormControlElement) {
     if (this.#value === notInitialized) return "notInitialized";
 
     const oldValue = this.pendingValue ?? this.#value;
     let newValue: string | undefined = undefined;
     let unselected = false;
-    for (const e of this.elements) {
+    const elements =
+      edited !== undefined && this.elements.has(edited)
+        ? new Set([edited, ...this.elements])
+        : this.elements;
+    for (const e of elements) {
       const change = storageControlsHandler.diff(e, oldValue);
       if (change.type === "unselected") {
         unselected = true;
@@ -171,27 +190,35 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
 ): T & HTMLElementConstructor<StorageElementMixin & StorageFormLikeElement> {
   return class extends mixinAreaHandlerElement(base) {
     readonly isNotStorageControl = true;
+    readonly [storageFormMarker] = true;
 
     private readonly namedControlMap = new NamedSetMap(
       (e: HTMLStorageFormControlElement) =>
         new NamedStorageControlsCollection(e),
     );
-    private readonly mutationObserver = new MutationObserver(
-      this.handleMutations.bind(this),
-    );
+    private readonly mutationObserver = new MutationObserver(() => {
+      this.handleMutations();
+    });
     /** The number of loadings being queued or running */
     private remainingLoads = 0;
     private readonly changeListener = (event: Event) => {
+      // Values written by storage forms are the stored ones or the defaults
+      // of removed values, which must not be stored.
+      if (ownEvents.has(event)) return;
       const e = event.target;
       if (!matchesStorageControl(e)) return;
-      const isOwnEvent = ownEvents.has(event);
+      // Name and position changes in the same task must be applied before the
+      // diff, and before telling whether the control is owned by this form.
+      if (this.mutationObserver.takeRecords().length > 0)
+        this.handleMutations(e);
+      if (!this.isOwnControl(e)) return;
       const elementSet = this.namedControlMap.get(e.name);
-      if (!isOwnEvent && elementSet?.isInitialized === false) {
+      if (elementSet?.isInitialized === false) {
         elementSet.markAsEdited(e);
         // Retry if the last loading failed
         if (this.remainingLoads === 0) this.invokeStorageChangeCallback();
       }
-      this.valueChangedCallback(isOwnEvent).catch(console.error);
+      this.valueChangedCallback(e).catch(console.error);
     };
 
     connectedCallback() {
@@ -220,11 +247,14 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
      *
      * The tree is scanned instead of tracing mutation records, because a record
      * does not tell the state at that time, such as the name of a removed control.
+     *
+     * @param edited The control being edited, whose value must not be
+     *   overwritten by the value of its new name.
      */
-    private updateControls() {
+    private updateControls(edited?: HTMLStorageFormControlElement) {
       const controls = new Set<HTMLStorageFormControlElement>();
       for (const e of this.querySelectorAll(STORAGE_CONTROL_SELECTOR)) {
-        if (matchesStorageControl(e)) controls.add(e);
+        if (this.isOwnControl(e)) controls.add(e);
       }
       for (const [name, elementSet] of this.namedControlMap) {
         for (const e of elementSet) {
@@ -232,7 +262,16 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
             this.namedControlMap.deleteByKeyValue(name, e);
         }
       }
-      for (const e of controls) this.namedControlMap.add(e);
+      for (const e of controls) {
+        const elementSet = this.namedControlMap.get(e.name);
+        if (elementSet === undefined) this.namedControlMap.add(e);
+        else elementSet.add(e, e !== edited);
+      }
+    }
+
+    /** Controls in a nested storage form are left to the nested form. */
+    private isOwnControl(e: unknown): e is HTMLStorageFormControlElement {
+      return matchesStorageControl(e) && closestStorageForm(e) === this;
     }
 
     disconnectedCallback() {
@@ -319,24 +358,28 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["name"],
+      // storage-area of nested forms changes the owner of their controls.
+      attributeFilter: ["name", "storage-area"],
     };
 
-    private handleMutations() {
-      this.updateControls();
+    private handleMutations(edited?: HTMLStorageFormControlElement) {
+      this.updateControls(edited);
       this.invokeStorageChangeCallback();
     }
 
-    private async valueChangedCallback(isOwnEvent: boolean): Promise<void> {
-      const entries: WroteValues = new Map();
-      for (const [name, elementSet] of this.namedControlMap) {
-        // Events by loading must not write values of other controls over the edit.
-        if (isOwnEvent && elementSet.isPending) continue;
-        const diff = elementSet.diff();
-        if (diff === "nochange" || diff === "notInitialized") continue;
-        entries.set(name, diff.newValue);
-      }
-      if (entries.size > 0) await this.areaHandler.write(entries);
+    private async valueChangedCallback(
+      edited: HTMLStorageFormControlElement,
+    ): Promise<void> {
+      // Only the edited name, because the other controls may show values not
+      // to be stored, such as the defaults of values removed by other windows.
+      const diff = this.namedControlMap.get(edited.name)?.diff(edited);
+      if (
+        diff === undefined ||
+        diff === "nochange" ||
+        diff === "notInitialized"
+      )
+        return;
+      await this.areaHandler.write(new Map([[edited.name, diff.newValue]]));
     }
   };
 }

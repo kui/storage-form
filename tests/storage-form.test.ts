@@ -155,6 +155,15 @@ describe("writing", () => {
     expect(b.checked).toBe(true);
   });
 
+  it("should keep the stored value on an event without changes", async () => {
+    localStorage.setItem("foo", "x");
+    await render(`
+      <storage-form storage-area="local-storage"><input name="foo"></storage-form>`);
+    query("input").dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    expect(dump(localStorage)).toEqual({ foo: "x" });
+  });
+
   it("should not write unchanged values", async () => {
     localStorage.setItem("foo", "stored");
     await render(`
@@ -202,6 +211,16 @@ describe("synchronization", () => {
     expect(query<HTMLInputElement>("[name=bar]").value).toBe("");
   });
 
+  it("should store the value of the edited control of the same name", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><input name="foo" id="b">
+      </storage-form>`);
+    await input(query("#b"), "typed");
+    expect(localStorage.getItem("foo")).toBe("typed");
+    expect(query<HTMLInputElement>("#a").value).toBe("typed");
+  });
+
   it("should synchronize between forms of the same area", async () => {
     await render(`
       <storage-form storage-area="local-storage"><input name="foo" id="a"></storage-form>
@@ -224,6 +243,28 @@ describe("synchronization", () => {
     await updateFromAnotherWindow(localStorage, "foo", null);
     expect(foo.value).toBe("default");
     expect(query<HTMLInputElement>("[name=bar]").value).toBe("default");
+  });
+
+  it("should not store the default value again after another window removes the value", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" value="default">
+      </storage-form>`);
+    await updateFromAnotherWindow(localStorage, "foo", null);
+    expect(query<HTMLInputElement>("input").value).toBe("default");
+    expect(localStorage.getItem("foo")).toBeNull();
+  });
+
+  it("should not store the default of a removed value by editing another name", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" value="default"><input name="bar">
+      </storage-form>`);
+    await updateFromAnotherWindow(localStorage, "foo", null);
+    await input(query("[name=bar]"), "typed");
+    expect(dump(localStorage)).toEqual({ bar: "typed" });
   });
 
   it("should reset values if the storage is cleared by another window", async () => {
@@ -826,6 +867,73 @@ describe("DOM mutations", () => {
     expect(b.value).toBe("");
   });
 
+  it("should leave controls in a nested form to the nested form", async () => {
+    localStorage.setItem("foo", "local");
+    sessionStorage.setItem("foo", "session");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a">
+        <storage-form storage-area="session-storage">
+          <div><input name="foo" id="b"></div>
+        </storage-form>
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    expect(query<HTMLInputElement>("#a").value).toBe("local");
+    expect(b.value).toBe("session");
+    await input(b, "typed");
+    expect(dump(localStorage)).toEqual({ foo: "local" });
+    expect(dump(sessionStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should manage controls in a nested form without storage-area", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <storage-form><div><input name="foo"></div></storage-form>
+      </storage-form>`);
+    const e = query<HTMLInputElement>("input");
+    expect(e.value).toBe("stored");
+    await input(e, "typed");
+    expect(localStorage.getItem("foo")).toBe("typed");
+  });
+
+  it("should follow storage-area of a nested form", async () => {
+    localStorage.setItem("foo", "local");
+    sessionStorage.setItem("foo", "session");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <storage-form id="inner"><div><input name="foo"></div></storage-form>
+      </storage-form>`);
+    const inner = query("#inner");
+    const e = query<HTMLInputElement>("input");
+    inner.setAttribute("storage-area", "session-storage");
+    await flush();
+    expect(e.value).toBe("session");
+    await input(e, "typed");
+    expect(dump(localStorage)).toEqual({ foo: "local" });
+    expect(dump(sessionStorage)).toEqual({ foo: "typed" });
+
+    inner.removeAttribute("storage-area");
+    await flush();
+    expect(e.value).toBe("local");
+    await input(e, "retyped");
+    expect(dump(localStorage)).toEqual({ foo: "retyped" });
+    expect(dump(sessionStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should not handle edits in a nested form by the outer form", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo">
+        <storage-form storage-area="session-storage">
+          <input name="foo" id="inner">
+        </storage-form>
+      </storage-form>`);
+    await input(query("#inner"), "typed");
+    expect(localStorage.getItem("foo")).toBeNull();
+    expect(dump(sessionStorage)).toEqual({ foo: "typed" });
+  });
+
   it("should release controls in a removed nested form", async () => {
     await render(`
       <storage-form storage-area="local-storage" id="outer">
@@ -910,6 +1018,47 @@ describe("DOM mutations", () => {
     expect(e.value).toBe("bar value");
     await input(e, "typed");
     expect(dump(localStorage)).toEqual({ foo: "foo value", bar: "typed" });
+  });
+
+  it("should store an input in the same task as the name change under the new name", async () => {
+    localStorage.setItem("foo", "old");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><input name="foo" id="b">
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    b.name = "bar";
+    await input(b, "typed");
+    expect(dump(localStorage)).toEqual({ foo: "old", bar: "typed" });
+    expect(query<HTMLInputElement>("#a").value).toBe("old");
+  });
+
+  it("should store an input in the same task as the change to a loaded name", async () => {
+    localStorage.setItem("foo", "old");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><input name="bar" id="b">
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    b.name = "foo";
+    await input(b, "typed");
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+    expect(query<HTMLInputElement>("#a").value).toBe("typed");
+  });
+
+  it("should keep a renamed edit when another element dispatches an input first", async () => {
+    localStorage.setItem("foo", "old");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" id="a"><input name="bar" id="b"><input id="c">
+      </storage-form>`);
+    const b = query<HTMLInputElement>("#b");
+    b.name = "foo";
+    b.value = "typed";
+    query("#c").dispatchEvent(new Event("input", { bubbles: true }));
+    b.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
   });
 
   it("should handle a control after its name is set", async () => {
