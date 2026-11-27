@@ -599,6 +599,20 @@ describe("edits before the initial loading", () => {
     expect(dump(localStorage)).toEqual({ foo: "new" });
   });
 
+  it("should prefer the last edit in a form without the area to an older edit", async () => {
+    await render(`
+      <storage-form id="loading" storage-area="async-local">
+        <input name="foo" id="owned">
+      </storage-form>
+      <storage-form><input name="foo" id="moved"></storage-form>`);
+    await input(query("#owned"), "owned");
+    await input(query("#moved"), "moved");
+    query("#loading").append(query("#moved"));
+    await completeReads();
+    expect(query<HTMLInputElement>("#owned").value).toBe("moved");
+    expect(dump(localStorage)).toEqual({ foo: "moved" });
+  });
+
   it("should keep the edits while the area is removed and set again", async () => {
     await render(`
       <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
