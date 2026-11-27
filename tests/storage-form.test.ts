@@ -306,6 +306,37 @@ describe("storage-area", () => {
     expect(localStorage.getItem("foo")).toBe("local");
     expect(sessionStorage.getItem("foo")).toBe("typed");
   });
+
+  it("should read the storage once on the area change", async () => {
+    await render(`
+      <storage-form storage-area="session-storage"><input name="foo"></storage-form>`);
+    const read = jest.spyOn(WebStorageHandler.prototype, "read");
+    query("storage-form").setAttribute("storage-area", "local-storage");
+    await flush();
+    expect(read).toHaveBeenCalledTimes(1);
+  });
+
+  it("should load and store the controls after the area is set", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`<storage-form><input name="foo"></storage-form>`);
+    const read = jest.spyOn(WebStorageHandler.prototype, "read");
+    const e = query<HTMLInputElement>("input");
+    query("storage-form").setAttribute("storage-area", "local-storage");
+    await flush();
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(e.value).toBe("stored");
+    await input(e, "typed");
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should release the controls after the area is removed", async () => {
+    await render(`
+      <storage-form storage-area="local-storage"><input name="foo"></storage-form>`);
+    query("storage-form").removeAttribute("storage-area");
+    await flush();
+    await input(query("input"), "typed");
+    expect(localStorage).toHaveLength(0);
+  });
 });
 
 describe("edits before the initial loading", () => {

@@ -185,8 +185,8 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       (e: HTMLStorageFormControlElement) =>
         new NamedStorageControlsCollection(e),
     );
-    private readonly mutationObserver = new MutationObserver(() => {
-      this.handleMutations();
+    private readonly mutationObserver = new MutationObserver((records) => {
+      if (this.hasUnhandledRecords(records)) this.handleMutations();
     });
     /** The number of loadings being queued or running */
     private remainingLoads = 0;
@@ -198,7 +198,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       if (!matchesStorageControl(e)) return;
       // Name and position changes in the same task must be applied before the
       // diff, and before telling whether the control is owned by this form.
-      if (this.mutationObserver.takeRecords().length > 0)
+      if (this.hasUnhandledRecords(this.mutationObserver.takeRecords()))
         this.handleMutations(e);
       if (!this.isOwnControl(e)) return;
       const elementSet = this.namedControlMap.get(e.name);
@@ -284,12 +284,14 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       oldValue: string | null,
       newValue: string | null,
     ) {
-      super.attributeChangedCallback?.(name, oldValue, newValue);
       if (name === "storage-area") {
         // Edits must not be compared with the values of the old area.
         if (oldValue !== newValue) this.uninitializeControls();
-        this.invokeStorageChangeCallback();
+        // Before the loading by the super class, which reads the names of the
+        // controls at once. They are not owned while this has no area.
+        this.updateControls();
       }
+      super.attributeChangedCallback?.(name, oldValue, newValue);
     }
 
     //
@@ -354,6 +356,13 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       // storage-area of nested forms changes the owner of their controls.
       attributeFilter: ["name", "storage-area"],
     };
+
+    /** Changes of own storage-area are handled by attributeChangedCallback. */
+    private hasUnhandledRecords(records: MutationRecord[]) {
+      return records.some(
+        (r) => r.target !== this || r.attributeName !== "storage-area",
+      );
+    }
 
     private handleMutations(edited?: HTMLStorageFormControlElement) {
       this.updateControls(edited);
