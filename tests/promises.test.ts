@@ -2,10 +2,19 @@ import { sleep, SerialTaskExecutor, withResolves } from "../ts/promises.js";
 
 describe("sleep", () => {
   it("should resolve after the specified time", async () => {
-    const startTime = Date.now();
-    await sleep(100);
-    const endTime = Date.now();
-    expect(endTime - startTime).toBeGreaterThanOrEqual(100);
+    jest.useFakeTimers();
+    try {
+      const onResolve = jest.fn();
+      void sleep(100).then(onResolve);
+
+      await jest.advanceTimersByTimeAsync(99);
+      expect(onResolve).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1);
+      expect(onResolve).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("should reject if cancelled", async () => {
