@@ -1,7 +1,9 @@
 import { mixinAreaHandlerElement } from "./area-handler-element.js";
 import { distinctConcat } from "./arrays.js";
 import {
+  dispatchOwnChangeEvent,
   findStorageForm,
+  isOwnChangeEvent,
   storageFormMarker,
   type HTMLElementConstructor,
   type StorageElementMixin,
@@ -24,17 +26,6 @@ function matchesStorageControl(e: unknown): e is HTMLStorageFormControlElement {
     e.hasAttribute("name") &&
     e.matches(STORAGE_CONTROL_SELECTOR)
   );
-}
-
-/** Change events dispatched by storage forms, not by users. */
-const ownEvents = new WeakSet<Event>();
-
-function dispatchOwnChangeEvents(elements: Iterable<EventTarget>) {
-  for (const element of elements) {
-    const event = new Event("change", { bubbles: true });
-    ownEvents.add(event);
-    element.dispatchEvent(event);
-  }
 }
 
 /**
@@ -221,7 +212,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     private readonly changeListener = (event: Event) => {
       // Values written by storage forms are the stored ones or the defaults
       // of removed values, which must not be stored.
-      if (ownEvents.has(event)) return;
+      if (isOwnChangeEvent(event)) return;
       const e = event.target;
       if (!matchesStorageControl(e)) return;
       // Name and position changes in the same task must be applied before the
@@ -377,7 +368,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
           console.error(error);
         });
       // At the end, because listeners may change the area.
-      dispatchOwnChangeEvents(changedControls);
+      for (const e of changedControls) dispatchOwnChangeEvent(e);
     }
 
     //

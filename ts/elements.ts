@@ -112,3 +112,16 @@ export function findStorageForm(
   }
   return { owner: null, forms };
 }
+
+/** Change events dispatched by storage elements, not by users. */
+const ownChangeEvents = new WeakSet<Event>();
+
+export function dispatchOwnChangeEvent(element: EventTarget) {
+  const event = new Event("change", { bubbles: true });
+  ownChangeEvents.add(event);
+  element.dispatchEvent(event);
+}
+
+export function isOwnChangeEvent(event: Event): boolean {
+  return ownChangeEvents.has(event);
+}

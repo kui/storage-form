@@ -4,6 +4,8 @@ import {
 } from "./area-handler-element.js";
 import { distinctConcat } from "./arrays.js";
 import {
+  dispatchOwnChangeEvent,
+  isOwnChangeEvent,
   type HTMLElementConstructor,
   type StorageFormLikeElement,
   type ValueContainerElement,
@@ -23,15 +25,6 @@ export type MonoStorageControlMixin = AreaHandlerElement &
 
 const notInitialized = Symbol("notInitialized");
 
-/** Change events dispatched by mono controls, not by users. */
-const ownEvents = new WeakSet<Event>();
-
-function dispatchOwnChangeEvent(element: EventTarget) {
-  const event = new Event("change", { bubbles: true });
-  ownEvents.add(event);
-  element.dispatchEvent(event);
-}
-
 export function mixinMonoStorageControl<
   T extends HTMLElementConstructor<FormControlLikeElement>,
 >(base: T): T & HTMLElementConstructor<MonoStorageControlMixin> {
@@ -40,7 +33,7 @@ export function mixinMonoStorageControl<
     private readonly valueChangedListener = (event: Event) => {
       // Values written by mono controls are the stored ones or the defaults of
       // removed values, which must not be stored.
-      if (ownEvents.has(event)) return;
+      if (isOwnChangeEvent(event)) return;
       if (event.target === this)
         this.valueChangedCallback().catch(console.error);
     };
