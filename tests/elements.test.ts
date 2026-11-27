@@ -1,10 +1,9 @@
 import {
   addChangeListeners,
-  closestStorageForm,
   dispatchChangeEvent,
+  findStorageForm,
   parentOrShadowRootHost,
   storageFormMarker,
-  storageFormsToClosest,
 } from "../ts/elements.js";
 import { flush } from "./helpers/dom.js";
 
@@ -69,7 +68,7 @@ describe("parentOrShadowRootHost", () => {
   });
 });
 
-describe("closestStorageForm", () => {
+describe("findStorageForm", () => {
   /** A fake storage form, like the elements made by mixinStorageForm. */
   function form(area?: string): HTMLElement {
     const e = document.createElement("div");
@@ -80,6 +79,18 @@ describe("closestStorageForm", () => {
     if (area !== undefined) e.setAttribute("storage-area", area);
     return e;
   }
+  /** Compares elements by identity, because toEqual uses isEqualNode. */
+  function expectResult(
+    actual: ReturnType<typeof findStorageForm>,
+    owner: HTMLElement | null,
+    forms: HTMLElement[],
+  ) {
+    expect(actual.owner).toBe(owner);
+    expect(actual.forms).toHaveLength(forms.length);
+    forms.forEach((f, i) => {
+      expect(actual.forms[i]).toBe(f);
+    });
+  }
   const across = { crossShadowRoots: true };
   const within = { crossShadowRoots: false };
 
@@ -89,16 +100,14 @@ describe("closestStorageForm", () => {
     const child = inner
       .appendChild(document.createElement("div"))
       .appendChild(document.createElement("span"));
-    expect(closestStorageForm(child, within)).toBe(inner);
-    expect([...storageFormsToClosest(child, within)]).toEqual([inner]);
+    expectResult(findStorageForm(child, within), inner, [inner]);
   });
 
-  it("should skip forms without the area, and yield them on the way", () => {
+  it("should skip forms without the area as owners, but return them", () => {
     const outer = form("local-storage");
     const inner = outer.appendChild(form());
     const child = inner.appendChild(document.createElement("span"));
-    expect(closestStorageForm(child, within)).toBe(outer);
-    expect([...storageFormsToClosest(child, within)]).toEqual([inner, outer]);
+    expectResult(findStorageForm(child, within), outer, [inner, outer]);
   });
 
   it("should not count elements which only have storageArea", () => {
@@ -109,14 +118,13 @@ describe("closestStorageForm", () => {
       }),
     );
     const child = notForm.appendChild(document.createElement("span"));
-    expect(closestStorageForm(child, within)).toBe(outer);
+    expectResult(findStorageForm(child, within), outer, [outer]);
   });
 
-  it("should return null without forms with the area", () => {
+  it("should return no owners without forms with the area", () => {
     const outer = form();
     const child = outer.appendChild(document.createElement("span"));
-    expect(closestStorageForm(child, within)).toBeNull();
-    expect([...storageFormsToClosest(child, within)]).toEqual([outer]);
+    expectResult(findStorageForm(child, within), null, [outer]);
   });
 
   it("should cross shadow roots only if specified", () => {
@@ -125,7 +133,7 @@ describe("closestStorageForm", () => {
       .appendChild(document.createElement("div"))
       .attachShadow({ mode: "open" })
       .appendChild(document.createElement("span"));
-    expect(closestStorageForm(child, across)).toBe(outer);
-    expect(closestStorageForm(child, within)).toBeNull();
+    expect(findStorageForm(child, across).owner).toBe(outer);
+    expectResult(findStorageForm(child, within), null, []);
   });
 });

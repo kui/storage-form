@@ -1,7 +1,7 @@
 import { mixinAreaHandlerElement } from "./area-handler-element.js";
 import { distinctConcat } from "./arrays.js";
 import {
-  closestStorageForm,
+  findStorageForm,
   storageFormMarker,
   type HTMLElementConstructor,
   type StorageElementMixin,
@@ -262,8 +262,9 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     private isOwnControl(e: unknown): e is HTMLStorageFormControlElement {
       return (
         matchesStorageControl(e) &&
-        // Controls in shadow trees are not found by querySelectorAll.
-        closestStorageForm(e, { crossShadowRoots: false }) === this
+        // Either option gives the same owner, because controls found by
+        // querySelectorAll or retargeted events are in the tree of this form.
+        findStorageForm(e, { crossShadowRoots: false }).owner === this
       );
     }
 

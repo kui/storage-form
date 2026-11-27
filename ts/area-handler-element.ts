@@ -1,10 +1,7 @@
 import { FacadeAreaHandler } from "./area-handler.js";
 import { distinctConcat } from "./arrays.js";
-import type {
-  HTMLElementConstructor,
-  StorageElementMixin,
-} from "./elements.js";
-import { storageFormsToClosest } from "./elements.js";
+import type { HTMLElementConstructor, StorageFormElement } from "./elements.js";
+import { findStorageForm } from "./elements.js";
 import { WroteValues, allCustomElementsDefinedEvent } from "./globals.js";
 import { SerialTaskExecutor } from "./promises.js";
 
@@ -96,7 +93,7 @@ export function mixinAreaHandlerElement<
 }
 
 export interface StorageFormChildAreaHandlerElement extends AreaHandlerElement {
-  readonly storageForm: StorageElementMixin | null;
+  readonly storageForm: StorageFormElement | null;
   /**
    * Reads the storage again if this element is connected and has an area.
    */
@@ -107,7 +104,9 @@ export function mixinStorageFormChildAreaHandlerElement<
   T extends HTMLElementConstructor<HTMLElement>,
 >(base: T): T & HTMLElementConstructor<StorageFormChildAreaHandlerElement> {
   return class extends mixinAreaHandlerElement(base) {
-    #storageForm: StorageElementMixin | null = null;
+    #storageForm: StorageFormElement | null = null;
+    /** The form and the forms without storage-area between this and it. */
+    #observedForms: StorageFormElement[] = [];
     // Unlike isConnected, this is false in attributeChangedCallback called
     // before connectedCallback.
     #isReady = false;
@@ -132,19 +131,16 @@ export function mixinStorageFormChildAreaHandlerElement<
       super.storageArea = v;
     }
 
-    /** Called if storage-area of the form or forms without it is changed. */
     private onStorageFormMutation(records: MutationRecord[]) {
-      const isChanged = this.findStorageForm();
-      if (isChanged || records.some((r) => r.target === this.#storageForm)) {
-        this.updateArea();
-        this.invokeStorageChangeCallback();
-      }
+      if (!this.trackStorageForm(records)) return;
+      this.updateArea();
+      this.invokeStorageChangeCallback();
     }
 
     connectedCallback() {
       // The super class reads the storage, so the form should be found before
       // it to avoid showing the value without the area.
-      this.findStorageForm();
+      this.trackStorageForm();
       super.connectedCallback?.();
       this.#isReady = true;
       allCustomElementsDefinedEvent.listeners.add(
@@ -160,6 +156,7 @@ export function mixinStorageFormChildAreaHandlerElement<
     disconnectedCallback() {
       super.disconnectedCallback?.();
       this.storageFormObserver.disconnect();
+      this.#observedForms = [];
       this.#storageForm = null;
       this.#isReady = false;
       allCustomElementsDefinedEvent.listeners.delete(
@@ -175,30 +172,44 @@ export function mixinStorageFormChildAreaHandlerElement<
     //
 
     private updateStorageForm() {
-      if (!this.findStorageForm()) return;
+      if (!this.trackStorageForm()) return;
       this.updateArea();
       this.invokeStorageChangeCallback();
     }
 
-    /** @return true if the form is changed. */
-    private findStorageForm(): boolean {
+    /**
+     * Finds the form, and observes storage-area of the forms which may change
+     * the area of this.
+     *
+     * @param records Records delivered to the observer.
+     * @return true if the form or its area may be changed.
+     */
+    private trackStorageForm(records: MutationRecord[] = []): boolean {
       // Elements in shadow trees inherit the area of the host's form.
-      const forms = [
-        ...storageFormsToClosest(this, { crossShadowRoots: true }),
-      ];
-      // Forms without storage-area are observed, because the area may be set.
-      this.storageFormObserver.disconnect();
-      for (const f of forms) {
-        this.storageFormObserver.observe(f, {
-          attributes: true,
-          attributeFilter: ["storage-area"],
-        });
+      const { owner, forms } = findStorageForm(this, {
+        crossShadowRoots: true,
+      });
+      const observed = this.#observedForms;
+      if (
+        forms.length !== observed.length ||
+        forms.some((f, i) => f !== observed[i])
+      ) {
+        // Records not delivered yet are discarded by disconnect().
+        records = [...records, ...this.storageFormObserver.takeRecords()];
+        this.storageFormObserver.disconnect();
+        for (const f of forms) {
+          this.storageFormObserver.observe(f, {
+            attributes: true,
+            attributeFilter: ["storage-area"],
+          });
+        }
+        this.#observedForms = forms;
       }
-      const last = forms.at(-1);
-      const form = last?.storageArea ? last : null;
-      if (form === this.#storageForm) return false;
-      this.#storageForm = form;
-      return true;
+      if (owner !== this.#storageForm) {
+        this.#storageForm = owner;
+        return true;
+      }
+      return records.some((r) => r.target === owner);
     }
 
     private updateArea() {

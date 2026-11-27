@@ -1,7 +1,13 @@
-import type { StorageFormChildAreaHandlerElement } from "../ts/area-handler-element.js";
+import {
+  mixinAreaHandlerElement,
+  type StorageFormChildAreaHandlerElement,
+} from "../ts/area-handler-element.js";
 import { registerHandler, WebStorageHandler } from "../ts/area-handler.js";
 import { allCustomElementsDefinedEvent } from "../ts/globals.js";
-import { HTMLStorageFormElement } from "../ts/storage-form.js";
+import {
+  HTMLStorageFormElement,
+  mixinStorageForm,
+} from "../ts/storage-form.js";
 import {
   HTMLStorageQuotaElement,
   HTMLStorageUsageElement,
@@ -22,6 +28,15 @@ HTMLStorageUsageElement.register();
 HTMLStorageQuotaElement.register();
 HTMLStorageUsageMeterElement.register();
 HTMLStorageFormElement.register();
+// An element with storageArea, which is not a storage form.
+customElements.define(
+  "area-holder",
+  class extends mixinAreaHandlerElement(HTMLElement) {
+    storageChangeCallback() {
+      // Nothing to show
+    }
+  },
+);
 
 beforeEach(() => {
   localStorage.clear();
@@ -186,6 +201,48 @@ describe("storage-usage", () => {
       query<HTMLStorageFormElement>("storage-form").storageArea = "small";
       await flush();
       expect(root.textContent).toBe("5B");
+    });
+
+    it("should follow the area changed just before the form is looked up again", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo"></storage-usage>
+        </storage-form>`);
+      query<HTMLStorageFormElement>("storage-form").storageArea =
+        "session-storage";
+      allCustomElementsDefinedEvent.dispatchEvent();
+      await flush();
+      expect(usage().textContent).toBe("1B");
+    });
+
+    it("should follow the area changed just before a form is upgraded on the way", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <late-storage-form><storage-usage name="foo"></storage-usage></late-storage-form>
+        </storage-form>`);
+      query<HTMLStorageFormElement>("storage-form").storageArea =
+        "session-storage";
+      customElements.define(
+        "late-storage-form",
+        class extends mixinStorageForm(HTMLElement) {},
+      );
+      allCustomElementsDefinedEvent.dispatchEvent();
+      await flush();
+      expect(usage().textContent).toBe("1B");
+    });
+
+    it("should skip an ancestor with storage-area which is not a form", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <area-holder storage-area="session-storage">
+            <storage-usage name="foo"></storage-usage>
+          </area-holder>
+        </storage-form>`);
+      expect(usage().storageForm).toBe(query("storage-form"));
+      expect(usage().textContent).toBe("5B");
     });
 
     it("should find the form after all elements are defined", async () => {

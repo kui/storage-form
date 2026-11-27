@@ -89,32 +89,26 @@ function isStorageForm(e: Element): e is StorageFormElement {
 }
 
 /**
- * Yields the ancestor storage forms from the nearest, until the one with
- * storage-area. Forms without storage-area are skipped as owners, but yielded
- * because setting their storage-area changes the owner.
+ * Finds the nearest ancestor storage form with storage-area, which owns the
+ * element.
  *
  * @param crossShadowRoots Whether to look for forms beyond shadow hosts.
+ * @returns `forms` are the ancestor forms from the nearest to the owner, or to
+ *   the top if no owner. Forms without storage-area are included, because
+ *   setting their storage-area changes the owner.
  */
-export function* storageFormsToClosest(
+export function findStorageForm(
   element: Element,
   { crossShadowRoots }: { crossShadowRoots: boolean },
-): Generator<StorageFormElement, void, undefined> {
+): { owner: StorageFormElement | null; forms: StorageFormElement[] } {
   const parentOf = crossShadowRoots
     ? parentOrShadowRootHost
     : (e: Element) => e.parentElement;
+  const forms: StorageFormElement[] = [];
   for (let p = parentOf(element); p !== null; p = parentOf(p)) {
     if (!isStorageForm(p)) continue;
-    yield p;
-    if (p.storageArea) return;
+    forms.push(p);
+    if (p.storageArea) return { owner: p, forms };
   }
-}
-
-/** The nearest ancestor storage form with storage-area. */
-export function closestStorageForm(
-  element: Element,
-  options: { crossShadowRoots: boolean },
-): StorageFormElement | null {
-  for (const form of storageFormsToClosest(element, options))
-    if (form.storageArea) return form;
-  return null;
+  return { owner: null, forms };
 }
