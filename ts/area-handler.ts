@@ -76,10 +76,20 @@ export class FacadeAreaHandler implements AreaHandler {
   }
 
   async write(items: WroteValues): Promise<void> {
-    await Promise.all([
-      this.handler?.write(items),
-      this.localListener.dispatchEvent(items),
-    ]);
+    const handler = this.handler;
+    const listener = this.localListener;
+    const writing = handler?.write(items);
+    // Not after the write, because asynchronous writes may be delayed for long.
+    // Async to reject instead of throwing if a listener throws synchronously.
+    const notifying = (async () => listener.dispatchEvent(items))();
+    // Wait for both, so that neither of them is left unhandled.
+    const [written, notified] = await Promise.allSettled([writing, notifying]);
+    if (written.status === "rejected") {
+      if (notified.status === "rejected") console.error(notified.reason);
+      if (handler) await notifyReadValues(handler, listener, items);
+      throw written.reason;
+    }
+    if (notified.status === "rejected") throw notified.reason;
   }
 
   onChange(callback: (updates: WroteValues) => void | Promise<void>) {
@@ -111,6 +121,25 @@ export class FacadeAreaHandler implements AreaHandler {
       globalThis.storageForm.updateEventListeners.set(this.handler, listener);
     }
     return listener;
+  }
+}
+
+/**
+ * Restores the values notified by a rejected write, with the values which the
+ * handler reads. They may include the entries waiting to be written.
+ */
+async function notifyReadValues(
+  handler: AreaHandler,
+  listener: UpdateEventListenerCollection,
+  items: WroteValues,
+) {
+  try {
+    const names = [...items.keys()];
+    const values: WroteValues = new Map(names.map((n) => [n, undefined]));
+    setAll(values, await handler.read(names));
+    await listener.dispatchEvent(values);
+  } catch (error) {
+    console.error(error);
   }
 }
 
@@ -283,6 +312,8 @@ export class BufferedWriteHandler implements AreaHandler {
   private readonly delayMillis: number;
   /** Entries which are not passed to the delegate yet. */
   private pendingEntries: WroteValues | null = null;
+  /** Entries which the delegate is writing. */
+  private writingEntries: WroteValues | null = null;
   private writePromise: Promise<void> = Promise.resolve();
   private lastWriteTime = 0;
 
@@ -311,8 +342,22 @@ export class BufferedWriteHandler implements AreaHandler {
     return this.delegate.readTotalBytes();
   }
 
-  read(names: string[]): Promise<StoredValues> | StoredValues {
-    return this.delegate.read(names);
+  async read(names: string[]): Promise<StoredValues> {
+    const values = new Map(await this.delegate.read(names));
+    // After reading, to include the entries added while reading. The entries
+    // whose write started while reading are still overlaid here, because the
+    // storage completes the operations in order, so the read completes before
+    // the write.
+    for (const entries of [this.writingEntries, this.pendingEntries]) {
+      if (!entries) continue;
+      for (const name of names) {
+        if (!entries.has(name)) continue;
+        const value = entries.get(name);
+        if (value === undefined) values.delete(name);
+        else values.set(name, value);
+      }
+    }
+    return values;
   }
 
   write(items: WroteValues): Promise<void> {
@@ -331,9 +376,11 @@ export class BufferedWriteHandler implements AreaHandler {
       const sleepTime = this.delayMillis - diffTime;
       if (sleepTime > 0) await sleep(sleepTime);
       this.pendingEntries = null;
+      this.writingEntries = entries;
       try {
         await this.delegate.write(entries);
       } finally {
+        this.writingEntries = null;
         // Failed writes may also consume the rate limit of the storage.
         this.lastWriteTime = Date.now();
       }

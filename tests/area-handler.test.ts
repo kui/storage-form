@@ -209,6 +209,155 @@ describe("FacadeAreaHandler", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  describe("#write", () => {
+    it("should notify before the asynchronous write ends", async () => {
+      const { name, handler } = registerStubHandler();
+      const { promise, resolve } = withResolves();
+      handler.write.mockReturnValueOnce(promise);
+      const facade = new FacadeAreaHandler();
+      facade.updateArea(name);
+      const callback = jest.fn();
+      facade.onChange(callback);
+
+      const items = new Map([["k", "v2"]]);
+      const done = jest.fn();
+      const p = facade.write(items).then(done);
+      await flush();
+      expect(callback.mock.calls).toEqual([[items]]);
+      expect(done).not.toHaveBeenCalled();
+      resolve();
+      await p;
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it("should notify the stored values if the write is rejected", async () => {
+      const error = jest.spyOn(console, "error").mockImplementation();
+      const { name, handler } = registerStubHandler();
+      handler.write.mockRejectedValueOnce(Error("test"));
+      const facade = new FacadeAreaHandler();
+      facade.updateArea(name);
+      const callback = jest.fn();
+      facade.onChange(callback);
+
+      const items = new Map([
+        ["k", "v2"],
+        ["missing", "v"],
+      ]);
+      await expect(facade.write(items)).rejects.toThrow("test");
+      expect(handler.read).toHaveBeenLastCalledWith(["k", "missing"]);
+      expect(callback.mock.calls).toEqual([
+        [items],
+        [
+          new Map([
+            ["k", "v"],
+            ["missing", undefined],
+          ]),
+        ],
+      ]);
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    it("should reject with the write error even if the read fails", async () => {
+      const error = jest.spyOn(console, "error").mockImplementation();
+      const { name, handler } = registerStubHandler();
+      handler.write.mockRejectedValueOnce(Error("write"));
+      handler.read.mockImplementationOnce(() => {
+        throw Error("read");
+      });
+      const facade = new FacadeAreaHandler();
+      facade.updateArea(name);
+      const callback = jest.fn();
+      facade.onChange(callback);
+
+      const items = new Map([["k", "v2"]]);
+      await expect(facade.write(items)).rejects.toThrow("write");
+      expect(callback.mock.calls).toEqual([[items]]);
+      expect(error).toHaveBeenCalledWith(Error("read"));
+    });
+
+    it("should not notify if the write throws synchronously", async () => {
+      const { name, handler } = registerStubHandler();
+      handler.write.mockImplementationOnce(() => {
+        throw Error("test");
+      });
+      const facade = new FacadeAreaHandler();
+      facade.updateArea(name);
+      const callback = jest.fn();
+      facade.onChange(callback);
+
+      await expect(facade.write(new Map([["k", "v2"]]))).rejects.toThrow(
+        "test",
+      );
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    describe("if a listener fails", () => {
+      const unhandled = jest.fn();
+      beforeEach(() => {
+        unhandled.mockClear();
+        process.on("unhandledRejection", unhandled);
+      });
+      afterEach(() => {
+        process.off("unhandledRejection", unhandled);
+      });
+      /** Waits for the unhandled rejections to be reported. */
+      async function tick() {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+
+      function facadeWithPendingWrite(
+        callback: (updates: WroteValues) => void | Promise<void>,
+      ) {
+        const { name, handler } = registerStubHandler();
+        const write = withResolves();
+        handler.write.mockReturnValueOnce(write.promise);
+        const facade = new FacadeAreaHandler();
+        facade.updateArea(name);
+        facade.onChange(callback);
+        return { facade, write };
+      }
+
+      it("should reject after the write without unhandled rejections", async () => {
+        const { facade, write } = facadeWithPendingWrite(() =>
+          Promise.reject(Error("listener")),
+        );
+        const done = jest.fn();
+        const p = facade.write(new Map([["k", "v2"]])).catch(done);
+        await tick();
+        expect(unhandled).not.toHaveBeenCalled();
+        expect(done).not.toHaveBeenCalled();
+        write.resolve();
+        await p;
+        expect(done).toHaveBeenCalledWith(Error("listener"));
+      });
+
+      it("should reject if a listener throws synchronously", async () => {
+        const { facade, write } = facadeWithPendingWrite(() => {
+          throw Error("listener");
+        });
+        const p = facade.write(new Map([["k", "v2"]]));
+        write.resolve();
+        await expect(p).rejects.toThrow("listener");
+      });
+
+      it("should reject with the write error if both fail", async () => {
+        const error = jest.spyOn(console, "error").mockImplementation();
+        // Only the first notification, not the restoring one.
+        const callback = jest.fn().mockImplementationOnce(() => {
+          throw Error("listener");
+        });
+        const { facade, write } = facadeWithPendingWrite(callback);
+        const p = facade.write(new Map([["k", "v2"]]));
+        write.reject(Error("write"));
+        await expect(p).rejects.toThrow("write");
+        await tick();
+        expect(unhandled).not.toHaveBeenCalled();
+        expect(error.mock.calls).toEqual([[Error("listener")]]);
+        expect(callback).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
   describe("#onChange", () => {
     it("should notify writes by other facades of the same area", async () => {
       const { name } = registerStubHandler();
@@ -481,12 +630,12 @@ describe("ChromeStorageHandler", () => {
 });
 
 describe("BufferedWriteHandler", () => {
-  it("should delegate except writing", () => {
+  it("should delegate except writing", async () => {
     const delegate = stubHandler();
     const handler = new BufferedWriteHandler(delegate, 200);
     expect(handler.quotaBytes).toBe(10);
     expect(handler.totalQuotaBytes).toBe(20);
-    expect(handler.read(["k"])).toEqual(new Map([["k", "v"]]));
+    await expect(handler.read(["k"])).resolves.toEqual(new Map([["k", "v"]]));
     expect(delegate.read).toHaveBeenCalledWith(["k"]);
     expect(handler.readBytes(["k"])).toEqual(new Map([["k", 1]]));
     expect(delegate.readBytes).toHaveBeenCalledWith(["k"]);
@@ -638,6 +787,137 @@ describe("BufferedWriteHandler", () => {
           ["n3", "v3"],
         ]),
       );
+    });
+
+    describe("#read", () => {
+      function storedHandler() {
+        const delegate = {
+          ...stubHandler(),
+          read: jest.fn((names: string[]) => {
+            const stored = ["a", "b"].filter((n) => names.includes(n));
+            return new Map(stored.map((n) => [n, "stored"]));
+          }),
+        };
+        return { delegate, handler: new BufferedWriteHandler(delegate, 200) };
+      }
+
+      it("should include the entries waiting to be written", async () => {
+        const { handler } = storedHandler();
+        await handler.write(new Map([["a", "first"]]));
+        const p = handler.write(
+          new Map([
+            ["a", "edited"],
+            ["b", undefined],
+            ["c", "added"],
+            ["d", "not read"],
+          ]),
+        );
+        await expect(handler.read(["a", "b", "c"])).resolves.toEqual(
+          new Map([
+            ["a", "edited"],
+            ["c", "added"],
+          ]),
+        );
+        await jest.advanceTimersByTimeAsync(INTERVAL);
+        await p;
+        await expect(handler.read(["a", "b"])).resolves.toEqual(
+          new Map([
+            ["a", "stored"],
+            ["b", "stored"],
+          ]),
+        );
+      });
+
+      it("should include the entries being written", async () => {
+        const { delegate, handler } = storedHandler();
+        const { promise, resolve } = withResolves();
+        delegate.write.mockReturnValueOnce(promise);
+        const p = handler.write(new Map([["a", "writing"]]));
+        await jest.advanceTimersByTimeAsync(0);
+        expect(delegate.write).toHaveBeenCalledTimes(1);
+        await expect(handler.read(["a", "b"])).resolves.toEqual(
+          new Map([
+            ["a", "writing"],
+            ["b", "stored"],
+          ]),
+        );
+        resolve();
+        await p;
+      });
+
+      it("should prefer the waiting entries to the ones being written", async () => {
+        const { delegate, handler } = storedHandler();
+        const { promise, resolve } = withResolves();
+        delegate.write.mockReturnValueOnce(promise);
+        const p1 = handler.write(new Map([["a", "writing"]]));
+        await jest.advanceTimersByTimeAsync(0);
+        const p2 = handler.write(new Map([["a", "waiting"]]));
+        await expect(handler.read(["a"])).resolves.toEqual(
+          new Map([["a", "waiting"]]),
+        );
+        resolve();
+        await p1;
+        await jest.advanceTimersByTimeAsync(INTERVAL);
+        await p2;
+      });
+
+      it("should not include the entries of a rejected write", async () => {
+        const { delegate, handler } = storedHandler();
+        delegate.write.mockRejectedValueOnce(Error("test"));
+        await expect(
+          handler.write(new Map([["a", "rejected"]])),
+        ).rejects.toThrow("test");
+        await expect(handler.read(["a"])).resolves.toEqual(
+          new Map([["a", "stored"]]),
+        );
+      });
+
+      describe("with a facade", () => {
+        function facadeOf(handler: AreaHandler) {
+          const name = `buffered-${(areaCount++).toString()}`;
+          registerHandler(name, handler);
+          const facade = new FacadeAreaHandler();
+          facade.updateArea(name);
+          const callback = jest.fn();
+          facade.onChange(callback);
+          return { facade, callback };
+        }
+
+        it("should notify the stored value if the delayed write is rejected", async () => {
+          const { delegate, handler } = storedHandler();
+          const { facade, callback } = facadeOf(handler);
+          await facade.write(new Map([["a", "first"]]));
+          delegate.write.mockRejectedValueOnce(Error("test"));
+          const p = expect(
+            facade.write(new Map([["a", "rejected"]])),
+          ).rejects.toThrow("test");
+          await jest.advanceTimersByTimeAsync(INTERVAL);
+          await p;
+          expect(callback.mock.calls.slice(1)).toEqual([
+            [new Map([["a", "rejected"]])],
+            [new Map([["a", "stored"]])],
+          ]);
+        });
+
+        it("should notify the waiting value if the running write is rejected", async () => {
+          const { delegate, handler } = storedHandler();
+          const { promise, reject } = withResolves();
+          delegate.write.mockReturnValueOnce(promise);
+          const { facade, callback } = facadeOf(handler);
+          const p1 = facade.write(new Map([["a", "rejected"]]));
+          await jest.advanceTimersByTimeAsync(0);
+          const p2 = facade.write(new Map([["a", "next"]]));
+          reject(Error("test"));
+          await expect(p1).rejects.toThrow("test");
+          expect(callback.mock.calls).toEqual([
+            [new Map([["a", "rejected"]])],
+            [new Map([["a", "next"]])],
+            [new Map([["a", "next"]])],
+          ]);
+          await jest.advanceTimersByTimeAsync(INTERVAL);
+          await p2;
+        });
+      });
     });
 
     describe("while the delegate is writing", () => {
