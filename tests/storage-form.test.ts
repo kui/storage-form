@@ -1090,6 +1090,18 @@ describe("DOM mutations", () => {
     expect(localStorage.getItem("foo")).toBe("typed");
   });
 
+  it("should not reload by storage-area of a mono control", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo">
+        <input is="storage-input" name="bar" storage-area="local-storage">
+      </storage-form>`);
+    const read = jest.spyOn(WebStorageHandler.prototype, "read");
+    query("[is=storage-input]").setAttribute("storage-area", "session-storage");
+    await flush();
+    expect(read).not.toHaveBeenCalledWith(["foo"]);
+  });
+
   it("should follow storage-area of a nested form", async () => {
     localStorage.setItem("foo", "local");
     sessionStorage.setItem("foo", "session");
