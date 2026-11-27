@@ -38,12 +38,20 @@ function dispatchOwnChangeEvents(elements: Iterable<EventTarget>) {
 }
 
 /**
- * Controls edited while no storage form owned them, with the order of the
- * edits. The form which gets storage-area later keeps the edits as the ones
- * before the initial loading.
+ * Controls edited before the value of their name is loaded, with the order of
+ * the edits. It is kept on the controls, not in a form, because the form which
+ * loads the value may change before the loading, e.g. while storage-area is
+ * being set, removed or changed. Edits of controls in no storage form are not
+ * known.
  */
-const unownedEdits = new WeakMap<HTMLStorageFormControlElement, number>();
-let unownedEditCount = 0;
+const unloadedEdits = new WeakMap<HTMLStorageFormControlElement, number>();
+let editCount = 0;
+
+function findOwner(e: HTMLStorageFormControlElement) {
+  // Either option gives the same owner, because controls found by
+  // querySelectorAll or retargeted events are in the tree of the form.
+  return findStorageForm(e, { crossShadowRoots: false });
+}
 
 const notInitialized = Symbol("notInitialized");
 
@@ -51,8 +59,6 @@ class NamedStorageControlsCollection {
   private readonly elements = new Set<HTMLStorageFormControlElement>();
   readonly name: string;
   #value: string | undefined | typeof notInitialized = notInitialized;
-  /** The last control edited before the value is initialized. */
-  private edited: HTMLStorageFormControlElement | undefined;
   /** The edited value being written by {@link load}. */
   private pendingValue: string | undefined;
 
@@ -65,15 +71,17 @@ class NamedStorageControlsCollection {
     if (e.name !== this.name) throw Error("Invalid name");
     if (this.elements.has(e)) return this;
     this.elements.add(e);
-    if (write && this.#value !== notInitialized) {
-      storageControlsHandler.write(e, this.pendingValue ?? this.#value);
+    if (this.#value !== notInitialized) {
+      // The loaded value is shown, or the edit is stored by the caller.
+      unloadedEdits.delete(e);
+      if (write)
+        storageControlsHandler.write(e, this.pendingValue ?? this.#value);
     }
     // Donot dispatch change event here because it is overwritten by the value
     return this;
   }
 
   delete(e: HTMLStorageFormControlElement) {
-    if (this.edited === e) this.edited = undefined;
     return this.elements.delete(e);
   }
 
@@ -85,7 +93,7 @@ class NamedStorageControlsCollection {
     return this.#value !== notInitialized;
   }
 
-  /** Discards the value. The edited control is kept. */
+  /** Discards the value. The edits are kept. */
   uninitialize() {
     this.#value = notInitialized;
   }
@@ -95,8 +103,19 @@ class NamedStorageControlsCollection {
     if (this.pendingValue === value) this.pendingValue = undefined;
   }
 
-  markAsEdited(e: HTMLStorageFormControlElement) {
-    if (this.elements.has(e)) this.edited = e;
+  /** Takes the last edited control, and forgets the edits of the others. */
+  private takeEdited(): HTMLStorageFormControlElement | undefined {
+    let edited: HTMLStorageFormControlElement | undefined;
+    let editedAt = -1;
+    for (const e of this.elements) {
+      const at = unloadedEdits.get(e);
+      unloadedEdits.delete(e);
+      if (at !== undefined && at > editedAt) {
+        edited = e;
+        editedAt = at;
+      }
+    }
+    return edited;
   }
 
   /**
@@ -109,8 +128,7 @@ class NamedStorageControlsCollection {
     editedValue?: string;
     changed: HTMLStorageFormControlElement[];
   } {
-    const edited = this.edited;
-    this.edited = undefined;
+    const edited = this.takeEdited();
     if (storedValue !== undefined || edited === undefined)
       return { changed: this.setValue(storedValue) };
 
@@ -210,14 +228,16 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       // diff, and before telling whether the control is owned by this form.
       if (this.hasUnhandledRecords(this.mutationObserver.takeRecords()))
         this.handleMutations(e);
-      if (!this.isOwnControl(e)) {
-        if (findStorageForm(e, { crossShadowRoots: false }).owner === null)
-          unownedEdits.set(e, unownedEditCount++);
+      const { owner, forms } = findOwner(e);
+      if (owner === null) {
+        // Recorded once by the nearest form, for the form which gets the area.
+        if (forms[0] === this) unloadedEdits.set(e, editCount++);
         return;
       }
+      if (owner !== this) return;
       const elementSet = this.namedControlMap.get(e.name);
       if (elementSet?.isInitialized === false) {
-        elementSet.markAsEdited(e);
+        unloadedEdits.set(e, editCount++);
         // Retry if the last loading failed
         if (this.remainingLoads === 0) this.invokeStorageChangeCallback();
       }
@@ -271,32 +291,11 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
         if (elementSet === undefined) this.namedControlMap.add(e);
         else elementSet.add(e, e !== edited);
       }
-      this.takeUnownedEdits(controls);
-    }
-
-    /** Values edited while not owned are not stored yet. */
-    private takeUnownedEdits(controls: Set<HTMLStorageFormControlElement>) {
-      const edits = [...controls]
-        .filter((e) => unownedEdits.has(e))
-        .sort(
-          (a, b) => (unownedEdits.get(a) ?? 0) - (unownedEdits.get(b) ?? 0),
-        );
-      for (const e of edits) {
-        unownedEdits.delete(e);
-        const elementSet = this.namedControlMap.get(e.name);
-        // An initialized value has been shown to the control by add().
-        if (elementSet?.isInitialized === false) elementSet.markAsEdited(e);
-      }
     }
 
     /** Controls in a nested storage form are left to the nested form. */
     private isOwnControl(e: unknown): e is HTMLStorageFormControlElement {
-      return (
-        matchesStorageControl(e) &&
-        // Either option gives the same owner, because controls found by
-        // querySelectorAll or retargeted events are in the tree of this form.
-        findStorageForm(e, { crossShadowRoots: false }).owner === this
-      );
+      return matchesStorageControl(e) && findOwner(e).owner === this;
     }
 
     disconnectedCallback() {

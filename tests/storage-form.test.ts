@@ -410,6 +410,28 @@ describe("storage-area", () => {
       expect(dump(sessionStorage)).toEqual({ foo: "typed" });
     });
 
+    it("should keep an unchecked checkbox", async () => {
+      await render(`
+        <storage-form><input name="foo" type="checkbox" checked></storage-form>`);
+      await check(query("input"), false);
+      query("storage-form").setAttribute("storage-area", "local-storage");
+      await flush();
+      expect(query<HTMLInputElement>("input").checked).toBe(false);
+      expect(localStorage).toHaveLength(0);
+    });
+
+    it("should keep the edits of a new name moved into a loaded form", async () => {
+      await render(`
+        <storage-form id="loaded" storage-area="local-storage"></storage-form>
+        <storage-form><input name="foo" id="moved" value="default"></storage-form>`);
+      const moved = query<HTMLInputElement>("#moved");
+      await input(moved, "typed");
+      query("#loaded").append(moved);
+      await flush();
+      expect(moved.value).toBe("typed");
+      expect(dump(localStorage)).toEqual({ foo: "typed" });
+    });
+
     it("should discard the edits of a control moved into a loaded form", async () => {
       await render(`
         <storage-form id="loaded" storage-area="local-storage"><input name="foo"></storage-form>
@@ -561,6 +583,34 @@ describe("edits before the initial loading", () => {
     for (const id of ["#a", "#b", "#c"])
       expect(query<HTMLInputElement>(id).value).toBe("last");
     expect(dump(localStorage)).toEqual({ foo: "last" });
+  });
+
+  it("should prefer the last edit to an older edit in a form without the area", async () => {
+    await render(`
+      <storage-form id="none"><input name="foo" id="old"></storage-form>
+      <storage-form id="loading" storage-area="async-local">
+        <input name="foo" id="new">
+      </storage-form>`);
+    await input(query("#old"), "old");
+    await input(query("#new"), "new");
+    query("#loading").append(query("#old"));
+    await completeReads();
+    expect(query<HTMLInputElement>("#old").value).toBe("new");
+    expect(dump(localStorage)).toEqual({ foo: "new" });
+  });
+
+  it("should keep the edits while the area is removed and set again", async () => {
+    await render(`
+      <storage-form storage-area="async-local"><input name="foo"></storage-form>`);
+    await input(query("input"), "typed");
+    const form = query("storage-form");
+    form.removeAttribute("storage-area");
+    await flush();
+    form.setAttribute("storage-area", "async-session");
+    await completeReads();
+    expect(query<HTMLInputElement>("input").value).toBe("typed");
+    expect(localStorage).toHaveLength(0);
+    expect(dump(sessionStorage)).toEqual({ foo: "typed" });
   });
 
   it("should store only the edited value if another control is loaded", async () => {
