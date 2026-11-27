@@ -68,9 +68,7 @@ export interface StorageElementMixin extends HTMLElement {
   storageArea: string;
 }
 
-export function parentOrShadowRootHost(
-  element: HTMLElement,
-): HTMLElement | null {
+export function parentOrShadowRootHost(element: Element): HTMLElement | null {
   const parent = element.parentElement;
   if (parent !== null) return parent;
   const shadowRoot = element.getRootNode();
@@ -78,4 +76,45 @@ export function parentOrShadowRootHost(
   const host = shadowRoot.host;
   if (!(host instanceof HTMLElement)) return null;
   return host;
+}
+
+export const storageFormMarker = Symbol("storageForm");
+
+export interface StorageFormElement extends StorageElementMixin {
+  readonly [storageFormMarker]: true;
+}
+
+function isStorageForm(e: Element): e is StorageFormElement {
+  return (e as Partial<StorageFormElement>)[storageFormMarker] === true;
+}
+
+/**
+ * Yields the ancestor storage forms from the nearest, until the one with
+ * storage-area. Forms without storage-area are skipped as owners, but yielded
+ * because setting their storage-area changes the owner.
+ *
+ * @param crossShadowRoots Whether to look for forms beyond shadow hosts.
+ */
+export function* storageFormsToClosest(
+  element: Element,
+  { crossShadowRoots }: { crossShadowRoots: boolean },
+): Generator<StorageFormElement, void, undefined> {
+  const parentOf = crossShadowRoots
+    ? parentOrShadowRootHost
+    : (e: Element) => e.parentElement;
+  for (let p = parentOf(element); p !== null; p = parentOf(p)) {
+    if (!isStorageForm(p)) continue;
+    yield p;
+    if (p.storageArea) return;
+  }
+}
+
+/** The nearest ancestor storage form with storage-area. */
+export function closestStorageForm(
+  element: Element,
+  options: { crossShadowRoots: boolean },
+): StorageFormElement | null {
+  for (const form of storageFormsToClosest(element, options))
+    if (form.storageArea) return form;
+  return null;
 }

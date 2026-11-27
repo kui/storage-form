@@ -1,7 +1,10 @@
 import {
   addChangeListeners,
+  closestStorageForm,
   dispatchChangeEvent,
   parentOrShadowRootHost,
+  storageFormMarker,
+  storageFormsToClosest,
 } from "../ts/elements.js";
 import { flush } from "./helpers/dom.js";
 
@@ -63,5 +66,66 @@ describe("parentOrShadowRootHost", () => {
   it("should return null if there are no parents", () => {
     expect(parentOrShadowRootHost(document.createElement("div"))).toBeNull();
     expect(parentOrShadowRootHost(document.documentElement)).toBeNull();
+  });
+});
+
+describe("closestStorageForm", () => {
+  /** A fake storage form, like the elements made by mixinStorageForm. */
+  function form(area?: string): HTMLElement {
+    const e = document.createElement("div");
+    Object.defineProperties(e, {
+      [storageFormMarker]: { value: true },
+      storageArea: { get: () => e.getAttribute("storage-area") ?? "" },
+    });
+    if (area !== undefined) e.setAttribute("storage-area", area);
+    return e;
+  }
+  const across = { crossShadowRoots: true };
+  const within = { crossShadowRoots: false };
+
+  it("should return the nearest form with the area", () => {
+    const outer = form("local-storage");
+    const inner = outer.appendChild(form("session-storage"));
+    const child = inner
+      .appendChild(document.createElement("div"))
+      .appendChild(document.createElement("span"));
+    expect(closestStorageForm(child, within)).toBe(inner);
+    expect([...storageFormsToClosest(child, within)]).toEqual([inner]);
+  });
+
+  it("should skip forms without the area, and yield them on the way", () => {
+    const outer = form("local-storage");
+    const inner = outer.appendChild(form());
+    const child = inner.appendChild(document.createElement("span"));
+    expect(closestStorageForm(child, within)).toBe(outer);
+    expect([...storageFormsToClosest(child, within)]).toEqual([inner, outer]);
+  });
+
+  it("should not count elements which only have storageArea", () => {
+    const outer = form("local-storage");
+    const notForm = outer.appendChild(
+      Object.assign(document.createElement("div"), {
+        storageArea: "session-storage",
+      }),
+    );
+    const child = notForm.appendChild(document.createElement("span"));
+    expect(closestStorageForm(child, within)).toBe(outer);
+  });
+
+  it("should return null without forms with the area", () => {
+    const outer = form();
+    const child = outer.appendChild(document.createElement("span"));
+    expect(closestStorageForm(child, within)).toBeNull();
+    expect([...storageFormsToClosest(child, within)]).toEqual([outer]);
+  });
+
+  it("should cross shadow roots only if specified", () => {
+    const outer = form("local-storage");
+    const child = outer
+      .appendChild(document.createElement("div"))
+      .attachShadow({ mode: "open" })
+      .appendChild(document.createElement("span"));
+    expect(closestStorageForm(child, across)).toBe(outer);
+    expect(closestStorageForm(child, within)).toBeNull();
   });
 });

@@ -4,7 +4,7 @@ import type {
   HTMLElementConstructor,
   StorageElementMixin,
 } from "./elements.js";
-import { parentOrShadowRootHost } from "./elements.js";
+import { storageFormsToClosest } from "./elements.js";
 import { WroteValues, allCustomElementsDefinedEvent } from "./globals.js";
 import { SerialTaskExecutor } from "./promises.js";
 
@@ -132,14 +132,12 @@ export function mixinStorageFormChildAreaHandlerElement<
       super.storageArea = v;
     }
 
-    private onStorageFormMutation(mutaions: MutationRecord[]) {
-      for (const mutaion of mutaions) {
-        if (mutaion.type === "attributes") {
-          if (mutaion.attributeName === "storage-area") {
-            this.updateArea();
-            this.invokeStorageChangeCallback();
-          }
-        }
+    /** Called if storage-area of the form or forms without it is changed. */
+    private onStorageFormMutation(records: MutationRecord[]) {
+      const isChanged = this.findStorageForm();
+      if (isChanged || records.some((r) => r.target === this.#storageForm)) {
+        this.updateArea();
+        this.invokeStorageChangeCallback();
       }
     }
 
@@ -184,25 +182,23 @@ export function mixinStorageFormChildAreaHandlerElement<
 
     /** @return true if the form is changed. */
     private findStorageForm(): boolean {
-      const form = this.getStorageForm();
-      if (form === this.#storageForm) return false;
-
+      // Elements in shadow trees inherit the area of the host's form.
+      const forms = [
+        ...storageFormsToClosest(this, { crossShadowRoots: true }),
+      ];
+      // Forms without storage-area are observed, because the area may be set.
       this.storageFormObserver.disconnect();
-      if (form !== null) {
-        this.storageFormObserver.observe(form, {
+      for (const f of forms) {
+        this.storageFormObserver.observe(f, {
           attributes: true,
           attributeFilter: ["storage-area"],
         });
       }
+      const last = forms.at(-1);
+      const form = last?.storageArea ? last : null;
+      if (form === this.#storageForm) return false;
       this.#storageForm = form;
       return true;
-    }
-
-    private getStorageForm(): StorageElementMixin | null {
-      let parent = parentOrShadowRootHost(this);
-      while (parent !== null && !(parent as StorageElementMixin).storageArea)
-        parent = parentOrShadowRootHost(parent);
-      return parent === null ? null : (parent as StorageElementMixin);
     }
 
     private updateArea() {

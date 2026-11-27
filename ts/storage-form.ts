@@ -1,6 +1,8 @@
 import { mixinAreaHandlerElement } from "./area-handler-element.js";
 import { distinctConcat } from "./arrays.js";
 import {
+  closestStorageForm,
+  storageFormMarker,
   type HTMLElementConstructor,
   type StorageElementMixin,
   type StorageFormLikeElement,
@@ -22,19 +24,6 @@ function matchesStorageControl(e: unknown): e is HTMLStorageFormControlElement {
     e.hasAttribute("name") &&
     e.matches(STORAGE_CONTROL_SELECTOR)
   );
-}
-
-const storageFormMarker = Symbol("storageForm");
-
-/** Storage forms without storage-area are skipped, as mono controls do. */
-function closestStorageForm(e: Element): Element | null {
-  for (let p = e.parentElement; p !== null; p = p.parentElement) {
-    const form = p as Partial<StorageElementMixin> & {
-      [storageFormMarker]?: true;
-    };
-    if (form[storageFormMarker] && form.storageArea) return p;
-  }
-  return null;
 }
 
 /** Change events dispatched by storage forms, not by users. */
@@ -271,7 +260,11 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
 
     /** Controls in a nested storage form are left to the nested form. */
     private isOwnControl(e: unknown): e is HTMLStorageFormControlElement {
-      return matchesStorageControl(e) && closestStorageForm(e) === this;
+      return (
+        matchesStorageControl(e) &&
+        // Controls in shadow trees are not found by querySelectorAll.
+        closestStorageForm(e, { crossShadowRoots: false }) === this
+      );
     }
 
     disconnectedCallback() {
