@@ -84,7 +84,7 @@ export interface StorageFormElement extends StorageElementMixin {
   readonly [storageFormMarker]: true;
 }
 
-function isStorageForm(e: Element): e is StorageFormElement {
+export function isStorageForm(e: Node): e is StorageFormElement {
   return (e as Partial<StorageFormElement>)[storageFormMarker] === true;
 }
 

@@ -1,5 +1,6 @@
 import { listNames } from "./area-handler.js";
 import {
+  isStorageForm,
   parentOrShadowRootHost,
   type HTMLElementConstructor,
   type StorageElementMixin,
@@ -65,11 +66,14 @@ export function mixinAreaSelect<
       target.storageArea = this.value;
     }
 
+    /**
+     * The nearest storage form, even without storage-area, because the area is
+     * set by this.
+     */
     private getTargetByParent(): StorageElementMixin | null {
       let parent = parentOrShadowRootHost(this);
       while (parent !== null) {
-        if (typeof (parent as StorageElementMixin).storageArea === "string")
-          return parent as StorageElementMixin;
+        if (isStorageForm(parent)) return parent;
         parent = parentOrShadowRootHost(parent);
       }
       return null;
