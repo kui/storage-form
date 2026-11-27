@@ -70,7 +70,7 @@ export function mixinAreaHandlerElement<
     ) {
       super.attributeChangedCallback?.(name, oldValue, newValue);
       if (name === "storage-area") {
-        this.areaHandler.updateArea(newValue);
+        this.areaHandler.updateArea(this.storageArea);
         this.invokeStorageChangeCallback();
       }
     }
@@ -127,6 +127,9 @@ export function mixinStorageFormChildAreaHandlerElement<
       return a === "" && this.storageForm !== null
         ? this.storageForm.storageArea
         : a;
+    }
+    set storageArea(v: string) {
+      super.storageArea = v;
     }
 
     private onStorageFormMutation(mutaions: MutationRecord[]) {

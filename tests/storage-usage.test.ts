@@ -278,6 +278,19 @@ describe("storage-usage", () => {
       expect(e.textContent).toBe("5B");
     });
 
+    it("should use the area of the form after its own area is removed", async () => {
+      sessionStorage.setItem("foo", "1");
+      await render(`
+        <storage-form storage-area="small">
+          <storage-usage name="foo" storage-area="session-storage"></storage-usage>
+        </storage-form>`);
+      expect(usage().textContent).toBe("1B");
+      usage().removeAttribute("storage-area");
+      await flush();
+      expect(usage().storageArea).toBe("small");
+      expect(usage().textContent).toBe("5B");
+    });
+
     it("should use its own area set while disconnected", async () => {
       sessionStorage.setItem("foo", "1");
       await render(`
@@ -314,6 +327,31 @@ describe("storage-usage", () => {
       await flush();
       expect(new Set(values)).toEqual(new Set([5]));
     });
+  });
+});
+
+describe("storageArea property", () => {
+  it.each([
+    ["storage-usage", `<storage-usage storage-area=small></storage-usage>`],
+    ["storage-quota", `<storage-quota storage-area=small></storage-quota>`],
+    ["meter", `<meter is="storage-usage-meter" storage-area=small></meter>`],
+  ])(
+    "should reflect the property of %s to the attribute",
+    async (selector, html) => {
+      await render(html);
+      const e = query<StorageFormChildAreaHandlerElement>(selector);
+      e.storageArea = "session-storage";
+      expect(e.getAttribute("storage-area")).toBe("session-storage");
+      expect(e.storageArea).toBe("session-storage");
+    },
+  );
+
+  it("should follow the area set by the property", async () => {
+    await render(`<storage-quota storage-area=small></storage-quota>`);
+    query<StorageFormChildAreaHandlerElement>("storage-quota").storageArea =
+      "local-storage";
+    await flush();
+    expect(quota().textContent).toBe("10MiB");
   });
 });
 
