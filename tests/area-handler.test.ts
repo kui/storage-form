@@ -275,7 +275,7 @@ describe("FacadeAreaHandler", () => {
       expect(error).toHaveBeenCalledWith(Error("read"));
     });
 
-    it("should not notify if the write throws synchronously", async () => {
+    it("should notify only the stored values if the write throws synchronously", async () => {
       const { name, handler } = registerStubHandler();
       handler.write.mockImplementationOnce(() => {
         throw Error("test");
@@ -285,10 +285,60 @@ describe("FacadeAreaHandler", () => {
       const callback = jest.fn();
       facade.onChange(callback);
 
-      await expect(facade.write(new Map([["k", "v2"]]))).rejects.toThrow(
-        "test",
-      );
-      expect(callback).not.toHaveBeenCalled();
+      await expect(
+        facade.write(
+          new Map([
+            ["k", "v2"],
+            ["missing", "v"],
+          ]),
+        ),
+      ).rejects.toThrow("test");
+      expect(handler.read).toHaveBeenLastCalledWith(["k", "missing"]);
+      expect(callback.mock.calls).toEqual([
+        [
+          new Map([
+            ["k", "v"],
+            ["missing", undefined],
+          ]),
+        ],
+      ]);
+    });
+
+    it("should notify the items written before Web Storage throws", async () => {
+      const stored = new Map([["a", "old"]]);
+      const storage = {
+        getItem: (key: string) => stored.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          if (key === "b") throw new DOMException("full", "QuotaExceededError");
+          stored.set(key, value);
+        },
+      } as Storage;
+      const name = `web-storage-${(areaCount++).toString()}`;
+      registerHandler(name, new WebStorageHandler(storage));
+      const writer = new FacadeAreaHandler();
+      writer.updateArea(name);
+      const other = new FacadeAreaHandler();
+      other.updateArea(name);
+      const callback = jest.fn();
+      other.onChange(callback);
+
+      await expect(
+        writer.write(
+          new Map([
+            ["a", "new"],
+            ["b", "new"],
+          ]),
+        ),
+      ).rejects.toThrow("full");
+      expect(stored.get("a")).toBe("new");
+      expect(callback.mock.calls).toEqual([
+        [
+          new Map([
+            ["a", "new"],
+            ["b", undefined],
+          ]),
+        ],
+      ]);
     });
 
     describe("if a listener fails", () => {

@@ -78,7 +78,16 @@ export class FacadeAreaHandler implements AreaHandler {
   async write(items: WroteValues): Promise<void> {
     const handler = this.handler;
     const listener = this.localListener;
-    const writing = handler?.write(items);
+    let writing: void | Promise<void>;
+    try {
+      writing = handler?.write(items);
+    } catch (error) {
+      // A synchronous write may fail partway, e.g. by the quota of Web Storage.
+      // The listeners have not seen the items yet, so notify only what is
+      // stored.
+      if (handler) await notifyReadValues(handler, listener, items);
+      throw error;
+    }
     // Not after the write, because asynchronous writes may be delayed for long.
     // Async to reject instead of throwing if a listener throws synchronously.
     const notifying = (async () => listener.dispatchEvent(items))();
