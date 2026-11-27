@@ -398,13 +398,31 @@ describe("storage-input", () => {
   });
 
   // https://github.com/kui/storage-form/issues/41
-  it.failing(
-    "should store the value changed by the value attribute",
-    async () => {
-      await render(html);
-      target().setAttribute("value", "attr");
+  it("should not store the value changed by the value attribute", async () => {
+    await render(html);
+    target().setAttribute("value", "attr");
+    await flush();
+    expect(localStorage.getItem("foo")).toBeNull();
+  });
+
+  it("should not overwrite the stored value by the value attribute", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(html);
+    target().setAttribute("value", "attr");
+    await flush();
+    expect(localStorage.getItem("foo")).toBe("stored");
+    expect(target().value).toBe("stored");
+  });
+
+  it.each(["radio", "checkbox"])(
+    "should store the value changed by the value attribute of %s",
+    async (type) => {
+      localStorage.setItem("foo", "a");
+      await render(html.replace("<input", `<input type="${type}" value="a"`));
+      expect(target().checked).toBe(true);
+      target().setAttribute("value", "b");
       await flush();
-      expect(localStorage.getItem("foo")).toBe("attr");
+      expect(localStorage.getItem("foo")).toBe("b");
     },
   );
 
