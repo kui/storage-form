@@ -8,7 +8,7 @@ export default defineConfig(
   globalIgnores(["js", "types", "docs", "test-results"]),
   js.configs.recommended,
   {
-    files: ["**/*.ts"],
+    files: ["*.ts", "{ts,tests,e2e}/**/*.ts"],
     extends: [
       tseslint.configs.strictTypeChecked,
       tseslint.configs.stylisticTypeChecked,
