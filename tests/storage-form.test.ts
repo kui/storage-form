@@ -1090,6 +1090,20 @@ describe("DOM mutations", () => {
     expect(localStorage.getItem("foo")).toBe("typed");
   });
 
+  it("should not reload by storage-area of a mono control", async () => {
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo">
+        <input is="storage-input" name="bar" storage-area="local-storage">
+      </storage-form>`);
+    const read = jest.spyOn(WebStorageHandler.prototype, "read");
+    query("[is=storage-input]").setAttribute("storage-area", "session-storage");
+    await flush();
+    expect(read.mock.calls.some(([names]) => names.includes("foo"))).toBe(
+      false,
+    );
+  });
+
   it("should follow storage-area of a nested form", async () => {
     localStorage.setItem("foo", "local");
     sessionStorage.setItem("foo", "session");
@@ -1308,13 +1322,17 @@ describe("DOM mutations", () => {
 });
 
 describe("failed and delayed writes", () => {
-  let isWriteRejected = false;
+  /** The number of the next writes to reject. */
+  let rejectedWrites = 0;
   const rejectingHandler = (storage: Storage): AreaHandler => {
     const handler = new WebStorageHandler(storage);
     return Object.assign(Object.create(handler) as WebStorageHandler, {
       write: async (items: Map<string, string | undefined>) => {
         await Promise.resolve();
-        if (isWriteRejected) throw Error("write rejected");
+        if (rejectedWrites > 0) {
+          rejectedWrites--;
+          throw Error("write rejected");
+        }
         handler.write(items);
       },
     });
@@ -1326,7 +1344,7 @@ describe("failed and delayed writes", () => {
   );
 
   afterEach(() => {
-    isWriteRejected = false;
+    rejectedWrites = 0;
   });
 
   it("should show the stored value and store it again after a rejected write", async () => {
@@ -1334,14 +1352,13 @@ describe("failed and delayed writes", () => {
     localStorage.setItem("foo", "stored");
     await render(`
       <storage-form storage-area="rejecting-local"><input name="foo"></storage-form>`);
-    isWriteRejected = true;
+    rejectedWrites = 1;
     await input(query("input"), "typed");
     await flush();
     expect(query<HTMLInputElement>("input").value).toBe("stored");
     expect(dump(localStorage)).toEqual({ foo: "stored" });
     expect(error).toHaveBeenCalledWith(Error("write rejected"));
 
-    isWriteRejected = false;
     await input(query("input"), "typed");
     expect(dump(localStorage)).toEqual({ foo: "typed" });
   });
@@ -1352,10 +1369,10 @@ describe("failed and delayed writes", () => {
       <storage-form storage-area="rejecting-local">
         <input name="foo" value="default">
       </storage-form>`);
-    isWriteRejected = true;
+    // Only the typed value, so that a write of the default value is stored.
+    rejectedWrites = 1;
     await input(query("input"), "typed");
     await flush();
-    isWriteRejected = false;
     await flush();
     expect(query<HTMLInputElement>("input").value).toBe("default");
     expect(localStorage).toHaveLength(0);

@@ -5,11 +5,13 @@ import {
   HTMLStorageAreaSelectElement,
 } from "../ts/storage-area-select.js";
 import { HTMLStorageFormElement } from "../ts/storage-form.js";
+import { HTMLStorageUsageElement } from "../ts/storage-usage.js";
 import { dump, flush, input, query, render } from "./helpers/dom.js";
 
 HTMLAreaSelectElement.register();
 HTMLStorageAreaSelectElement.register();
 HTMLStorageFormElement.register();
+HTMLStorageUsageElement.register();
 
 beforeEach(() => {
   localStorage.clear();
@@ -62,6 +64,18 @@ describe("area-select", () => {
       `<select is="area-select"></select>`;
     await flush();
     expect(form().storageArea).toBe("local-storage");
+  });
+
+  it("should skip ancestors with storageArea which are not storage forms", async () => {
+    await render(
+      `<storage-form><storage-usage></storage-usage></storage-form>`,
+    );
+    // In the shadow tree, because the usage overwrites its children.
+    query("storage-usage").attachShadow({ mode: "open" }).innerHTML =
+      `<select is="area-select"><option>session-storage</select>`;
+    await flush();
+    expect(form().storageArea).toBe("session-storage");
+    expect(query("storage-usage").getAttribute("storage-area")).toBeNull();
   });
 
   it("should prefer the target property", async () => {

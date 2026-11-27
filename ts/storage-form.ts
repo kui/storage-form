@@ -4,6 +4,7 @@ import {
   dispatchOwnChangeEvent,
   findStorageForm,
   isOwnChangeEvent,
+  isStorageForm,
   storageFormMarker,
   type HTMLElementConstructor,
   type StorageElementMixin,
@@ -381,10 +382,16 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       attributeFilter: ["name", "storage-area"],
     };
 
-    /** Changes of own storage-area are handled by attributeChangedCallback. */
+    /**
+     * Changes of own storage-area are handled by attributeChangedCallback, and
+     * storage-area of other elements than nested forms does not change the
+     * owner of controls.
+     */
     private hasUnhandledRecords(records: MutationRecord[]) {
       return records.some(
-        (r) => r.target !== this || r.attributeName !== "storage-area",
+        (r) =>
+          r.attributeName !== "storage-area" ||
+          (r.target !== this && isStorageForm(r.target)),
       );
     }
 
