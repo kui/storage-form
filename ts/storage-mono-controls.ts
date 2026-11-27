@@ -52,7 +52,7 @@ export function mixinMonoStorageControl<
 
     static readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
-      ["name"],
+      ["name", "value"],
     );
 
     override attributeChangedCallback(
@@ -68,7 +68,18 @@ export function mixinMonoStorageControl<
       super.attributeChangedCallback?.(name, oldValue, newValue);
       if (name === "name") {
         this.invokeStorageChangeCallback();
+      } else if (name === "value" && this.isSubmittedValueAttribute()) {
+        this.valueChangedCallback().catch(console.error);
       }
+    }
+
+    // The value attribute of a checkbox or a radio is the submitted value
+    // itself, not an initial value. For other controls, it is only an initial
+    // value, so a change must not overwrite the value that the user or the
+    // storage has set.
+    private isSubmittedValueAttribute(): boolean {
+      const type = (this as { type?: string }).type;
+      return type === "checkbox" || type === "radio";
     }
 
     override invokeStorageChangeCallback(updates: WroteValues = new Map()) {

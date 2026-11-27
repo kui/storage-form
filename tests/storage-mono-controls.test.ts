@@ -414,6 +414,18 @@ describe("storage-input", () => {
     expect(target().value).toBe("stored");
   });
 
+  it.each(["radio", "checkbox"])(
+    "should store the value changed by the value attribute of %s",
+    async (type) => {
+      localStorage.setItem("foo", "a");
+      await render(html.replace("<input", `<input type="${type}" value="a"`));
+      expect(target().checked).toBe(true);
+      target().setAttribute("value", "b");
+      await flush();
+      expect(localStorage.getItem("foo")).toBe("b");
+    },
+  );
+
   it("should synchronize with other elements", async () => {
     await render(
       `${html}<textarea is="storage-textarea" name="foo" storage-area="local-storage"></textarea>`,
