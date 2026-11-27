@@ -1,4 +1,5 @@
 import {
+  BufferedWriteHandler,
   registerHandler,
   WebStorageHandler,
   type AreaHandler,
@@ -1111,5 +1112,76 @@ describe("DOM mutations", () => {
     await flush();
     await input(query("#a"), "typed");
     expect(b.value).toBe("");
+  });
+});
+
+describe("failed and delayed writes", () => {
+  let isWriteRejected = false;
+  const rejectingHandler = (storage: Storage): AreaHandler => {
+    const handler = new WebStorageHandler(storage);
+    return Object.assign(Object.create(handler) as WebStorageHandler, {
+      write: async (items: Map<string, string | undefined>) => {
+        await Promise.resolve();
+        if (isWriteRejected) throw Error("write rejected");
+        handler.write(items);
+      },
+    });
+  };
+  registerHandler("rejecting-local", rejectingHandler(localStorage));
+  registerHandler(
+    "buffered-local",
+    new BufferedWriteHandler(new WebStorageHandler(localStorage), 0),
+  );
+
+  afterEach(() => {
+    isWriteRejected = false;
+  });
+
+  it("should show the stored value and store it again after a rejected write", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation();
+    localStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="rejecting-local"><input name="foo"></storage-form>`);
+    isWriteRejected = true;
+    await input(query("input"), "typed");
+    await flush();
+    expect(query<HTMLInputElement>("input").value).toBe("stored");
+    expect(dump(localStorage)).toEqual({ foo: "stored" });
+    expect(error).toHaveBeenCalledWith(Error("write rejected"));
+
+    isWriteRejected = false;
+    await input(query("input"), "typed");
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should not store the default value after a rejected write of a value not stored", async () => {
+    jest.spyOn(console, "error").mockImplementation();
+    await render(`
+      <storage-form storage-area="rejecting-local">
+        <input name="foo" value="default">
+      </storage-form>`);
+    isWriteRejected = true;
+    await input(query("input"), "typed");
+    await flush();
+    isWriteRejected = false;
+    await flush();
+    expect(query<HTMLInputElement>("input").value).toBe("default");
+    expect(localStorage).toHaveLength(0);
+  });
+
+  it("should keep the edited value when the form reloads during a delayed write", async () => {
+    await render(`
+      <storage-form storage-area="buffered-local"><input name="foo"></storage-form>`);
+    // The first write is not delayed, and the next one waits for the interval.
+    await input(query("input"), "first");
+    await input(query("input"), "typed");
+    expect(localStorage.getItem("foo")).toBe("first");
+    query("storage-form").append(document.createElement("span"));
+    await flush();
+    await flush();
+    expect(query<HTMLInputElement>("input").value).toBe("typed");
+    // The interval includes the margin of BufferedWriteHandler.
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(localStorage.getItem("foo")).toBe("typed");
   });
 });
