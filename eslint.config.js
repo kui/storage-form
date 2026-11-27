@@ -28,22 +28,5 @@ export default defineConfig(
       },
     },
   },
-  {
-    files: ["ts/**/*.ts"],
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-      },
-    },
-  },
-  {
-    files: ["tests/**/*.ts"],
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-        ...globals.jest,
-      },
-    },
-  },
   eslintConfigPrettier,
 );
