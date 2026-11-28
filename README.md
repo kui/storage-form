@@ -6,6 +6,22 @@ Custom elements to manipulate `localStorage`/`sessionStorage`/`chrome.storage.{s
 - [Demo source](https://github.com/kui/storage-form/blob/master/docs/index.html)
 - [npm](https://www.npmjs.com/package/storage-form)
 
+## Install
+
+```sh
+npm install storage-form
+```
+
+Register the custom elements once before using them:
+
+```js
+import { register } from "storage-form";
+
+register();
+```
+
+The package is ESM only and ships its TypeScript declarations.
+
 ## Browser support
 
 Safari is not supported because it does not implement [customized built-in elements](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/is), such as `<input is="storage-input">`.
