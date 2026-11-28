@@ -32,8 +32,10 @@ jobs:
         run: npx playwright install --with-deps --no-shell chromium
       - name: Run e2e tests
         run: npm run test:e2e
+      # Staging needs a maintainer to approve it with 2FA (`npm stage approve`)
+      # before it becomes public, so this job alone cannot publish.
       # Keep prereleases off the latest dist-tag, which plain installs use.
-      - name: Publish
+      - name: Stage the package
         run: |
           tag=$(node -p 'require("./package.json").version.includes("-") ? "next" : "latest"')
-          npm publish --tag "$tag"
+          npm stage publish --tag "$tag"
