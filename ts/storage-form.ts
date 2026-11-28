@@ -322,7 +322,15 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       const diff = elementSet.diff(e);
       // Listeners on the ancestors may set the validity.
       afterPropagation(event, () => {
-        this.valueChangedCallback(elementSet, diff).catch(console.error);
+        // Taken again if the control is still here, because the listeners may
+        // also change the value, and dispatch another event for it.
+        const isOwned =
+          this.namedControlMap.get(e.name) === elementSet &&
+          findOwner(e).owner === this;
+        this.valueChangedCallback(
+          elementSet,
+          isOwned ? elementSet.diff(e) : diff,
+        ).catch(console.error);
       });
     };
 

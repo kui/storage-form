@@ -334,6 +334,43 @@ describe("validation edge cases", () => {
     expect(dump(localStorage)).toEqual({ foo: "typed" });
   });
 
+  it("should store the value changed and dispatched again by a listener on an ancestor", async () => {
+    await render(`
+      <div><storage-form storage-area="local-storage">
+        <input name="foo">
+      </storage-form></div>`);
+    const e = query<HTMLInputElement>("input");
+    document.body.addEventListener(
+      "input",
+      () => {
+        e.value = "ab";
+        e.dispatchEvent(new Event("input", { bubbles: true }));
+      },
+      { once: true },
+    );
+    await input(e, "a");
+    expect(e.value).toBe("ab");
+    expect(dump(localStorage)).toEqual({ foo: "ab" });
+  });
+
+  it("should store the value changed by a listener on an ancestor", async () => {
+    await render(`
+      <div><storage-form storage-area="local-storage">
+        <input name="foo">
+      </storage-form></div>`);
+    const e = query<HTMLInputElement>("input");
+    document.body.addEventListener(
+      "input",
+      () => {
+        e.value = e.value.toUpperCase();
+      },
+      { once: true },
+    );
+    await input(e, "abc");
+    expect(e.value).toBe("ABC");
+    expect(dump(localStorage)).toEqual({ foo: "ABC" });
+  });
+
   it("should store an edit even if the form is removed after the propagation is stopped", async () => {
     await render(`
       <div><storage-form storage-area="local-storage">
