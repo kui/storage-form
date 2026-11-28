@@ -27,6 +27,8 @@ jobs:
         run: npm run lint
       - name: Run tests
         run: npm test
+      - name: Check the package
+        run: npm run check:package
       - name: Install browser
         run: npx playwright install --with-deps --no-shell chromium
       - name: Run e2e tests
