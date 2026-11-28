@@ -317,6 +317,23 @@ describe("validation edge cases", () => {
     expect(dump(localStorage)).toEqual({ foo: "typed" });
   });
 
+  it("should store an edit even if a listener on an ancestor removes the control", async () => {
+    await render(`
+      <div><storage-form storage-area="local-storage">
+        <input name="foo">
+      </storage-form></div>`);
+    query("div").addEventListener(
+      "input",
+      () => {
+        query("[name=foo]").remove();
+      },
+      { once: true },
+    );
+    const e = query<HTMLInputElement>("input");
+    await input(e, "typed");
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
   it("should store an edit even if the form is removed after the propagation is stopped", async () => {
     await render(`
       <div><storage-form storage-area="local-storage">

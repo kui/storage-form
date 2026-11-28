@@ -59,6 +59,15 @@ const SKIP = { type: "skip" } as const;
 
 type Validates = (e: HTMLStorageFormControlElement) => boolean;
 
+type EditDiff =
+  | "notInitialized"
+  | "nochange"
+  | {
+      oldValue: string | undefined;
+      newValue: string | undefined;
+      source: HTMLStorageFormControlElement;
+    };
+
 class NamedStorageControlsCollection {
   private readonly elements = new Set<HTMLStorageFormControlElement>();
   readonly name: string;
@@ -177,17 +186,14 @@ class NamedStorageControlsCollection {
     return this.writeElements(newValue);
   }
 
-  /**
-   * Decides what to do with the edit of `edited`, or with the skipped edit if
-   * no control of this name is edited.
-   */
-  takeEdit(
-    edited: HTMLStorageFormControlElement | undefined,
-    validates: Validates,
-  ): EditOutcome {
-    const control = edited ?? this.#skipped;
-    if (control === undefined) return NONE;
-    const diff = this.diff(control);
+  /** Decides what to do with the skipped edit, which may be valid now. */
+  retrySkipped(validates: Validates): EditOutcome {
+    if (this.#skipped === undefined) return NONE;
+    return this.decide(this.diff(this.#skipped), validates);
+  }
+
+  /** Decides what to do with an edit by its diff. */
+  decide(diff: EditDiff, validates: Validates): EditOutcome {
     // The skipped edit is kept to be compared with the value being loaded.
     if (diff === "notInitialized") return NONE;
     if (diff === "nochange") {
@@ -220,7 +226,7 @@ class NamedStorageControlsCollection {
    *   because other controls of the same name may also differ from the value,
    *   such as text inputs when nothing is stored.
    */
-  private diff(edited?: HTMLStorageFormControlElement) {
+  diff(edited?: HTMLStorageFormControlElement): EditDiff {
     if (this.#value === notInitialized) return "notInitialized";
 
     const oldValue = this.pendingValue ?? this.#value;
@@ -293,15 +299,6 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       if (isOwnChangeEvent(event)) return;
       const e = event.target;
       if (!matchesStorageControl(e)) return;
-      // Listeners on the ancestors may set the validity, or change the name
-      // and the position of the control. They may also remove this form, but
-      // the edit made before it is still stored.
-      afterPropagation(event, () => {
-        this.editedCallback(e);
-      });
-    };
-
-    private editedCallback(e: HTMLStorageFormControlElement) {
       // Name and position changes in the same task must be applied before the
       // diff, and before telling whether the control is owned by this form.
       if (this.hasUnhandledRecords(this.mutationObserver.takeRecords()))
@@ -319,8 +316,15 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
         // Retry if the last loading failed
         if (this.remainingLoads === 0) this.invokeStorageChangeCallback();
       }
-      this.valueChangedCallback(e).catch(console.error);
-    }
+      if (elementSet === undefined) return;
+      // Taken now, because listeners on the ancestors may remove the control
+      // or this form, but the edit made before it is still stored.
+      const diff = elementSet.diff(e);
+      // Listeners on the ancestors may set the validity.
+      afterPropagation(event, () => {
+        this.valueChangedCallback(elementSet, diff).catch(console.error);
+      });
+    };
 
     get noValidate(): boolean {
       return this.hasAttribute("novalidate");
@@ -501,21 +505,20 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     }
 
     private async valueChangedCallback(
-      edited: HTMLStorageFormControlElement,
+      edited: NamedStorageControlsCollection,
+      diff: EditDiff,
     ): Promise<void> {
       // Only the edited name and the skipped ones, because the other controls
       // may show values not to be stored, such as the defaults of values
       // removed by other windows.
-      const outcomes = [...this.namedControlMap].map(
-        ([name, elementSet]) =>
-          [
-            name,
-            elementSet.takeEdit(
-              name === edited.name ? edited : undefined,
-              this.validates,
-            ),
-          ] as const,
-      );
+      const outcomes: [string, EditOutcome][] = [];
+      for (const [name, elementSet] of this.namedControlMap)
+        if (elementSet !== edited)
+          outcomes.push([name, elementSet.retrySkipped(this.validates)]);
+        else outcomes.push([name, edited.decide(diff, this.validates)]);
+      // The control of the name may have been removed.
+      if (this.namedControlMap.get(edited.name) !== edited)
+        outcomes.push([edited.name, edited.decide(diff, this.validates)]);
       const { entries, skipped } = sortOutcomes(outcomes);
       await this.writeAndNotify(entries, skipped);
     }
