@@ -3,7 +3,6 @@ import { distinctConcat } from "./arrays.js";
 import {
   afterPropagation,
   dispatchOwnChangeEvent,
-  dispatchWriteEvent,
   findStorageForm,
   isOwnChangeEvent,
   isStorageForm,
@@ -50,12 +49,29 @@ function findOwner(e: HTMLStorageFormControlElement) {
 
 const notInitialized = Symbol("notInitialized");
 
+/** What to do with an edit. */
+type EditOutcome =
+  | { type: "write"; value: string | undefined }
+  | { type: "skip" }
+  | { type: "none" };
+const NONE = { type: "none" } as const;
+const SKIP = { type: "skip" } as const;
+
+type Validates = (e: HTMLStorageFormControlElement) => boolean;
+
 class NamedStorageControlsCollection {
   private readonly elements = new Set<HTMLStorageFormControlElement>();
   readonly name: string;
   #value: string | undefined | typeof notInitialized = notInitialized;
   /** The edited value being written by {@link load}. */
   private pendingValue: string | undefined;
+  /**
+   * The control whose edit was not stored because it was invalid. It is
+   * stored on a later edit in the form once valid, because a control may
+   * become valid without an event of its own, e.g. by fixing another control
+   * which conflicts with it.
+   */
+  #skipped: HTMLStorageFormControlElement | undefined;
 
   constructor(e: HTMLStorageFormControlElement) {
     this.name = e.name;
@@ -77,11 +93,9 @@ class NamedStorageControlsCollection {
   }
 
   delete(e: HTMLStorageFormControlElement) {
+    // Otherwise, the diff of the removed control falls back to the others.
+    if (e === this.#skipped) this.#skipped = undefined;
     return this.elements.delete(e);
-  }
-
-  has(e: HTMLStorageFormControlElement) {
-    return this.elements.has(e);
   }
 
   get size(): number {
@@ -120,36 +134,37 @@ class NamedStorageControlsCollection {
   /**
    * Change events should be dispatched to `changed` by the caller.
    *
-   * @returns `editedValue` is the value edited before the initialization. It
-   *   should be stored if defined, because nothing is stored. `skipped` is the
-   *   edited control whose value is not stored, because it is invalid.
+   * @returns `outcome` is for the value edited before the initialization,
+   *   which should be stored, because nothing is stored.
    */
   load(
     storedValue: string | undefined,
-    validates: (e: HTMLStorageFormControlElement) => boolean,
-  ): {
-    editedValue: string | undefined;
-    skipped?: HTMLStorageFormControlElement;
-    changed: HTMLStorageFormControlElement[];
-  } {
+    validates: Validates,
+  ): { outcome: EditOutcome; changed: HTMLStorageFormControlElement[] } {
     const edited = this.takeEdited();
     if (storedValue !== undefined || edited === undefined)
-      return { editedValue: undefined, changed: this.setValue(storedValue) };
+      return { outcome: NONE, changed: this.setValue(storedValue) };
 
     // Not the edited value, because the following queued reads may also return
     // nothing while the write is delayed, and then reset the controls.
     this.#value = undefined;
     const change = storageControlsHandler.diff(edited, undefined);
-    if (change.type === "value" && !validates(edited)) {
-      return {
-        editedValue: undefined,
-        skipped: edited,
-        changed: this.writeElements(undefined, edited),
-      };
-    }
-    const editedValue = change.type === "value" ? change.value : undefined;
+    const isSkipped = change.type === "value" && !validates(edited);
+    const editedValue =
+      change.type === "value" && !isSkipped ? change.value : undefined;
     this.pendingValue = editedValue;
-    return { editedValue, changed: this.writeElements(editedValue, edited) };
+    const changed = this.writeElements(editedValue, edited);
+    if (isSkipped) {
+      this.#skipped = edited;
+      return { outcome: SKIP, changed };
+    }
+    return {
+      outcome:
+        editedValue === undefined
+          ? NONE
+          : { type: "write", value: editedValue },
+      changed,
+    };
   }
 
   /** @returns The changed controls, to which change events should be dispatched. */
@@ -157,7 +172,34 @@ class NamedStorageControlsCollection {
     if (this.#value === newValue) return [];
     this.#value = newValue;
     this.pendingValue = undefined;
+    // The skipped edit is overwritten.
+    this.#skipped = undefined;
     return this.writeElements(newValue);
+  }
+
+  /**
+   * Decides what to do with the edit of `edited`, or with the skipped edit if
+   * no control of this name is edited.
+   */
+  takeEdit(
+    edited: HTMLStorageFormControlElement | undefined,
+    validates: Validates,
+  ): EditOutcome {
+    const control = edited ?? this.#skipped;
+    if (control === undefined) return NONE;
+    const diff = this.diff(control);
+    // The skipped edit is kept to be compared with the value being loaded.
+    if (diff === "notInitialized") return NONE;
+    if (diff === "nochange") {
+      this.#skipped = undefined;
+      return NONE;
+    }
+    if (!validates(diff.source)) {
+      this.#skipped = diff.source;
+      return SKIP;
+    }
+    this.#skipped = undefined;
+    return { type: "write", value: diff.newValue };
   }
 
   private writeElements(
@@ -178,7 +220,7 @@ class NamedStorageControlsCollection {
    *   because other controls of the same name may also differ from the value,
    *   such as text inputs when nothing is stored.
    */
-  diff(edited?: HTMLStorageFormControlElement) {
+  private diff(edited?: HTMLStorageFormControlElement) {
     if (this.#value === notInitialized) return "notInitialized";
 
     const oldValue = this.pendingValue ?? this.#value;
@@ -213,6 +255,17 @@ class NamedStorageControlsCollection {
   }
 }
 
+/** Sorts the outcomes of the edits into the entries to write and the skipped names. */
+function sortOutcomes(outcomes: Iterable<readonly [string, EditOutcome]>) {
+  const entries: WroteValues = new Map();
+  const skipped: string[] = [];
+  for (const [name, outcome] of outcomes) {
+    if (outcome.type === "write") entries.set(name, outcome.value);
+    else if (outcome.type === "skip") skipped.push(name);
+  }
+  return { entries, skipped };
+}
+
 export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
   base: T,
 ): T &
@@ -232,16 +285,6 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     });
     /** The number of loadings being queued or running */
     private remainingLoads = 0;
-    /**
-     * Controls whose edits were not stored because they were invalid, by the
-     * name. They are stored on a later edit in the form once valid, because a
-     * control may become valid without an event of its own, e.g. by fixing
-     * another control which conflicts with it.
-     */
-    private readonly skippedControls = new Map<
-      string,
-      HTMLStorageFormControlElement
-    >();
     /** Unlike isConnected, this is false before connectedCallback. */
     #isReady = false;
     private readonly changeListener = (event: Event) => {
@@ -250,6 +293,14 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       if (isOwnChangeEvent(event)) return;
       const e = event.target;
       if (!matchesStorageControl(e)) return;
+      // Listeners on the ancestors may set the validity, or change the name
+      // and the position of the control.
+      afterPropagation(event, () => {
+        if (this.#isReady) this.editedCallback(e);
+      });
+    };
+
+    private editedCallback(e: HTMLStorageFormControlElement) {
       // Name and position changes in the same task must be applied before the
       // diff, and before telling whether the control is owned by this form.
       if (this.hasUnhandledRecords(this.mutationObserver.takeRecords()))
@@ -267,11 +318,8 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
         // Retry if the last loading failed
         if (this.remainingLoads === 0) this.invokeStorageChangeCallback();
       }
-      // Listeners on the ancestors may set the validity.
-      afterPropagation(event, () => {
-        if (this.#isReady) this.valueChangedCallback(e).catch(console.error);
-      });
-    };
+      this.valueChangedCallback(e).catch(console.error);
+    }
 
     get noValidate(): boolean {
       return this.hasAttribute("novalidate");
@@ -281,7 +329,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       this.toggleAttribute("novalidate", value);
     }
 
-    private readonly validates = (e: HTMLStorageFormControlElement) =>
+    private readonly validates: Validates = (e) =>
       this.noValidate || isValid(e);
 
     override connectedCallback() {
@@ -397,38 +445,28 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
     }
 
     private applyValues(values: WroteValues, isLoading = false) {
-      const editedValues: WroteValues = new Map();
-      const skippedNames: string[] = [];
+      const outcomes: [string, EditOutcome][] = [];
       const changedControls: HTMLStorageFormControlElement[] = [];
       for (const [name, elementSet] of this.namedControlMap) {
         if (!values.has(name)) continue;
         // Uninitialized values will be loaded by a queued task.
         if (!isLoading && !elementSet.isInitialized && this.remainingLoads > 0)
           continue;
-        const { editedValue, skipped, changed } = elementSet.load(
+        const { outcome, changed } = elementSet.load(
           values.get(name),
           this.validates,
         );
-        if (editedValue !== undefined) editedValues.set(name, editedValue);
-        if (skipped !== undefined) {
-          this.skippedControls.set(name, skipped);
-          skippedNames.push(name);
-        } else {
-          const s = this.skippedControls.get(name);
-          // The skipped edit is overwritten by the stored value.
-          if (s !== undefined && changed.includes(s))
-            this.skippedControls.delete(name);
-        }
+        outcomes.push([name, outcome]);
         changedControls.push(...changed);
       }
+      const { entries, skipped } = sortOutcomes(outcomes);
       // Not awaited, because a delayed write would block queued tasks.
-      if (editedValues.size > 0 || skippedNames.length > 0)
-        this.write(editedValues, skippedNames).catch((error: unknown) => {
-          for (const [name, value] of editedValues)
-            if (value !== undefined)
-              this.namedControlMap.get(name)?.discardPendingValue(value);
-          console.error(error);
-        });
+      this.writeAndNotify(entries, skipped).catch((error: unknown) => {
+        for (const [name, value] of entries)
+          if (value !== undefined)
+            this.namedControlMap.get(name)?.discardPendingValue(value);
+        console.error(error);
+      });
       // At the end, because listeners may change the area.
       for (const e of changedControls) dispatchOwnChangeEvent(e);
     }
@@ -467,41 +505,18 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       // Only the edited name and the skipped ones, because the other controls
       // may show values not to be stored, such as the defaults of values
       // removed by other windows.
-      const controls = new Map(this.skippedControls);
-      controls.set(edited.name, edited);
-      const entries: WroteValues = new Map();
-      const skippedNames: string[] = [];
-      for (const [name, control] of controls) {
-        const elementSet = this.namedControlMap.get(name);
-        const isOwned =
-          control === edited ||
-          (control.name === name && elementSet?.has(control) === true);
-        const diff = isOwned ? elementSet?.diff(control) : undefined;
-        // Kept to be compared with the value being loaded.
-        if (diff === "notInitialized") continue;
-        if (diff === undefined || diff === "nochange") {
-          this.skippedControls.delete(name);
-        } else if (this.validates(diff.source)) {
-          this.skippedControls.delete(name);
-          entries.set(name, diff.newValue);
-        } else {
-          this.skippedControls.set(name, diff.source);
-          skippedNames.push(name);
-        }
-      }
-      if (entries.size > 0 || skippedNames.length > 0)
-        await this.write(entries, skippedNames);
-    }
-
-    /** Writes the entries, and then dispatches a write event. */
-    private async write(entries: WroteValues, skipped: string[]) {
-      try {
-        if (entries.size > 0) await this.areaHandler.write(entries);
-      } catch (error) {
-        dispatchWriteEvent(this, { written: [], skipped, error });
-        throw error;
-      }
-      dispatchWriteEvent(this, { written: [...entries.keys()], skipped });
+      const outcomes = [...this.namedControlMap].map(
+        ([name, elementSet]) =>
+          [
+            name,
+            elementSet.takeEdit(
+              name === edited.name ? edited : undefined,
+              this.validates,
+            ),
+          ] as const,
+      );
+      const { entries, skipped } = sortOutcomes(outcomes);
+      await this.writeAndNotify(entries, skipped);
     }
   };
 }

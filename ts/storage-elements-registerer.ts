@@ -16,6 +16,12 @@ import {
   HTMLStorageUsageMeterElement,
 } from "./storage-usage.js";
 
+// Also makes the type of the event known to listeners.
+export type {
+  StorageFormWriteEvent,
+  StorageFormWriteEventDetail,
+} from "./write-event.js";
+
 /**
  * Registers all custom elements defined in this package.
  */

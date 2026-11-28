@@ -158,7 +158,7 @@ export function afterPropagation(event: Event, callback: () => void) {
   const timer = setTimeout(call, 0);
 }
 
-export interface ValidatableElement extends HTMLElement {
+interface ValidatableElement extends HTMLElement {
   readonly willValidate: boolean;
   readonly validity: ValidityState;
 }
@@ -167,33 +167,4 @@ export interface ValidatableElement extends HTMLElement {
 export function isValid(element: HTMLElement): boolean {
   const e = element as Partial<ValidatableElement>;
   return e.willValidate !== true || e.validity?.valid !== false;
-}
-
-export const WRITE_EVENT_TYPE = "storage-form-write";
-
-export interface StorageFormWriteEventDetail {
-  /** Names written to the storage. */
-  written: string[];
-  /** Names not written, because their controls are invalid. */
-  skipped: string[];
-  /** Set if the write failed. */
-  error?: unknown;
-}
-
-export type StorageFormWriteEvent = CustomEvent<StorageFormWriteEventDetail>;
-
-declare global {
-  // Extended by the event maps of HTMLElement, Document and Window.
-  interface GlobalEventHandlersEventMap {
-    [WRITE_EVENT_TYPE]: StorageFormWriteEvent;
-  }
-}
-
-export function dispatchWriteEvent(
-  element: EventTarget,
-  detail: StorageFormWriteEventDetail,
-) {
-  element.dispatchEvent(
-    new CustomEvent(WRITE_EVENT_TYPE, { bubbles: true, detail }),
-  );
 }

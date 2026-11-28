@@ -6,9 +6,10 @@ interface Write {
 }
 
 /**
- * Records the details of the write events, and returns a function waiting for
- * a recorded write that matches. Moving the focus also dispatches change events
- * and writes, so the order of the writes is not checked.
+ * Records the details of the write events, and returns a function which runs
+ * an action and waits for a write after it that matches. Moving the focus also
+ * dispatches change events and writes, so the order of the writes is not
+ * checked.
  */
 async function recordWrites(page: Page) {
   await page.evaluate(() => {
@@ -19,15 +20,19 @@ async function recordWrites(page: Page) {
       writes.push({ written, skipped });
     });
   });
-  return async (expected: Partial<Write>) => {
-    const matches = (actual: string[], names: string[] | undefined) =>
-      names === undefined ||
-      (actual.length === names.length &&
-        names.every((n) => actual.includes(n)));
+  const matches = (actual: string[], names: string[] | undefined) =>
+    names === undefined ||
+    (actual.length === names.length && names.every((n) => actual.includes(n)));
+  return async (action: () => Promise<void>, expected: Partial<Write>) => {
+    // Writes of the previous actions must not match.
+    await page.evaluate(() => {
+      (window as unknown as { writes: Write[] }).writes.length = 0;
+    });
+    await action();
     await expect
       .poll(async () => {
-        const writes = await page.evaluate(() =>
-          (window as unknown as { writes: Write[] }).writes.splice(0),
+        const writes = await page.evaluate(
+          () => (window as unknown as { writes: Write[] }).writes,
         );
         return writes.some(
           (w) =>
@@ -58,20 +63,23 @@ test("should not store invalid values, and store the others", async ({
 }) => {
   const required = control(page, "validation-required");
   const pattern = control(page, "validation-pattern");
-  const waitForWrite = await recordWrites(page);
-  await required.fill("valid");
-  await waitForWrite({ written: ["validation-required"] });
+  const expectWrite = await recordWrites(page);
+  await expectWrite(() => required.fill("valid"), {
+    written: ["validation-required"],
+  });
 
-  await required.fill("");
-  await waitForWrite({ written: [], skipped: ["validation-required"] });
-  await pattern.fill("abc");
-  await waitForWrite({ written: ["validation-pattern"] });
+  await expectWrite(() => required.fill(""), {
+    written: [],
+    skipped: ["validation-required"],
+  });
+  await expectWrite(() => pattern.fill("abc"), {
+    written: ["validation-pattern"],
+  });
   expect(await stored(page, "validation-required")).toBe("valid");
   expect(await stored(page, "validation-pattern")).toBe("abc");
 
   // The invalid value skipped before is checked again.
-  await pattern.fill("ABC");
-  await waitForWrite({
+  await expectWrite(() => pattern.fill("ABC"), {
     written: [],
     skipped: ["validation-required", "validation-pattern"],
   });
@@ -83,14 +91,18 @@ test("should check the custom validity set by a listener outside the form", asyn
 }) => {
   const primary = control(page, "validation-primary");
   const secondary = control(page, "validation-secondary");
-  const waitForWrite = await recordWrites(page);
-  await primary.fill("x");
-  await waitForWrite({ written: ["validation-primary"] });
-  await secondary.fill("y");
-  await waitForWrite({ written: ["validation-secondary"] });
+  const expectWrite = await recordWrites(page);
+  await expectWrite(() => primary.fill("x"), {
+    written: ["validation-primary"],
+  });
+  await expectWrite(() => secondary.fill("y"), {
+    written: ["validation-secondary"],
+  });
 
-  await secondary.fill("x");
-  await waitForWrite({ written: [], skipped: ["validation-secondary"] });
+  await expectWrite(() => secondary.fill("x"), {
+    written: [],
+    skipped: ["validation-secondary"],
+  });
   await expect(page.locator("#validation-message")).toHaveText(
     "Same as the primary key",
   );
@@ -100,8 +112,7 @@ test("should check the custom validity set by a listener outside the form", asyn
   expect(await stored(page, "validation-secondary")).toBe("y");
 
   // Fixing the conflict stores the skipped value too.
-  await primary.fill("z");
-  await waitForWrite({
+  await expectWrite(() => primary.fill("z"), {
     written: ["validation-primary", "validation-secondary"],
     skipped: [],
   });
@@ -118,9 +129,11 @@ test("should write after the listeners on the window", async ({ page }) => {
       });
     });
   });
-  const waitForWrite = await recordWrites(page);
-  await control(page, "validation-pattern").pressSequentially("a");
-  await waitForWrite({ written: ["validation-pattern"] });
+  const expectWrite = await recordWrites(page);
+  await expectWrite(
+    () => control(page, "validation-pattern").pressSequentially("a"),
+    { written: ["validation-pattern"] },
+  );
   expect(
     await page.evaluate(
       () =>
@@ -132,10 +145,13 @@ test("should write after the listeners on the window", async ({ page }) => {
 
 test("should store an invalid value with novalidate", async ({ page }) => {
   const novalidate = control(page, "validation-novalidate");
-  const waitForWrite = await recordWrites(page);
-  await novalidate.fill("typed");
-  await waitForWrite({ written: ["validation-novalidate"] });
-  await novalidate.fill("");
-  await waitForWrite({ written: ["validation-novalidate"], skipped: [] });
+  const expectWrite = await recordWrites(page);
+  await expectWrite(() => novalidate.fill("typed"), {
+    written: ["validation-novalidate"],
+  });
+  await expectWrite(() => novalidate.fill(""), {
+    written: ["validation-novalidate"],
+    skipped: [],
+  });
   expect(await stored(page, "validation-novalidate")).toBe("");
 });

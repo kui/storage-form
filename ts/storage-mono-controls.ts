@@ -6,7 +6,6 @@ import { distinctConcat } from "./arrays.js";
 import {
   afterPropagation,
   dispatchOwnChangeEvent,
-  dispatchWriteEvent,
   isOwnChangeEvent,
   isValid,
   type HTMLElementConstructor,
@@ -24,7 +23,7 @@ export interface FormControlLikeElement<
 
 export type MonoStorageControlMixin = AreaHandlerElement &
   FormControlLikeElement &
-  StorageFormLikeElement;
+  StorageFormLikeElement & { noValidate: boolean };
 
 const notInitialized = Symbol("notInitialized");
 
@@ -46,6 +45,14 @@ export function mixinMonoStorageControl<
 
     #value: string | typeof notInitialized | undefined = notInitialized;
     #queuedLoadCount = 0;
+
+    get noValidate(): boolean {
+      return this.hasAttribute("novalidate");
+    }
+
+    set noValidate(value: boolean) {
+      this.toggleAttribute("novalidate", value);
+    }
 
     override connectedCallback() {
       super.connectedCallback?.();
@@ -144,17 +151,13 @@ export function mixinMonoStorageControl<
       }
 
       if (entries.size === 0) return;
-      if (!this.hasAttribute("novalidate") && !isValid(this)) {
-        dispatchWriteEvent(this, { written: [], skipped: [this.name] });
-        return;
-      }
-      try {
-        await this.areaHandler.write(entries);
-      } catch (error) {
-        dispatchWriteEvent(this, { written: [], skipped: [], error });
-        throw error;
-      }
-      dispatchWriteEvent(this, { written: [this.name], skipped: [] });
+      // Unlike storage forms, a skipped value is not stored by edits of other
+      // controls, because mono controls do not know them.
+      const valid = this.noValidate || isValid(this);
+      await this.writeAndNotify(
+        valid ? entries : new Map<string, string | undefined>(),
+        valid ? [] : [this.name],
+      );
     }
   };
 }

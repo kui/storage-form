@@ -3,7 +3,6 @@ import {
   WebStorageHandler,
   type AreaHandler,
 } from "../ts/area-handler.js";
-import type { StorageFormWriteEventDetail } from "../ts/elements.js";
 import type { StoredValues, WroteValues } from "../ts/globals.js";
 import {
   HTMLStorageInputElement,
@@ -11,6 +10,7 @@ import {
   HTMLStorageSelectElement,
   HTMLStorageTextAreaElement,
 } from "../ts/storage-mono-controls.js";
+import type { StorageFormWriteEventDetail } from "../ts/write-event.js";
 import {
   check,
   dump,
@@ -545,4 +545,13 @@ describe("validation of storage-input", () => {
       { written: [], skipped: [], error: Error("write rejected") },
     ]);
   });
+});
+
+it("should reflect noValidate of storage-input to the attribute", async () => {
+  await render(`<input is="storage-input" name="foo">`);
+  const e = query<HTMLStorageInputElement>("input");
+  e.noValidate = true;
+  expect(e.hasAttribute("novalidate")).toBe(true);
+  e.noValidate = false;
+  expect(e.hasAttribute("novalidate")).toBe(false);
 });
