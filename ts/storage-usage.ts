@@ -76,12 +76,12 @@ export function mixinFormattedNumberElement<
       this.textContent = this.formatter.format(this.value);
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["name", "format", "value"],
     );
 
-    attributeChangedCallback(
+    override attributeChangedCallback(
       name: string,
       oldValue: string | null,
       newValue: string | null,
@@ -151,12 +151,12 @@ export function mixinStorageUsageMeterElement<
       }
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["name"],
     );
 
-    attributeChangedCallback(
+    override attributeChangedCallback(
       name: string,
       oldValue: string | null,
       newValue: string | null,
@@ -214,12 +214,12 @@ export function mixinStorageUsageElement<
       }
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["name", "format"],
     );
 
-    attributeChangedCallback(
+    override attributeChangedCallback(
       name: string,
       oldValue: string | null,
       newValue: string | null,
@@ -250,12 +250,12 @@ export function mixinStorageQuotaElement<
       }
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["name"],
     );
 
-    attributeChangedCallback(
+    override attributeChangedCallback(
       name: string,
       oldValue: string | null,
       newValue: string | null,

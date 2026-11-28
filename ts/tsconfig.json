@@ -3,6 +3,7 @@
     "lib": ["ESNext", "DOM"],
     "types": ["chrome"],
     "isolatedModules": true,
+    "noImplicitOverride": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "target": "ES2022",

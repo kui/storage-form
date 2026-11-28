@@ -34,7 +34,7 @@ export function mixinAreaHandlerElement<
       return this.#areaHandler;
     }
 
-    connectedCallback() {
+    override connectedCallback() {
       super.connectedCallback?.();
       this.areaListening = this.areaHandler.onChange(
         this.invokeStorageChangeCallback.bind(this),
@@ -43,24 +43,24 @@ export function mixinAreaHandlerElement<
       this.invokeStorageChangeCallback();
     }
 
-    adoptedCallback() {
+    override adoptedCallback() {
       super.adoptedCallback?.();
       this.areaHandler.updateArea(this.storageArea);
       this.invokeStorageChangeCallback();
     }
 
-    disconnectedCallback() {
+    override disconnectedCallback() {
       super.disconnectedCallback?.();
       this.areaListening?.stop();
       this.areaListening = null;
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["storage-area"],
     );
 
-    attributeChangedCallback(
+    override attributeChangedCallback(
       name: string,
       oldValue: string | null,
       newValue: string | null,
@@ -121,13 +121,13 @@ export function mixinStorageFormChildAreaHandlerElement<
       return this.#storageForm;
     }
 
-    get storageArea() {
+    override get storageArea() {
       const a = super.storageArea;
       return a === "" && this.storageForm !== null
         ? this.storageForm.storageArea
         : a;
     }
-    set storageArea(v: string) {
+    override set storageArea(v: string) {
       super.storageArea = v;
     }
 
@@ -137,7 +137,7 @@ export function mixinStorageFormChildAreaHandlerElement<
       this.invokeStorageChangeCallback();
     }
 
-    connectedCallback() {
+    override connectedCallback() {
       // The super class reads the storage, so the form should be found before
       // it to avoid showing the value without the area.
       this.trackStorageForm();
@@ -148,12 +148,12 @@ export function mixinStorageFormChildAreaHandlerElement<
       );
     }
 
-    adoptedCallback() {
+    override adoptedCallback() {
       super.adoptedCallback?.();
       this.updateStorageForm();
     }
 
-    disconnectedCallback() {
+    override disconnectedCallback() {
       super.disconnectedCallback?.();
       this.storageFormObserver.disconnect();
       this.#observedForms = [];

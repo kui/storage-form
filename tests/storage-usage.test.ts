@@ -32,7 +32,7 @@ HTMLStorageFormElement.register();
 customElements.define(
   "area-holder",
   class extends mixinAreaHandlerElement(HTMLElement) {
-    storageChangeCallback() {
+    override storageChangeCallback() {
       // Nothing to show
     }
   },

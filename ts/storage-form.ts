@@ -236,7 +236,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       this.valueChangedCallback(e).catch(console.error);
     };
 
-    connectedCallback() {
+    override connectedCallback() {
       // Storage custom elements cannot be told from plain controls until they are
       // upgraded, and descendants are upgraded after this by default.
       customElements.upgrade(this);
@@ -290,7 +290,7 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       return matchesStorageControl(e) && findOwner(e).owner === this;
     }
 
-    disconnectedCallback() {
+    override disconnectedCallback() {
       super.disconnectedCallback?.();
       this.mutationObserver.disconnect();
       this.#isReady = false;
@@ -298,12 +298,12 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       this.removeEventListener("input", this.changeListener);
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["storage-area"],
     );
 
-    attributeChangedCallback(
+    override attributeChangedCallback(
       name: string,
       oldValue: string | null,
       newValue: string | null,
