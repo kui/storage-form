@@ -34,7 +34,7 @@
     "fix:eslint": "eslint . --fix",
     "fix:prettier": "prettier --write .",
     "fix": "run-s fix:*",
-    "clean:build": "rm -fr js types",
+    "clean:build": "node -e \"for (const d of ['js', 'types']) require('fs').rmSync(d, { recursive: true, force: true })\"",
     "clean:docs": "rm -fr docs/{ts,js}",
     "clean": "run-s clean:*",
     "serve-docs": "http-server -c=-1 docs",
