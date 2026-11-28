@@ -301,7 +301,23 @@ describe("validation edge cases", () => {
     expect(setItem).not.toHaveBeenCalled();
   });
 
-  it("should not store an edit handled after the form is disconnected", async () => {
+  it("should store an edit even if a listener on an ancestor removes the form", async () => {
+    await render(`
+      <div><storage-form storage-area="local-storage">
+        <input name="foo">
+      </storage-form></div>`);
+    document.body.addEventListener(
+      "input",
+      () => {
+        query("storage-form").remove();
+      },
+      { once: true },
+    );
+    await input(query("input"), "typed");
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
+  });
+
+  it("should store an edit even if the form is removed after the propagation is stopped", async () => {
     await render(`
       <div><storage-form storage-area="local-storage">
         <input name="foo">
@@ -314,7 +330,7 @@ describe("validation edge cases", () => {
     e.dispatchEvent(new Event("input", { bubbles: true }));
     query("storage-form").remove();
     await flush();
-    expect(localStorage).toHaveLength(0);
+    expect(dump(localStorage)).toEqual({ foo: "typed" });
   });
 
   it("should keep a skipped control when another control of the name is removed", async () => {

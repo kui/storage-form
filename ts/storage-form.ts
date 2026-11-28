@@ -294,9 +294,10 @@ export function mixinStorageForm<T extends HTMLElementConstructor<HTMLElement>>(
       const e = event.target;
       if (!matchesStorageControl(e)) return;
       // Listeners on the ancestors may set the validity, or change the name
-      // and the position of the control.
+      // and the position of the control. They may also remove this form, but
+      // the edit made before it is still stored.
       afterPropagation(event, () => {
-        if (this.#isReady) this.editedCallback(e);
+        this.editedCallback(e);
       });
     };
 

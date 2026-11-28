@@ -571,3 +571,19 @@ it("should not report an unchanged invalid storage-input", async () => {
   await flush();
   expect(details).toEqual([]);
 });
+
+it("should store an edit of storage-input even if a listener on an ancestor removes it", async () => {
+  await render(
+    `<div><input is="storage-input" name="foo" storage-area="local-storage"></div>`,
+  );
+  document.body.addEventListener(
+    "input",
+    () => {
+      query("input").remove();
+    },
+    { once: true },
+  );
+  const e = query<HTMLInputElement>("input");
+  await input(e, "typed");
+  expect(dump(localStorage)).toEqual({ foo: "typed" });
+});

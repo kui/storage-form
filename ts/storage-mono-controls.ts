@@ -37,10 +37,14 @@ export function mixinMonoStorageControl<
       // removed values, which must not be stored.
       if (isOwnChangeEvent(event)) return;
       if (event.target !== this) return;
+      // Taken now, because listeners on the ancestors may remove this, which
+      // discards the value, but the edit made before it is still stored.
+      const value = this.#value;
       // Listeners on the ancestors may set the validity.
       afterPropagation(event, () => {
-        // Nothing is written after disconnected, because the value is unknown.
-        this.valueChangedCallback().catch(console.error);
+        this.valueChangedCallback(this.isConnected ? this.#value : value).catch(
+          console.error,
+        );
       });
     };
 
@@ -87,7 +91,7 @@ export function mixinMonoStorageControl<
       if (name === "name") {
         this.invokeStorageChangeCallback();
       } else if (name === "value" && this.isSubmittedValueAttribute()) {
-        this.valueChangedCallback().catch(console.error);
+        this.valueChangedCallback(this.#value).catch(console.error);
       }
     }
 
@@ -140,11 +144,13 @@ export function mixinMonoStorageControl<
       );
     }
 
-    private async valueChangedCallback(): Promise<void> {
-      if (this.#value === notInitialized) return;
+    private async valueChangedCallback(
+      storedValue: string | typeof notInitialized | undefined,
+    ): Promise<void> {
+      if (storedValue === notInitialized) return;
 
       const entries: WroteValues = new Map();
-      const diff = storageControlsHandler.diff(this, this.#value);
+      const diff = storageControlsHandler.diff(this, storedValue);
       if (diff.type === "unselected") {
         entries.set(this.name, undefined);
       } else if (diff.type === "value") {
