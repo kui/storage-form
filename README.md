@@ -20,6 +20,8 @@ import { register } from "storage-form";
 register();
 ```
 
+Without a bundler, import `js/storage-elements-registerer.js` of the package by its path instead, as the [demo](https://github.com/kui/storage-form/blob/master/docs/index.html) does, or map `storage-form` to it with an import map.
+
 The package is ESM only and ships its TypeScript declarations.
 
 ## Browser support
