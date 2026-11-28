@@ -3,11 +3,14 @@
   "version": "2.2.0",
   "description": "Custom element to use <form> as storages such as localStorage, chrome.storage.",
   "type": "module",
+  "main": "./js/storage-elements-registerer.js",
+  "types": "./types/storage-elements-registerer.d.ts",
   "exports": {
     ".": {
-      "import": "./js/storage-elements-registerer.js",
-      "types": "./types/storage-elements-registerer.d.ts"
-    }
+      "types": "./types/storage-elements-registerer.d.ts",
+      "default": "./js/storage-elements-registerer.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "js",
@@ -15,7 +18,7 @@
     "ts/*.ts"
   ],
   "scripts": {
-    "prepare": "npm run build:ts",
+    "prepare": "run-s clean:build build:ts",
     "test": "jest",
     "pretest:e2e": "npm run docs",
     "test:e2e": "playwright test",
@@ -27,10 +30,13 @@
     "lint:ts": "tsc --noEmit --project ts",
     "lint:ts-tests": "tsc --noEmit --project .",
     "lint": "run-p -l lint:*",
+    "check:package": "publint && attw --pack . --profile esm-only",
     "fix:eslint": "eslint . --fix",
     "fix:prettier": "prettier --write .",
     "fix": "run-s fix:*",
-    "clean": "rm -fr js types docs/{ts,js}",
+    "clean:build": "node -e \"for (const d of ['js', 'types']) require('fs').rmSync(d, { recursive: true, force: true })\"",
+    "clean:docs": "rm -fr docs/{ts,js}",
+    "clean": "run-s clean:*",
     "serve-docs": "http-server -c=-1 docs",
     "watch:ts": "tsc --watch --preserveWatchOutput --project ts",
     "watch:js": "onchange 'js/**/*.js' -- npm run build:docs",
@@ -40,13 +46,25 @@
     "web",
     "web-components",
     "custom-elements",
-    "stroage",
-    "web-stroage",
-    "chrome-storage"
+    "storage",
+    "web-storage",
+    "localstorage",
+    "chrome-storage",
+    "chrome-extension",
+    "form"
   ],
   "author": "Keiichiro Ui",
   "license": "MIT",
+  "homepage": "https://kui.github.io/storage-form/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kui/storage-form.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kui/storage-form/issues"
+  },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.65.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
@@ -62,6 +80,7 @@
     "npm-run-all2": "^9.1.0",
     "onchange": "^7.1.0",
     "prettier": "^3.10.1",
+    "publint": "^0.3.25",
     "ts-jest": "^29.4.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.74.0"
@@ -72,6 +91,5 @@
       "version": "^26.0.0",
       "onFail": "warn"
     }
-  },
-  "repository": "https://github.com/kui/storage-form.git"
+  }
 }
