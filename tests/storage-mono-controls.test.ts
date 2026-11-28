@@ -10,6 +10,7 @@ import {
   HTMLStorageSelectElement,
   HTMLStorageTextAreaElement,
 } from "../ts/storage-mono-controls.js";
+import type { StorageFormWriteEventDetail } from "../ts/write-event.js";
 import {
   check,
   dump,
@@ -478,4 +479,111 @@ describe("storage-input", () => {
     await input(target(), "typed");
     expect(query<HTMLTextAreaElement>("textarea").value).toBe("typed");
   });
+});
+
+describe("validation of storage-input", () => {
+  function recordWrites() {
+    const details: StorageFormWriteEventDetail[] = [];
+    query<HTMLElement>("input").addEventListener("storage-form-write", (e) =>
+      details.push(e.detail),
+    );
+    return details;
+  }
+
+  it("should not store an invalid value", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(
+      `<input is="storage-input" name="foo" storage-area="local-storage" required>`,
+    );
+    const writes = recordWrites();
+    await input(query("input"), "");
+    expect(dump(localStorage)).toEqual({ foo: "stored" });
+    expect(writes).toEqual([{ written: [], skipped: ["foo"] }]);
+  });
+
+  it("should store an invalid value with novalidate", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(
+      `<input is="storage-input" name="foo" storage-area="local-storage" required novalidate>`,
+    );
+    await input(query("input"), "");
+    expect(dump(localStorage)).toEqual({ foo: "" });
+  });
+
+  it("should check the validity set by a bubbling listener on an ancestor", async () => {
+    await render(
+      `<div><input is="storage-input" name="foo" storage-area="local-storage"></div>`,
+    );
+    const e = query<HTMLInputElement>("input");
+    document.body.addEventListener("input", () => {
+      e.setCustomValidity(e.value === "bad" ? "bad value" : "");
+    });
+    await input(e, "bad");
+    expect(localStorage).toHaveLength(0);
+    await input(e, "good");
+    expect(dump(localStorage)).toEqual({ foo: "good" });
+  });
+
+  it("should dispatch a write event after a write", async () => {
+    await render(
+      `<input is="storage-input" name="foo" storage-area="local-storage">`,
+    );
+    const writes = recordWrites();
+    await input(query("input"), "typed");
+    expect(writes).toEqual([{ written: ["foo"], skipped: [] }]);
+  });
+
+  it("should dispatch a write event with the error of a rejected write", async () => {
+    jest.spyOn(console, "error").mockImplementation();
+    await render(
+      `<input is="storage-input" name="foo" storage-area="rejecting-local">`,
+    );
+    rejectedWrites = 1;
+    const writes = recordWrites();
+    await input(query("input"), "typed");
+    expect(writes).toEqual([
+      { written: [], skipped: [], error: Error("write rejected") },
+    ]);
+  });
+});
+
+it("should reflect noValidate of storage-input to the attribute", async () => {
+  await render(`<input is="storage-input" name="foo">`);
+  const e = query<HTMLStorageInputElement>("input");
+  e.noValidate = true;
+  expect(e.hasAttribute("novalidate")).toBe(true);
+  e.noValidate = false;
+  expect(e.hasAttribute("novalidate")).toBe(false);
+});
+
+it("should not report an unchanged invalid storage-input", async () => {
+  localStorage.setItem("foo", "stored");
+  await render(
+    `<input is="storage-input" name="foo" storage-area="local-storage">`,
+  );
+  const e = query<HTMLInputElement>("input");
+  e.setCustomValidity("invalid");
+  const details: StorageFormWriteEventDetail[] = [];
+  e.addEventListener("storage-form-write", (event) =>
+    details.push(event.detail),
+  );
+  e.dispatchEvent(new Event("change", { bubbles: true }));
+  await flush();
+  expect(details).toEqual([]);
+});
+
+it("should store an edit of storage-input even if a listener on an ancestor removes it", async () => {
+  await render(
+    `<div><input is="storage-input" name="foo" storage-area="local-storage"></div>`,
+  );
+  document.body.addEventListener(
+    "input",
+    () => {
+      query("input").remove();
+    },
+    { once: true },
+  );
+  const e = query<HTMLInputElement>("input");
+  await input(e, "typed");
+  expect(dump(localStorage)).toEqual({ foo: "typed" });
 });

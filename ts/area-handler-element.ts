@@ -4,11 +4,17 @@ import type { HTMLElementConstructor, StorageFormElement } from "./elements.js";
 import { findStorageForm } from "./elements.js";
 import { WroteValues, allCustomElementsDefinedEvent } from "./globals.js";
 import { SerialTaskExecutor } from "./promises.js";
+import { dispatchWriteEvent } from "./write-event.js";
 
 export interface AreaHandlerElement extends HTMLElement {
   storageArea: string;
   readonly areaHandler: FacadeAreaHandler;
   invokeStorageChangeCallback(updates?: WroteValues): void;
+  /**
+   * Writes the entries, and then dispatches a write event from this element,
+   * unless both are empty.
+   */
+  writeAndNotify(entries: WroteValues, skipped: string[]): Promise<void>;
   /**
    * @param changes If no entries, it means to change storage area reference.
    */
@@ -76,6 +82,19 @@ export function mixinAreaHandlerElement<
       this.taskExecutor.enqueueNoWait(() =>
         this.storageChangeCallback(updates),
       );
+    }
+
+    async writeAndNotify(entries: WroteValues, skipped: string[]) {
+      if (entries.size === 0 && skipped.length === 0) return;
+      try {
+        // Awaited even if nothing is written, so that the event is dispatched
+        // asynchronously in either case.
+        await (entries.size > 0 ? this.areaHandler.write(entries) : undefined);
+      } catch (error) {
+        dispatchWriteEvent(this, { written: [], skipped, error });
+        throw error;
+      }
+      dispatchWriteEvent(this, { written: [...entries.keys()], skipped });
     }
 
     /**

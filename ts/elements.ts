@@ -125,3 +125,44 @@ export function dispatchOwnChangeEvent(element: EventTarget) {
 export function isOwnChangeEvent(event: Event): boolean {
   return ownChangeEvents.has(event);
 }
+
+/**
+ * Calls `callback` once, after the listeners of `event` on its whole
+ * propagation path, so that listeners on ancestors, such as ones setting a
+ * custom validity, run before it. Must be called while `event` is dispatched.
+ */
+export function afterPropagation(event: Event, callback: () => void) {
+  const end = event.composedPath().at(-1);
+  // A listener added to the current target is not called for this dispatch.
+  if (!event.bubbles || end === undefined || end === event.currentTarget) {
+    callback();
+    return;
+  }
+  // Either of them is called, because the task runs after the dispatch.
+  const call = () => {
+    clearTimeout(timer);
+    end.removeEventListener(event.type, listener);
+    callback();
+  };
+  // Not `once`, because a nested dispatch of the same type may reach the end
+  // first.
+  const listener = (e: Event) => {
+    if (e === event) call();
+  };
+  // Listeners added during a dispatch to the objects later in the path are
+  // called after the ones already added.
+  end.addEventListener(event.type, listener);
+  // The end is not reached if the propagation is stopped.
+  const timer = setTimeout(call, 0);
+}
+
+interface ValidatableElement extends HTMLElement {
+  readonly willValidate: boolean;
+  readonly validity: ValidityState;
+}
+
+/** Like `checkValidity()`, without dispatching an `invalid` event. */
+export function isValid(element: HTMLElement): boolean {
+  const e = element as Partial<ValidatableElement>;
+  return e.willValidate !== true || e.validity?.valid !== false;
+}

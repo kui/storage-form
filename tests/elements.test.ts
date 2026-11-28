@@ -1,11 +1,13 @@
 import {
   addChangeListeners,
+  afterPropagation,
   dispatchChangeEvent,
   findStorageForm,
+  isValid,
   parentOrShadowRootHost,
   storageFormMarker,
 } from "../ts/elements.js";
-import { flush } from "./helpers/dom.js";
+import { flush, query } from "./helpers/dom.js";
 
 describe("dispatchChangeEvent", () => {
   it("should dispatch a bubbling change event on each element", () => {
@@ -135,5 +137,118 @@ describe("findStorageForm", () => {
       .appendChild(document.createElement("span"));
     expect(findStorageForm(child, across).owner).toBe(outer);
     expectResult(findStorageForm(child, within), null, []);
+  });
+});
+
+describe("afterPropagation", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("should call back after the listeners on the whole path", async () => {
+    document.body.innerHTML = "<div><input></div>";
+    const div = query("div");
+    const order: string[] = [];
+    div.addEventListener("input", (e) => {
+      order.push("div");
+      afterPropagation(e, () => order.push("callback"));
+    });
+    document.body.addEventListener("input", () => order.push("body"));
+    addEventListener("input", () => order.push("window"), { once: true });
+    query("input").dispatchEvent(new Event("input", { bubbles: true }));
+    expect(order).toEqual(["div", "body", "window", "callback"]);
+    // Not called again by the fallback task.
+    await flush();
+    expect(order).toEqual(["div", "body", "window", "callback"]);
+  });
+
+  it("should call back once, after a nested dispatch of the same type", () => {
+    document.body.innerHTML = "<div><input></div>";
+    const div = query("div");
+    const input = query("input");
+    const order: string[] = [];
+    let isNested = false;
+    div.addEventListener("input", (e) => {
+      if (isNested) return;
+      afterPropagation(e, () => order.push("callback"));
+      isNested = true;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      order.push("nested");
+    });
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(order).toEqual(["nested", "callback"]);
+  });
+
+  it("should call back in a task if the propagation is stopped", async () => {
+    document.body.innerHTML = "<div><input></div>";
+    const div = query("div");
+    const callback = jest.fn();
+    div.addEventListener("input", (e) => {
+      afterPropagation(e, callback);
+    });
+    document.body.addEventListener("input", (e) => {
+      e.stopPropagation();
+    });
+    query("input").dispatchEvent(new Event("input", { bubbles: true }));
+    expect(callback).not.toHaveBeenCalled();
+    await flush();
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("should call back at once for a non-bubbling event", () => {
+    const element = document.createElement("div");
+    const callback = jest.fn();
+    element.addEventListener("input", (e) => {
+      afterPropagation(e, callback);
+    });
+    element.dispatchEvent(new Event("input"));
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("should call back at once on the root of a detached tree", () => {
+    const element = document.createElement("div");
+    const callback = jest.fn();
+    element.addEventListener("input", (e) => {
+      afterPropagation(e, callback);
+    });
+    element
+      .appendChild(document.createElement("input"))
+      .dispatchEvent(new Event("input", { bubbles: true }));
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("should end at the shadow root for a non-composed event", () => {
+    document.body.innerHTML = "<div></div>";
+    const root = query("div").attachShadow({ mode: "open" });
+    const span = root.appendChild(document.createElement("span"));
+    const input = span.appendChild(document.createElement("input"));
+    const order: string[] = [];
+    span.addEventListener("change", (e) => {
+      afterPropagation(e, () => order.push("callback"));
+    });
+    root.addEventListener("change", () => order.push("root"));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(order).toEqual(["root", "callback"]);
+  });
+});
+
+describe("isValid", () => {
+  it("should tell the validity without an invalid event", () => {
+    const input = document.createElement("input");
+    const invalid = jest.fn();
+    input.addEventListener("invalid", invalid);
+    expect(isValid(input)).toBe(true);
+    input.setCustomValidity("bad");
+    expect(isValid(input)).toBe(false);
+    expect(invalid).not.toHaveBeenCalled();
+  });
+
+  it("should treat elements barred from validation as valid", () => {
+    const input = document.createElement("input");
+    input.setCustomValidity("bad");
+    input.disabled = true;
+    expect(isValid(input)).toBe(true);
+    expect(isValid(document.createElement("output"))).toBe(true);
+    expect(isValid(document.createElement("div"))).toBe(true);
   });
 });
