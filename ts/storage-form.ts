@@ -117,12 +117,12 @@ class NamedStorageControlsCollection {
    *   should be stored if defined, because nothing is stored.
    */
   load(storedValue: string | undefined): {
-    editedValue?: string;
+    editedValue: string | undefined;
     changed: HTMLStorageFormControlElement[];
   } {
     const edited = this.takeEdited();
     if (storedValue !== undefined || edited === undefined)
-      return { changed: this.setValue(storedValue) };
+      return { editedValue: undefined, changed: this.setValue(storedValue) };
 
     // Not the edited value, because the following queued reads may also return
     // nothing while the write is delayed, and then reset the controls.
