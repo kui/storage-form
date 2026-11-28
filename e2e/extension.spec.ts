@@ -11,7 +11,7 @@ const test = base.extend<{ optionsUrl: string }>({
     const context = await chromium.launchPersistentContext(
       testInfo.outputPath("profile"),
       {
-        ...(channel && { channel }),
+        channel,
         args: [
           `--disable-extensions-except=${extension}`,
           `--load-extension=${extension}`,
