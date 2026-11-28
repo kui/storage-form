@@ -4,8 +4,11 @@ import {
 } from "./area-handler-element.js";
 import { distinctConcat } from "./arrays.js";
 import {
+  afterPropagation,
   dispatchOwnChangeEvent,
+  dispatchWriteEvent,
   isOwnChangeEvent,
+  isValid,
   type HTMLElementConstructor,
   type StorageFormLikeElement,
   type ValueContainerElement,
@@ -34,8 +37,11 @@ export function mixinMonoStorageControl<
       // Values written by mono controls are the stored ones or the defaults of
       // removed values, which must not be stored.
       if (isOwnChangeEvent(event)) return;
-      if (event.target === this)
-        this.valueChangedCallback().catch(console.error);
+      if (event.target !== this) return;
+      // Listeners on the ancestors may set the validity.
+      afterPropagation(event, () => {
+        if (this.isConnected) this.valueChangedCallback().catch(console.error);
+      });
     };
 
     #value: string | typeof notInitialized | undefined = notInitialized;
@@ -137,7 +143,18 @@ export function mixinMonoStorageControl<
         entries.set(this.name, diff.value);
       }
 
-      if (entries.size > 0) await this.areaHandler.write(entries);
+      if (entries.size === 0) return;
+      if (!this.hasAttribute("novalidate") && !isValid(this)) {
+        dispatchWriteEvent(this, { written: [], skipped: [this.name] });
+        return;
+      }
+      try {
+        await this.areaHandler.write(entries);
+      } catch (error) {
+        dispatchWriteEvent(this, { written: [], skipped: [], error });
+        throw error;
+      }
+      dispatchWriteEvent(this, { written: [this.name], skipped: [] });
     }
   };
 }

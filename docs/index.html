@@ -351,6 +351,136 @@
   type=date.
 </p>
 
+<h2>Validation</h2>
+
+<p>
+  Like <code>&lt;form&gt;</code>, invalid values are not stored. The validity is
+  checked by the constraint attributes, such as <code>required</code> and
+  <code>pattern</code>, and by <code>setCustomValidity()</code>. Other valid
+  values in the same <code>storage-form</code> are still stored.
+</p>
+
+<script type="code">
+  <storage-form storage-area="local-storage">
+    <label>required: <input name="validation-required" required /></label>
+    <br />
+    <label>
+      lowercase letters:
+      <input name="validation-pattern" pattern="[a-z]+" />
+    </label>
+  </storage-form>
+</script>
+
+<div class="result">
+  <storage-form storage-area="local-storage">
+    <label>required: <input name="validation-required" required /></label>
+    <br />
+    <label>
+      lowercase letters:
+      <input name="validation-pattern" pattern="[a-z]+" />
+    </label>
+  </storage-form>
+</div>
+
+<p>
+  The validity is checked after the <code>input</code> or
+  <code>change</code> event has propagated, so a listener on an ancestor, even
+  one outside the <code>storage-form</code>, can set a custom validity. A
+  skipped value is stored on a later edit in the same
+  <code>storage-form</code> once it is valid, e.g. when the conflicting value is
+  fixed.
+</p>
+
+<p>
+  After each write, a <code>storage-form-write</code> event is dispatched from
+  the <code>storage-form</code>, with the names written and the names skipped as
+  invalid in <code>event.detail</code>.
+</p>
+
+<script type="code">
+  <div id="validation-custom">
+    <storage-form storage-area="local-storage">
+      <label>primary key: <input name="validation-primary" value="a" /></label>
+      <br />
+      <label>secondary key: <input name="validation-secondary" value="b" /></label>
+    </storage-form>
+    <output id="validation-message"></output>
+    <pre id="validation-log"></pre>
+  </div>
+
+  <script>
+    const root = document.getElementById("validation-custom");
+    const [primary, secondary] = root.querySelectorAll("input");
+    // Bubbling listeners on an ancestor of the storage-form
+    const validate = () => {
+      const conflict = primary.value === secondary.value;
+      secondary.setCustomValidity(conflict ? "Same as the primary key" : "");
+      document.getElementById("validation-message").value =
+        secondary.validationMessage;
+    };
+    root.addEventListener("input", validate);
+    root.addEventListener("change", validate);
+    root.addEventListener("storage-form-write", (event) => {
+      const { written, skipped } = event.detail;
+      document.getElementById("validation-log").textContent =
+        `written: [${written}], skipped: [${skipped}]`;
+    });
+  &lt;/script>
+</script>
+
+<div class="result">
+  <div id="validation-custom">
+    <storage-form storage-area="local-storage">
+      <label>primary key: <input name="validation-primary" value="a" /></label>
+      <br />
+      <label
+        >secondary key: <input name="validation-secondary" value="b"
+      /></label>
+    </storage-form>
+    <output id="validation-message"></output>
+    <pre id="validation-log"></pre>
+  </div>
+</div>
+
+<script>
+  {
+    const root = document.getElementById("validation-custom");
+    const [primary, secondary] = root.querySelectorAll("input");
+    // Bubbling listeners on an ancestor of the storage-form
+    const validate = () => {
+      const conflict = primary.value === secondary.value;
+      secondary.setCustomValidity(conflict ? "Same as the primary key" : "");
+      document.getElementById("validation-message").value =
+        secondary.validationMessage;
+    };
+    root.addEventListener("input", validate);
+    root.addEventListener("change", validate);
+    root.addEventListener("storage-form-write", (event) => {
+      const { written, skipped } = event.detail;
+      document.getElementById("validation-log").textContent =
+        `written: [${written}], skipped: [${skipped}]`;
+    });
+  }
+</script>
+
+<p>
+  To store invalid values too, add the <code>novalidate</code> attribute to the
+  <code>storage-form</code>, or to a mono storage control such as
+  <code>storage-input</code>.
+</p>
+
+<script type="code">
+  <storage-form storage-area="local-storage" novalidate>
+    <label>required: <input name="validation-novalidate" required /></label>
+  </storage-form>
+</script>
+
+<div class="result">
+  <storage-form storage-area="local-storage" novalidate>
+    <label>required: <input name="validation-novalidate" required /></label>
+  </storage-form>
+</div>
+
 <h2>Switch attributes programmatically</h2>
 
 <p>

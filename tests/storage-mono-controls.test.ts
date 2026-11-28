@@ -3,6 +3,7 @@ import {
   WebStorageHandler,
   type AreaHandler,
 } from "../ts/area-handler.js";
+import type { StorageFormWriteEventDetail } from "../ts/elements.js";
 import type { StoredValues, WroteValues } from "../ts/globals.js";
 import {
   HTMLStorageInputElement,
@@ -477,5 +478,71 @@ describe("storage-input", () => {
     );
     await input(target(), "typed");
     expect(query<HTMLTextAreaElement>("textarea").value).toBe("typed");
+  });
+});
+
+describe("validation of storage-input", () => {
+  function recordWrites() {
+    const details: StorageFormWriteEventDetail[] = [];
+    query<HTMLElement>("input").addEventListener("storage-form-write", (e) =>
+      details.push(e.detail),
+    );
+    return details;
+  }
+
+  it("should not store an invalid value", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(
+      `<input is="storage-input" name="foo" storage-area="local-storage" required>`,
+    );
+    const writes = recordWrites();
+    await input(query("input"), "");
+    expect(dump(localStorage)).toEqual({ foo: "stored" });
+    expect(writes).toEqual([{ written: [], skipped: ["foo"] }]);
+  });
+
+  it("should store an invalid value with novalidate", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(
+      `<input is="storage-input" name="foo" storage-area="local-storage" required novalidate>`,
+    );
+    await input(query("input"), "");
+    expect(dump(localStorage)).toEqual({ foo: "" });
+  });
+
+  it("should check the validity set by a bubbling listener on an ancestor", async () => {
+    await render(
+      `<div><input is="storage-input" name="foo" storage-area="local-storage"></div>`,
+    );
+    const e = query<HTMLInputElement>("input");
+    document.body.addEventListener("input", () => {
+      e.setCustomValidity(e.value === "bad" ? "bad value" : "");
+    });
+    await input(e, "bad");
+    expect(localStorage).toHaveLength(0);
+    await input(e, "good");
+    expect(dump(localStorage)).toEqual({ foo: "good" });
+  });
+
+  it("should dispatch a write event after a write", async () => {
+    await render(
+      `<input is="storage-input" name="foo" storage-area="local-storage">`,
+    );
+    const writes = recordWrites();
+    await input(query("input"), "typed");
+    expect(writes).toEqual([{ written: ["foo"], skipped: [] }]);
+  });
+
+  it("should dispatch a write event with the error of a rejected write", async () => {
+    jest.spyOn(console, "error").mockImplementation();
+    await render(
+      `<input is="storage-input" name="foo" storage-area="rejecting-local">`,
+    );
+    rejectedWrites = 1;
+    const writes = recordWrites();
+    await input(query("input"), "typed");
+    expect(writes).toEqual([
+      { written: [], skipped: [], error: Error("write rejected") },
+    ]);
   });
 });
