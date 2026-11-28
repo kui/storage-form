@@ -470,6 +470,9 @@ describe("formatted number", () => {
     [1536, "1.5KiB"],
     [1024 ** 2, "1MiB"],
     [1024 ** 3 * 1.234, "1.23GiB"],
+    [0.5, "0.5B"],
+    [-2048, "-2KiB"],
+    [1024 ** 9, "1,024YiB"],
     [NaN, "NaN"],
   ])("should format %d as bytes", async (value, text) => {
     await render(`<storage-usage></storage-usage>`);

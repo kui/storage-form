@@ -114,15 +114,20 @@ numberFormats.set(
 numberFormats.set("bytes", { format: bytesUnitFormat });
 
 const KIBI = 1024;
-const UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
+const LARGER_UNITS = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
 function bytesUnitFormat(bytes: number) {
   if (isNaN(bytes)) return String(NaN);
-  if (bytes === 0) return "0B";
-  const unitIndex = Math.floor(Math.log(bytes) / Math.log(KIBI));
+  let value = bytes;
+  let unit = "B";
+  for (const larger of LARGER_UNITS) {
+    if (Math.abs(value) < KIBI) break;
+    value /= KIBI;
+    unit = larger;
+  }
   const format = new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 2,
   });
-  return `${format.format(bytes / KIBI ** unitIndex)}${UNITS[unitIndex]}`;
+  return `${format.format(value)}${unit}`;
 }
 
 export function mixinStorageUsageMeterElement<
