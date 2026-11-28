@@ -117,6 +117,7 @@ const KIBI = 1024;
 const LARGER_UNITS = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
 function bytesUnitFormat(bytes: number) {
   if (isNaN(bytes)) return String(NaN);
+  if (bytes === 0) return "0B";
   let value = bytes;
   let unit = "B";
   for (const larger of LARGER_UNITS) {
