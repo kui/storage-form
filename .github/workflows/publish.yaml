@@ -28,5 +28,12 @@ jobs:
         run: npm test
       - name: Check the package
         run: npm run check:package
+      - name: Install browser
+        run: npx playwright install --with-deps --no-shell chromium
+      - name: Run e2e tests
+        run: npm run test:e2e
+      # Keep prereleases off the latest dist-tag, which plain installs use.
       - name: Publish
-        run: npm publish
+        run: |
+          tag=$(node -p 'require("./package.json").version.includes("-") ? "next" : "latest"')
+          npm publish --tag "$tag"
