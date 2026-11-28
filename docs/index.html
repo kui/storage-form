@@ -395,9 +395,9 @@
   After each write, a <code>storage-form-write</code> event is dispatched from
   the <code>storage-form</code>, with the names written and the names skipped as
   invalid in <code>event.detail</code>. A skipped name is reported again on each
-  later edit in the form, until its value is stored. Mono storage controls such
-  as <code>storage-input</code> dispatch the event too, but store a skipped
-  value only on a later edit of the control itself.
+  later edit in the form, until its value is stored, restored or overwritten.
+  Mono storage controls such as <code>storage-input</code> dispatch the event
+  too, but store a skipped value only on a later edit of the control itself.
 </p>
 
 <script type="code">

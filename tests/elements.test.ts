@@ -145,7 +145,7 @@ describe("afterPropagation", () => {
     document.body.innerHTML = "";
   });
 
-  it("should call back after the listeners on the whole path", () => {
+  it("should call back after the listeners on the whole path", async () => {
     document.body.innerHTML = "<div><input></div>";
     const div = query("div");
     const order: string[] = [];
@@ -156,6 +156,9 @@ describe("afterPropagation", () => {
     document.body.addEventListener("input", () => order.push("body"));
     addEventListener("input", () => order.push("window"), { once: true });
     query("input").dispatchEvent(new Event("input", { bubbles: true }));
+    expect(order).toEqual(["div", "body", "window", "callback"]);
+    // Not called again by the fallback task.
+    await flush();
     expect(order).toEqual(["div", "body", "window", "callback"]);
   });
 

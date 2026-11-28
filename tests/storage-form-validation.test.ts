@@ -273,3 +273,83 @@ describe("validation", () => {
     expect(error).toHaveBeenCalledWith(Error("write rejected"));
   });
 });
+
+describe("validation edge cases", () => {
+  it("should bubble the write event to the document", async () => {
+    await render(`
+      <storage-form storage-area="local-storage"><input name="foo"></storage-form>`);
+    const details: StorageFormWriteEventDetail[] = [];
+    const listener = (e: Event) =>
+      details.push((e as CustomEvent<StorageFormWriteEventDetail>).detail);
+    document.addEventListener("storage-form-write", listener);
+    await input(query("input"), "typed");
+    document.removeEventListener("storage-form-write", listener);
+    expect(details).toEqual([{ written: ["foo"], skipped: [] }]);
+  });
+
+  it("should not access the storage if all edits are skipped", async () => {
+    localStorage.setItem("foo", "stored");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="foo" required>
+      </storage-form>`);
+    const getItem = jest.spyOn(Storage.prototype, "getItem");
+    const setItem = jest.spyOn(Storage.prototype, "setItem");
+    await input(query("input"), "");
+    await flush();
+    expect(getItem).not.toHaveBeenCalled();
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it("should not store an edit handled after the form is disconnected", async () => {
+    await render(`
+      <div><storage-form storage-area="local-storage">
+        <input name="foo">
+      </storage-form></div>`);
+    query("div").addEventListener("input", (e) => {
+      e.stopPropagation();
+    });
+    const e = query<HTMLInputElement>("input");
+    e.value = "typed";
+    e.dispatchEvent(new Event("input", { bubbles: true }));
+    query("storage-form").remove();
+    await flush();
+    expect(localStorage).toHaveLength(0);
+  });
+
+  it("should keep a skipped control when another control of the name is removed", async () => {
+    localStorage.setItem("a", "stored");
+    await render(`
+      <storage-form storage-area="local-storage">
+        <input name="a" id="a1" required><input name="a" id="a2">
+        <input name="b">
+      </storage-form>`);
+    await input(query("#a1"), "");
+    query("#a2").remove();
+    await flush();
+    const details: StorageFormWriteEventDetail[] = [];
+    query<HTMLElement>("storage-form").addEventListener(
+      "storage-form-write",
+      (e) => details.push(e.detail),
+    );
+    await input(query("[name=b]"), "x");
+    expect(details).toEqual([{ written: ["b"], skipped: ["a"] }]);
+  });
+
+  it("should not report an unchanged edit before the initial loading", async () => {
+    document.body.innerHTML = `
+      <storage-form storage-area="local-storage">
+        <input type="checkbox" name="foo" required>
+      </storage-form>`;
+    const details: StorageFormWriteEventDetail[] = [];
+    query<HTMLElement>("storage-form").addEventListener(
+      "storage-form-write",
+      (e) => details.push(e.detail),
+    );
+    query("input").dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    await flush();
+    expect(details).toEqual([]);
+    expect(localStorage).toHaveLength(0);
+  });
+});

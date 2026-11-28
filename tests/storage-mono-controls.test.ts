@@ -555,3 +555,19 @@ it("should reflect noValidate of storage-input to the attribute", async () => {
   e.noValidate = false;
   expect(e.hasAttribute("novalidate")).toBe(false);
 });
+
+it("should not report an unchanged invalid storage-input", async () => {
+  localStorage.setItem("foo", "stored");
+  await render(
+    `<input is="storage-input" name="foo" storage-area="local-storage">`,
+  );
+  const e = query<HTMLInputElement>("input");
+  e.setCustomValidity("invalid");
+  const details: StorageFormWriteEventDetail[] = [];
+  e.addEventListener("storage-form-write", (event) =>
+    details.push(event.detail),
+  );
+  e.dispatchEvent(new Event("change", { bubbles: true }));
+  await flush();
+  expect(details).toEqual([]);
+});

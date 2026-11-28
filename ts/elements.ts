@@ -138,10 +138,8 @@ export function afterPropagation(event: Event, callback: () => void) {
     callback();
     return;
   }
-  let isCalled = false;
+  // Either of them is called, because the task runs after the dispatch.
   const call = () => {
-    if (isCalled) return;
-    isCalled = true;
     clearTimeout(timer);
     end.removeEventListener(event.type, listener);
     callback();

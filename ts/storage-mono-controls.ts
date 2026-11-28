@@ -39,7 +39,8 @@ export function mixinMonoStorageControl<
       if (event.target !== this) return;
       // Listeners on the ancestors may set the validity.
       afterPropagation(event, () => {
-        if (this.isConnected) this.valueChangedCallback().catch(console.error);
+        // Nothing is written after disconnected, because the value is unknown.
+        this.valueChangedCallback().catch(console.error);
       });
     };
 
