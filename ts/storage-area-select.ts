@@ -29,7 +29,7 @@ export function mixinAreaSelect<
       this.#target = v;
     }
 
-    connectedCallback() {
+    override connectedCallback() {
       super.connectedCallback?.();
 
       if (this instanceof HTMLSelectElement && this.options.length === 0) {
@@ -50,7 +50,7 @@ export function mixinAreaSelect<
       this.addEventListener("input", this.onChangeListener);
     }
 
-    disconnectedCallback() {
+    override disconnectedCallback() {
       super.disconnectedCallback?.();
       allCustomElementsDefinedEvent.listeners.delete(
         this.allCustomElementsDefinedListener,
@@ -86,7 +86,7 @@ export class HTMLAreaSelectElement extends mixinAreaSelect(HTMLSelectElement) {
 export class HTMLStorageAreaSelectElement extends mixinMonoStorageControl(
   HTMLAreaSelectElement,
 ) {
-  static register() {
+  static override register() {
     customElements.define("storage-area-select", HTMLStorageAreaSelectElement, {
       extends: "select",
     });

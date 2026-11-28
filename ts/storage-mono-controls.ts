@@ -54,7 +54,7 @@ export function mixinMonoStorageControl<
       this.removeEventListener("input", this.valueChangedListener);
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["name", "value"],
     );

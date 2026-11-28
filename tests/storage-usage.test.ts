@@ -32,7 +32,7 @@ HTMLStorageFormElement.register();
 customElements.define(
   "area-holder",
   class extends mixinAreaHandlerElement(HTMLElement) {
-    storageChangeCallback() {
+    override storageChangeCallback() {
       // Nothing to show
     }
   },
@@ -470,6 +470,15 @@ describe("formatted number", () => {
     [1536, "1.5KiB"],
     [1024 ** 2, "1MiB"],
     [1024 ** 3 * 1.234, "1.23GiB"],
+    [1024 ** 4, "1TiB"],
+    [1024 ** 5, "1PiB"],
+    [1024 ** 6, "1EiB"],
+    [1024 ** 7, "1ZiB"],
+    [1024 ** 8, "1YiB"],
+    [-0, "0B"],
+    [0.5, "0.5B"],
+    [-2048, "-2KiB"],
+    [1024 ** 9, "1,024YiB"],
     [NaN, "NaN"],
   ])("should format %d as bytes", async (value, text) => {
     await render(`<storage-usage></storage-usage>`);

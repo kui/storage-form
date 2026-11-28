@@ -76,12 +76,12 @@ export function mixinFormattedNumberElement<
       this.textContent = this.formatter.format(this.value);
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["name", "format", "value"],
     );
 
-    attributeChangedCallback(
+    override attributeChangedCallback(
       name: string,
       oldValue: string | null,
       newValue: string | null,
@@ -114,15 +114,21 @@ numberFormats.set(
 numberFormats.set("bytes", { format: bytesUnitFormat });
 
 const KIBI = 1024;
-const UNITS = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
+const LARGER_UNITS = ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
 function bytesUnitFormat(bytes: number) {
   if (isNaN(bytes)) return String(NaN);
   if (bytes === 0) return "0B";
-  const unitIndex = Math.floor(Math.log(bytes) / Math.log(KIBI));
+  let value = bytes;
+  let unit = "B";
+  for (const larger of LARGER_UNITS) {
+    if (Math.abs(value) < KIBI) break;
+    value /= KIBI;
+    unit = larger;
+  }
   const format = new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 2,
   });
-  return `${format.format(bytes / KIBI ** unitIndex)}${UNITS[unitIndex]}`;
+  return `${format.format(value)}${unit}`;
 }
 
 export function mixinStorageUsageMeterElement<
@@ -151,12 +157,12 @@ export function mixinStorageUsageMeterElement<
       }
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["name"],
     );
 
-    attributeChangedCallback(
+    override attributeChangedCallback(
       name: string,
       oldValue: string | null,
       newValue: string | null,
@@ -214,12 +220,12 @@ export function mixinStorageUsageElement<
       }
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["name", "format"],
     );
 
-    attributeChangedCallback(
+    override attributeChangedCallback(
       name: string,
       oldValue: string | null,
       newValue: string | null,
@@ -250,12 +256,12 @@ export function mixinStorageQuotaElement<
       }
     }
 
-    static readonly observedAttributes = distinctConcat(
+    static override readonly observedAttributes = distinctConcat(
       super.observedAttributes ?? [],
       ["name"],
     );
 
-    attributeChangedCallback(
+    override attributeChangedCallback(
       name: string,
       oldValue: string | null,
       newValue: string | null,

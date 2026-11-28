@@ -43,9 +43,9 @@ export class SerialTaskExecutor {
 
     this.isRunning = true;
     (async () => {
-      while (this.queue.length > 0) {
+      for (let task; (task = this.queue[0]) !== undefined;) {
         try {
-          await this.queue[0]();
+          await task();
         } finally {
           this.queue.shift();
         }
